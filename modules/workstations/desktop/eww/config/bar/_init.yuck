@@ -69,9 +69,7 @@
   (systray :class "systray" :spacing 16)
 )
 
-
-
-(defwindow bar 
+(defwindow bar
     :monitor 0
     :geometry (geometry :x "20px"
       :y "20px"

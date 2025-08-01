@@ -11,6 +11,7 @@
     ### Display
     wlr-randr
     brightnessctl
+    hyprland-monitor-attached
 
     ### Sound
     playerctl

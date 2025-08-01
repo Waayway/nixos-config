@@ -31,6 +31,7 @@ in
         "nm-applet --indicator"
         "eww open bar"
         "hyprlock"
+        "hyprland-monitor-attached ~/.config/hypr/scripts/monitor-change.sh"
       ];
 
       bindm = [

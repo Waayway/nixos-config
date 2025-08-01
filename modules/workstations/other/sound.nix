@@ -12,6 +12,7 @@
       pulse.enable = true;
     };
   };
+
   environment.systemPackages = with pkgs; [
     gst_all_1.gstreamer
     # Common plugins like "filesrc" to combine within e.g. gst-launch
