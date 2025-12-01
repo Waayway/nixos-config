@@ -9,10 +9,11 @@
 
   isServer = false;
   isLaptop = false;
+  isFramework = false;
 
   options = {
     desktop = {
-      kde.enable = true;
+      kde.enable = false;
     };
     bluetooth.enable = true;
   };
@@ -20,34 +21,23 @@
   config =
     { ... }:
     {
-      boot.initrd.kernelModules = [ "amdgpu" ];
-      services.xserver.videoDrivers = [ "amdgpu" ];
-      boot.initrd.availableKernelModules = [
-        "nvme"
-        "xhci_pci"
-        "ahci"
-        "usbhid"
-        "sd_mod"
-      ];
+	boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "ahci" "thunderbolt" "uas" "usbhid" "sd_mod" ];
+	boot.initrd.kernelModules = [ ];
+	boot.kernelModules = [ "kvm-amd" ];
+	boot.extraModulePackages = [ ];
 
-      # Keep most default settings here
-      boot.kernelModules = [ "kvm-amd" ];
+	fileSystems."/" =
+	  { device = "/dev/disk/by-uuid/dfe31e44-f9db-455f-8b21-81069556c572";
+	      fsType = "ext4";
+	    };
 
-      fileSystems."/" = {
-        device = "/dev/disk/by-uuid/1b7cad63-1f08-4b57-b35e-53cb671d4a1d";
-        fsType = "ext4";
-      };
+	  fileSystems."/boot" =
+	    { device = "/dev/disk/by-uuid/657C-8CCB";
+	      fsType = "vfat";
+	      options = [ "fmask=0077" "dmask=0077" ];
+	    };
 
-      fileSystems."/boot" = {
-        device = "/dev/disk/by-uuid/131E-A26F";
-        fsType = "vfat";
-        options = [
-          "fmask=0077"
-          "dmask=0077"
-        ];
-      };
-
-      swapDevices = [ { device = "/dev/disk/by-uuid/75933563-25ea-4f27-a203-c9c9c5ac9a24"; } ];
+	  swapDevices = [ ];
 
     };
 
