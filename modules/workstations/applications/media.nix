@@ -16,6 +16,9 @@
     # -- Video --
     mpv
 
+		# -- Linux isos --
+		qbittorrent
+
     # -- Vector
     inkscape
     figma-linux

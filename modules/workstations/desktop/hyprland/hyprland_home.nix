@@ -16,7 +16,8 @@ in
       monitor = [
         "desc:Acer Technologies X32Q FS 1414012CC3E00,3840x2160@143.98,1600x0,2.0,bitdepth,10" # Primary acer 4k 144 monitor
         "desc:LG Electronics LG ULTRAGEAR 111MAXSP2986,2560x1440@144.0,0x90,1.6" # 2nd lg 1440p monitor
-        "desc:Philips Consumer Electronics Company Philips FTV 0x01010101,3840x2160@120.0,1440x0,2.0,bitdepth,10" # Philips tv downstairs
+        "desc:Philips Consumer Electronics Company Philips FTV 0x01010101,3840x2160@120.0,1440x0,2.5,bitdepth,10" # Philips tv downstairs
+				"desc:Nreal Air 2 Pro 0x88888800,1920x1080@120,auto,1"
       ];
 
       env = [
@@ -55,7 +56,8 @@ in
       bind =
         [
           "$mod SHIFT, N, exec, swaync-client -t -sw"
-          "$mod, Return, exec, wezterm start --always-new-process"
+          "$mod, Return, exec, ghostty"
+          #"$mod, Return, exec, wezterm start --always-new-process"
           "$mod, B, exec, firefox"
           "$mod, Space, exec, rofi -show drun -theme ~/.config/rofi/theme.rasi"
           "$mod, T, exec, nemo"
@@ -98,11 +100,11 @@ in
                     c = (x + 1) / 10;
                   in
                   builtins.toString (x + 1 - (c * 10));
-              in
+             in
               [
                 "$mod, ${ws}, workspace, ${toString (x + 1)}"
                 "$mod SHIFT, ${ws}, movetoworkspace, ${toString (x + 1)}"
-                "$mod ALT, ${ws}, movecurrentworkspacetomonitor, ${toString x}"
+                "$mod ALT, ${ws}, exec, bash ~/.config/hypr/scripts/move_workspace_to_monitor.sh ${toString x}"
               ]
             ) 10
           )
@@ -189,7 +191,8 @@ in
 
       misc = {
         enable_swallow = "true";
-        swallow_regex = "^(wezterm)$";
+        swallow_regex = "^(ghostty)$";
+        #swallow_regex = "^(wezterm)$";
         #swallow_regex = ^(kitty)$
         disable_hyprland_logo = "false";
       };

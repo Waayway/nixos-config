@@ -3,7 +3,6 @@
   environment.systemPackages =
     with pkgs;
     [
-      audacity
       fastfetch
       neovim
       git
@@ -57,6 +56,7 @@
       gnutar
       rsync
 
+			gnumake
       gcc
     ]
     ++ (

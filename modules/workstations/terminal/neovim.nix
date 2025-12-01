@@ -27,5 +27,8 @@
 
     ## Typescript
     typescript-language-server
+
+    ## SQL
+    sqls
   ];
 }
