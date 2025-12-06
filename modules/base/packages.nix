@@ -4,7 +4,6 @@
     with pkgs;
     [
       fastfetch
-      neovim
       git
 
       strace

@@ -28,7 +28,7 @@
     # --Overlays Bars and more--
     waybar
     wlogout
-    rofi-wayland
+    rofi
 
     # HyprCursor cursor
     rose-pine-hyprcursor

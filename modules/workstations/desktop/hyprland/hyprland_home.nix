@@ -17,7 +17,7 @@ in
         "desc:Acer Technologies X32Q FS 1414012CC3E00,3840x2160@143.98,1600x0,2.0,bitdepth,10" # Primary acer 4k 144 monitor
         "desc:LG Electronics LG ULTRAGEAR 111MAXSP2986,2560x1440@144.0,0x90,1.6" # 2nd lg 1440p monitor
         "desc:Philips Consumer Electronics Company Philips FTV 0x01010101,3840x2160@120.0,1440x0,2.5,bitdepth,10" # Philips tv downstairs
-				"desc:Nreal Air 2 Pro 0x88888800,1920x1080@120,auto,1"
+        "desc:Nreal Air 2 Pro 0x88888800,1920x1080@120,auto,1"
       ];
 
       env = [
@@ -53,67 +53,66 @@ in
         "workspace name:󰊴, class:^(.gamescope-wrapped)$"
       ];
 
-      bind =
-        [
-          "$mod SHIFT, N, exec, swaync-client -t -sw"
-          "$mod, Return, exec, ghostty"
-          #"$mod, Return, exec, wezterm start --always-new-process"
-          "$mod, B, exec, firefox"
-          "$mod, Space, exec, rofi -show drun -theme ~/.config/rofi/theme.rasi"
-          "$mod, T, exec, nemo"
+      bind = [
+        "$mod SHIFT, N, exec, swaync-client -t -sw"
+        "$mod, Return, exec, ghostty"
+        #"$mod, Return, exec, wezterm start --always-new-process"
+        "$mod, B, exec, firefox"
+        "$mod, Space, exec, rofi -show drun -theme ~/.config/rofi/theme.rasi"
+        "$mod, T, exec, nemo"
 
-          "$mod SHIFT, S, exec, grim -g \"$(slurp)\" - | wl-copy"
-          "$mod ALT, S, exec, grim -g \"$(slurp)\""
-          "$mod SHIFT, C, exec, hyprpicker | wl-copy"
-          "$mod, L, exec, killall wlogout || wlogout -b 2"
-          "$mod SHIFT, L, exec, killall hyprlock"
+        "$mod SHIFT, S, exec, grim -g \"$(slurp)\" - | wl-copy"
+        "$mod ALT, S, exec, grim -g \"$(slurp)\""
+        "$mod SHIFT, C, exec, hyprpicker | wl-copy"
+        "$mod, L, exec, killall wlogout || wlogout -b 2"
+        "$mod SHIFT, L, exec, killall hyprlock"
 
-          "$mod, Q, killactive,"
-          "$mod, V, togglefloating,"
-          "$mod, P, pseudo"
-          "$mod, J, togglesplit"
-          "$mod, F, fullscreen"
+        "$mod, Q, killactive,"
+        "$mod, V, togglefloating,"
+        "$mod, P, pseudo"
+        "$mod, J, togglesplit"
+        "$mod, F, fullscreen"
 
-          # Move focus with mod + arrow keys
-          "$mod, left, movefocus, l"
-          "$mod, right, movefocus, r"
-          "$mod, up, movefocus, u"
-          "$mod, down, movefocus, d"
+        # Move focus with mod + arrow keys
+        "$mod, left, movefocus, l"
+        "$mod, right, movefocus, r"
+        "$mod, up, movefocus, u"
+        "$mod, down, movefocus, d"
 
-          # Media controls
-          ", XF86AudioPlay, exec, playerctl play-pause"
-          ", XF86AudioNext, exec, playerctl next"
-          ", XF86AudioPrev, exec, playerctl previous"
-          ", XF86audiostop, exec, playerctl stop"
+        # Media controls
+        ", XF86AudioPlay, exec, playerctl play-pause"
+        ", XF86AudioNext, exec, playerctl next"
+        ", XF86AudioPrev, exec, playerctl previous"
+        ", XF86audiostop, exec, playerctl stop"
 
-          "$mod SHIFT, F12, exec, bash ~/.config/hypr/scripts/wallpaper-random.sh"
-        ]
-        ++ (
-          # workspaces
-          # binds $mod + [shift +] {1..10} to [move to] workspace {1..10}
-          builtins.concatLists (
-            builtins.genList (
-              x:
-              let
-                ws =
-                  let
-                    c = (x + 1) / 10;
-                  in
-                  builtins.toString (x + 1 - (c * 10));
-             in
-              [
-                "$mod, ${ws}, workspace, ${toString (x + 1)}"
-                "$mod SHIFT, ${ws}, movetoworkspace, ${toString (x + 1)}"
-                "$mod ALT, ${ws}, exec, bash ~/.config/hypr/scripts/move_workspace_to_monitor.sh ${toString x}"
-              ]
-            ) 10
-          )
+        "$mod SHIFT, F12, exec, bash ~/.config/hypr/scripts/wallpaper-random.sh"
+      ]
+      ++ (
+        # workspaces
+        # binds $mod + [shift +] {1..10} to [move to] workspace {1..10}
+        builtins.concatLists (
+          builtins.genList (
+            x:
+            let
+              ws =
+                let
+                  c = (x + 1) / 10;
+                in
+                builtins.toString (x + 1 - (c * 10));
+            in
+            [
+              "$mod, ${ws}, workspace, ${toString (x + 1)}"
+              "$mod SHIFT, ${ws}, movetoworkspace, ${toString (x + 1)}"
+              "$mod ALT, ${ws}, exec, bash ~/.config/hypr/scripts/move_workspace_to_monitor.sh ${toString x}"
+            ]
+          ) 10
         )
-        ++ [
-          "$mod, S, workspace, name:󰝚"
-          "$mod, D, workspace, name:󰭹"
-          "$mod, G, workspace, name:󰊴"
-        ];
+      )
+      ++ [
+        "$mod, S, workspace, name:󰝚"
+        "$mod, D, workspace, name:󰭹"
+        "$mod, G, workspace, name:󰊴"
+      ];
 
       binde = [
         #  Volume + Brightness control
@@ -183,10 +182,6 @@ in
       dwindle = {
         pseudotile = "yes";
         preserve_split = "yes";
-      };
-
-      gestures = {
-        workspace_swipe = "on";
       };
 
       misc = {
