@@ -33,11 +33,6 @@
 
     nixvim.url = "github:Waayway/nvim-config/nixvim";
 
-    fw-fanctrl = {
-      url = "github:TamtamHero/fw-fanctrl/packaging/nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     rofiThemeRepo = {
       url = "github:Murzchnvok/rofi-collection";
       flake = false;
