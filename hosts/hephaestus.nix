@@ -1,4 +1,7 @@
 {
+  system = "x86_64-linux";
+  user = { name = "waayway"; fullname = "Thijs van Waaij"; };
+
   hardware-profiles = [
     "common-cpu-amd"
     "common-cpu-amd-pstate"

@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ config, lib, isLinux ? true, ... }:
 let locale = config.modules.locale;
 in {
   options.modules.locale = {
@@ -29,6 +29,7 @@ in {
 
   config = {
     time.timeZone = locale.timeZone;
+  } // lib.optionalAttrs isLinux {
     i18n.defaultLocale = locale.defaultLocale;
 
     i18n.extraLocaleSettings = {

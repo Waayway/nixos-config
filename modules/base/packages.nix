@@ -1,32 +1,13 @@
-{ pkgs, isFramework, ... }:
+{ pkgs, lib, isLinux, isFramework, ... }:
 {
   environment.systemPackages =
     with pkgs;
+    # Cross-platform: usable on NixOS and nix-darwin alike.
     [
       fastfetch
       git
-
-      strace
-      ltrace
-      bpftrace
-      tcpdump
       lsof
-
-      sysstat
-      iotop
-      iftop
       btop
-      nmon
-      sysbench
-
-      psmisc
-      lm_sensors
-      ethtool
-      pciutils
-      usbutils
-      hdparm
-      dmidecode
-      parted
 
       # Archives
       zip
@@ -41,7 +22,7 @@
       gawk
       jq
 
-      # networking tools
+      # Networking tools
       dnsutils
       wget
       curl
@@ -54,20 +35,38 @@
       tree
       gnutar
       rsync
-
-			gnumake
-      gcc
+      gnumake
     ]
-    ++ (
-      if isFramework then
-        [
-          pkgs.framework-tool
-        ]
-      else
-        [ ]
-    );
+    # Linux-only tools (kernel tracing, hardware probes, GNU sysadmin tools
+    # that don't exist or don't make sense on darwin).
+    ++ lib.optionals isLinux (with pkgs; [
+      strace
+      ltrace
+      bpftrace
+      tcpdump
 
-  environment.variables.PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+      sysstat
+      iotop
+      iftop
+      nmon
+      sysbench
 
-  environment.variables.EDITOR = "nvim";
+      psmisc
+      lm_sensors
+      ethtool
+      pciutils
+      usbutils
+      hdparm
+      dmidecode
+      parted
+
+      gcc
+    ])
+    ++ lib.optionals isFramework [ pkgs.framework-tool ];
+
+  environment.variables = {
+    EDITOR = "nvim";
+  } // lib.optionalAttrs isLinux {
+    PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+  };
 }

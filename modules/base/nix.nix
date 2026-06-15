@@ -1,21 +1,22 @@
-{ lib, user, ... }:
+{ lib, isLinux, user, ... }:
 {
-  nixpkgs.config.allowUnfree = lib.mkForce true;
+  config = lib.mkMerge [
+    {
+      nixpkgs.config.allowUnfree = lib.mkForce true;
 
-  nix.settings.trusted-users = [ user.name ];
+      nix.settings.trusted-users         = [ user.name ];
+      nix.settings.experimental-features = [ "nix-command" "flakes" ];
+      nix.settings.auto-optimise-store   = true;
 
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
+      nix.channel.enable = false;
+
+      nix.gc.automatic = lib.mkDefault true;
+      nix.gc.options   = lib.mkDefault "--delete-older-than 7d";
+    }
+    # `nix.gc.dates` is the NixOS (systemd timer) form. nix-darwin uses
+    # `nix.gc.interval` (launchd attrset) — set in modules/workstations/darwin/nix.nix.
+    (lib.mkIf isLinux {
+      nix.gc.dates = lib.mkDefault "weekly";
+    })
   ];
-
-  nix.gc = {
-    automatic = lib.mkDefault true;
-    dates = lib.mkDefault "weekly";
-    options = lib.mkDefault "--delete-older-than 7d";
-  };
-
-  nix.settings.auto-optimise-store = true;
-
-  nix.channel.enable = false;
 }

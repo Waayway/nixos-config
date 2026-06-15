@@ -1,6 +1,11 @@
 { umport, ... }:
 {
-  imports = umport {
+  imports = [
+    ./boot.nix
+    ./user.nix
+    ./networking.nix
+  ]
+  ++ umport {
     paths = [
       ./other
       ./gaming

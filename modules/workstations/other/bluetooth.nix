@@ -37,7 +37,7 @@ in
       enable = true;
     };
     environment.systemPackages = with pkgs; [
-      blueberry
+      blueman
     ];
   };
 }

@@ -2,16 +2,32 @@
   description = "Nixos configuration **Waayway**";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nixos-hardware.url = "github:NixOS/nixos-hardware";
+
+    nix-darwin = {
+      url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nix-homebrew = {
+      url = "github:zhaofengli/nix-homebrew";
+      # Upstream pins brew 5.1.1, which has a regression where
+      # `cask_struct_generator.rb` crashes with "undefined method 'to_sym'
+      # for nil" while parsing depends_on from the cask API. 5.1.14 fixes it.
+      inputs.brew-src = {
+        url = "github:Homebrew/brew/5.1.14";
+        flake = false;
+      };
+    };
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
@@ -26,15 +42,29 @@
       url = "github:Murzchnvok/rofi-collection";
       flake = false;
     };
+
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    deploy-rs = {
+      url = "github:serokell/deploy-rs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     inputs@{ nixpkgs, ... }:
     let
-      version = "25.05";
-      x64 = "x86_64-linux";
+      version = "26.05";
 
-      overlays = [ (final: prev: rec { }) ];
+      overlays = [ ];
 
       mkSystem = import ./lib/mkSystem.nix {
         inherit
@@ -45,20 +75,40 @@
           ;
       };
 
-      mkUser = import ./lib/mkUser.nix;
+      mkDarwin = import ./lib/mkDarwin.nix {
+        inherit
+          overlays
+          nixpkgs
+          inputs
+          version
+          ;
+      };
 
+      mkDeployNode = import ./lib/mkDeployNode.nix { inherit inputs; };
+
+      hosts = (import ./lib/discoverHosts.nix { lib = nixpkgs.lib; }) ./hosts;
+
+      isDarwinHost = h: nixpkgs.lib.hasSuffix "darwin" h.system;
+
+      nixosHosts  = nixpkgs.lib.filterAttrs (_: h: !(isDarwinHost h)) hosts;
+      darwinHosts = nixpkgs.lib.filterAttrs (_: h:  (isDarwinHost h)) hosts;
+      deployHosts = nixpkgs.lib.filterAttrs (_: h:  h ? deploy)       hosts;
+
+      nixosConfigurations  = nixpkgs.lib.mapAttrs mkSystem nixosHosts;
+      darwinConfigurations = nixpkgs.lib.mapAttrs mkDarwin darwinHosts;
+
+      deployNodes = nixpkgs.lib.mapAttrs
+        (name: h: mkDeployNode name h nixosConfigurations.${name})
+        deployHosts;
     in
     {
-      nixosConfigurations = {
-        hephaestus = mkSystem x64 "hephaestus" {
-          # Desktop (R9 5900x + 7900xtx)
-          user = mkUser "waayway" { fullname = "Thijs van Waaij"; };
-        };
+      inherit nixosConfigurations darwinConfigurations;
+      deploy.nodes = deployNodes;
 
-        hermes = mkSystem x64 "hermes" {
-          # Framework 13 R7 AI 300
-          user = mkUser "waayway" { fullname = "Thijs van Waaij"; };
-        };
+      packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {
+        system  = "x86_64-linux";
+        format  = "proxmox";
+        modules = [ ./template/proxmox.nix ];
       };
     };
 }

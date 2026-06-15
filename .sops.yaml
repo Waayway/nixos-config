@@ -1,0 +1,32 @@
+# Per-host age keys are derived from the host's SSH host key (ed25519).
+# To add a new host: `ssh-keyscan -t ed25519 <ip> | ssh-to-age` → paste below.
+keys:
+  # User editing key (apollo / macbook personal age key in ~/.config/sops/age/keys.txt)
+  - &thijs_macbook age1dqvrgleczxsp68fv889xq8a0kk9c8qzaa4xjrtzq2n5sgmnqgd9ql6gw3z
+
+  # Host keys (derived from /etc/ssh/ssh_host_ed25519_key on each host)
+  - &host_backup   age1rtus5ez4taw0pyufqjwvfzmj24q7px2tjppul68lmzu7e8t4g95qvvd7rn
+
+  # TODO: derive and add once each host has been booted with the merged flake:
+  # - &host_apollo     <age1...>   # apollo system-level sops (separate from thijs_macbook user key)
+  # - &host_hephaestus <age1...>
+  # - &host_hermes     <age1...>
+
+creation_rules:
+  - path_regex: secrets/common\.yaml$
+    key_groups:
+      - age:
+          - *thijs_macbook
+          - *host_backup
+
+  - path_regex: secrets/workstations/.*\.yaml$
+    key_groups:
+      - age:
+          - *thijs_macbook
+          # Add per-workstation host anchors here once derived.
+
+  - path_regex: secrets/servers/.*\.yaml$
+    key_groups:
+      - age:
+          - *thijs_macbook
+          - *host_backup

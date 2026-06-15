@@ -19,16 +19,15 @@ let
   machineOptions = hostAttrs;
   hardware-profiles = machineOptions.hardware-profiles or [ ];
   isServer = machineOptions.isServer;
-  isLaptop = machineOptions.isLaptop or false;
-  isFramework = machineOptions.isFramework or false;
-  isLinux = true; # TODO: Darwin
-  tags = machineOptions.tags or [ ];
+  isLaptop = machineOptions.isLaptop;
+  isFramework = machineOptions.isFramework;
+  isLinux = false;
 
   colors = import ./color.nix { };
 
   machineConfig = machineOptions.config;
 
-  baseConfig = ../modules/system.nix;
+  baseConfig = ../modules/workstations/darwin;
 
   extraArgs = {
     inherit version;
@@ -45,7 +44,6 @@ let
     isFramework = isFramework;
     isLinux = isLinux;
     hardware-profiles = hardware-profiles;
-    tags = tags;
 
     upkgs = upkgs; # Unstable pkgs
 
@@ -54,12 +52,15 @@ let
     umport = import ./umport.nix { lib = upkgs.lib; };
   };
 
-  systemFunc = nixpkgs.lib.nixosSystem;
+  systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
-  homeManager = (import ./mkHome.nix { }) user extraArgs;
+  homeManager = (import ./mkHome.nix {
+    isDarwin = true;
+    homeEntry = ../modules/workstations/darwin/home.nix;
+  }) user extraArgs;
 
 in
-systemFunc rec {
+systemFunc {
   inherit system;
 
   specialArgs = extraArgs;
@@ -70,15 +71,16 @@ systemFunc rec {
       nixpkgs.overlays = overlays;
       nixpkgs.config.allowUnfree = true;
       nixpkgs.hostPlatform = system;
-      system.stateVersion = version;
-      networking.hostName = name;
+      system.stateVersion = 6;
+      system.primaryUser = user.name;
     }
 
     baseConfig
 
     machineConfig
 
-    inputs.sops-nix.nixosModules.sops
-  ]
-  ++ (if !isServer then [ homeManager ] else [ ]);
+    inputs.sops-nix.darwinModules.sops
+
+    (if !isServer then homeManager else { })
+  ];
 }
