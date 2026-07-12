@@ -6,6 +6,7 @@ keys:
 
   # Host keys (derived from /etc/ssh/ssh_host_ed25519_key on each host)
   - &host_backup   age1rtus5ez4taw0pyufqjwvfzmj24q7px2tjppul68lmzu7e8t4g95qvvd7rn
+  - &host_games    age1kxyzpzdnsqqnsxuh5p76f8vj2q67ddkzfa4t0rh3gzatcka4tvdsvzv7ex
 
   # TODO: derive and add once each host has been booted with the merged flake:
   # - &host_apollo     <age1...>   # apollo system-level sops (separate from thijs_macbook user key)
@@ -18,6 +19,7 @@ creation_rules:
       - age:
           - *thijs_macbook
           - *host_backup
+          - *host_games
 
   - path_regex: secrets/workstations/.*\.yaml$
     key_groups:
@@ -30,3 +32,4 @@ creation_rules:
       - age:
           - *thijs_macbook
           - *host_backup
+          - *host_games
