@@ -1,12 +1,13 @@
 {
   system = "x86_64-linux";
-  user = { name = "waayway"; fullname = "Thijs van Waaij"; };
+  user = {
+    name = "waayway";
+    fullname = "Thijs van Waaij";
+  };
 
   hardware-profiles = [ "framework-amd-ai-300-series" ];
 
-  isServer = false;
-  isLaptop = true;
-  isFramework = true;
+  type = "framework13";
 
   options = {
     desktop = {

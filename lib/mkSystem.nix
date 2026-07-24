@@ -18,10 +18,8 @@ let
 
   machineOptions = hostAttrs;
   hardware-profiles = machineOptions.hardware-profiles or [ ];
-  isServer = machineOptions.isServer;
-  isLaptop = machineOptions.isLaptop or false;
-  isFramework = machineOptions.isFramework or false;
-  isLinux = true; # TODO: Darwin
+  type = machineOptions.type;
+  isServer = machineOptions.type == "server";
   tags = machineOptions.tags or [ ];
 
   colors = import ./color.nix { };
@@ -41,9 +39,8 @@ let
     color = colors;
 
     isServer = isServer;
-    isLaptop = isLaptop;
-    isFramework = isFramework;
-    isLinux = isLinux;
+    type = type;
+
     hardware-profiles = hardware-profiles;
     tags = tags;
 

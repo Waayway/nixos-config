@@ -11,13 +11,14 @@
 # Put host-specific overrides in `config` below.
 {
   system = "aarch64-darwin";
-  user = { name = "thijsvw"; fullname = "Thijs van Waaij"; };
+  user = {
+    name = "thijsvw";
+    fullname = "Thijs van Waaij";
+  };
+
+  type = "macbook";
 
   hardware-profiles = [ ];
-
-  isServer = false;
-  isLaptop = true;
-  isFramework = false;
 
   options = { };
 
@@ -29,7 +30,10 @@
       # the VM is aarch64 NixOS; binfmt-qemu lets it also build x86_64
       # (Proxmox VMs are x86_64).
       nix.linux-builder.enable = true;
-      nix.linux-builder.systems = [ "aarch64-linux" "x86_64-linux" ];
+      nix.linux-builder.systems = [
+        "aarch64-linux"
+        "x86_64-linux"
+      ];
       nix.linux-builder.config = {
         boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
       };

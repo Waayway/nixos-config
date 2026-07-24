@@ -61,6 +61,8 @@
 
       overlays = [ ];
 
+      isDarwinHost = h: nixpkgs.lib.hasSuffix "darwin" h.system;
+
       mkSystem = import ./lib/mkSystem.nix {
         inherit
           overlays
@@ -83,26 +85,24 @@
 
       hosts = (import ./lib/discoverHosts.nix { lib = nixpkgs.lib; }) ./hosts;
 
-      isDarwinHost = h: nixpkgs.lib.hasSuffix "darwin" h.system;
+      nixosHosts = nixpkgs.lib.filterAttrs (_: h: !(isDarwinHost h)) hosts;
+      darwinHosts = nixpkgs.lib.filterAttrs (_: h: (isDarwinHost h)) hosts;
+      deployHosts = nixpkgs.lib.filterAttrs (_: h: h ? deploy) hosts;
 
-      nixosHosts  = nixpkgs.lib.filterAttrs (_: h: !(isDarwinHost h)) hosts;
-      darwinHosts = nixpkgs.lib.filterAttrs (_: h:  (isDarwinHost h)) hosts;
-      deployHosts = nixpkgs.lib.filterAttrs (_: h:  h ? deploy)       hosts;
-
-      nixosConfigurations  = nixpkgs.lib.mapAttrs mkSystem nixosHosts;
+      nixosConfigurations = nixpkgs.lib.mapAttrs mkSystem nixosHosts;
       darwinConfigurations = nixpkgs.lib.mapAttrs mkDarwin darwinHosts;
 
-      deployNodes = nixpkgs.lib.mapAttrs
-        (name: h: mkDeployNode name h nixosConfigurations.${name})
-        deployHosts;
+      deployNodes = nixpkgs.lib.mapAttrs (
+        name: h: mkDeployNode name h nixosConfigurations.${name}
+      ) deployHosts;
     in
     {
       inherit nixosConfigurations darwinConfigurations;
       deploy.nodes = deployNodes;
 
       packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {
-        system  = "x86_64-linux";
-        format  = "proxmox";
+        system = "x86_64-linux";
+        format = "proxmox";
         modules = [ ./template/proxmox.nix ];
       };
     };
