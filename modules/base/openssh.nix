@@ -7,20 +7,23 @@
 let
   inherit (pkgs.stdenv) hostPlatform;
 in
-if hostPlatform.isDarwin then
-  {
-    services.openssh.enable = true;
-  }
-else
-  {
-    services.openssh = {
-      enable = true;
-      openFirewall = true;
-      settings = {
-        X11Forwarding = true;
-        PermitRootLogin = "prohibit-password";
-        PasswordAuthentication = true;
+{
+  config =
+    if hostPlatform.isDarwin then
+      {
+        services.openssh.enable = true;
+      }
+    else
+      {
+        services.openssh = {
+          enable = true;
+          openFirewall = true;
+          settings = {
+            X11Forwarding = true;
+            PermitRootLogin = "prohibit-password";
+            PasswordAuthentication = true;
+          };
+        };
+        environment.enableAllTerminfo = true;
       };
-    };
-    environment.enableAllTerminfo = true;
-  }
+}
