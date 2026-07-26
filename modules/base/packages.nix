@@ -1,4 +1,12 @@
-{ pkgs, lib, isLinux, isFramework, ... }:
+{
+  pkgs,
+  lib,
+  isFramework,
+  ...
+}:
+let
+  inherit (pkgs.stdenv) hostPlatform;
+in
 {
   environment.systemPackages =
     with pkgs;
@@ -39,34 +47,38 @@
     ]
     # Linux-only tools (kernel tracing, hardware probes, GNU sysadmin tools
     # that don't exist or don't make sense on darwin).
-    ++ lib.optionals isLinux (with pkgs; [
-      strace
-      ltrace
-      bpftrace
-      tcpdump
+    ++ lib.optionals hostPlatform.isLinux (
+      with pkgs;
+      [
+        strace
+        ltrace
+        bpftrace
+        tcpdump
 
-      sysstat
-      iotop
-      iftop
-      nmon
-      sysbench
+        sysstat
+        iotop
+        iftop
+        nmon
+        sysbench
 
-      psmisc
-      lm_sensors
-      ethtool
-      pciutils
-      usbutils
-      hdparm
-      dmidecode
-      parted
+        psmisc
+        lm_sensors
+        ethtool
+        pciutils
+        usbutils
+        hdparm
+        dmidecode
+        parted
 
-      gcc
-    ])
+        gcc
+      ]
+    )
     ++ lib.optionals isFramework [ pkgs.framework-tool ];
 
   environment.variables = {
     EDITOR = "nvim";
-  } // lib.optionalAttrs isLinux {
+  }
+  // lib.optionalAttrs hostPlatform.isLinux {
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
   };
 }

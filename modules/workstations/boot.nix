@@ -1,6 +1,6 @@
-{ lib, isLinux, ... }:
+{ lib, pkgs, ... }:
 {
-  config = lib.mkIf isLinux {
+  config = lib.optional pkgs.stdenv.hostPlatform.isLinux {
     boot.loader.systemd-boot = {
       enable = true;
       configurationLimit = lib.mkDefault 10;

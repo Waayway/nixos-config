@@ -20,8 +20,6 @@ let
   hardware-profiles = machineOptions.hardware-profiles or [ ];
   isServer = machineOptions.isServer;
   isLaptop = machineOptions.isLaptop;
-  isFramework = machineOptions.isFramework;
-  isLinux = false;
 
   colors = import ./color.nix { };
 
@@ -39,10 +37,7 @@ let
 
     color = colors;
 
-    isServer = isServer;
     isLaptop = isLaptop;
-    isFramework = isFramework;
-    isLinux = isLinux;
     hardware-profiles = hardware-profiles;
 
     upkgs = upkgs; # Unstable pkgs
@@ -54,10 +49,13 @@ let
 
   systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
-  homeManager = (import ./mkHome.nix {
-    isDarwin = true;
-    homeEntry = ../modules/workstations/darwin/home.nix;
-  }) user extraArgs;
+  homeManager =
+    (import ./mkHome.nix {
+      isDarwin = true;
+      homeEntry = ../modules/workstations/darwin/home.nix;
+    })
+      user
+      extraArgs;
 
 in
 systemFunc {

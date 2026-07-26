@@ -1,11 +1,13 @@
 {
   pkgs,
-  isLinux,
   lib,
   ...
 }:
+let
+  inherit (pkgs.stdenv) hostPlatform;
+in
 {
-  config = lib.mkIf isLinux {
+  config = lib.optional hostPlatform.isLinux {
     boot.kernelPackages = pkgs.linuxPackages_latest;
   };
 }

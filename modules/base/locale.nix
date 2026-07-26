@@ -1,6 +1,14 @@
-{ config, lib, isLinux ? true, ... }:
-let locale = config.modules.locale;
-in {
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  locale = config.modules.locale;
+  inherit (pkgs.stdenv) hostPlatform;
+in
+{
   options.modules.locale = {
     timeZone = lib.mkOption {
       type = lib.types.str;
@@ -29,7 +37,8 @@ in {
 
   config = {
     time.timeZone = locale.timeZone;
-  } // lib.optionalAttrs isLinux {
+  }
+  // lib.optionalAttrs hostPlatform.isLinux {
     i18n.defaultLocale = locale.defaultLocale;
 
     i18n.extraLocaleSettings = {

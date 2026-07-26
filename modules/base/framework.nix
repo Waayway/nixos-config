@@ -1,12 +1,11 @@
 {
   lib,
-  isLinux,
+  pkgs,
   isFramework,
-  inputs,
   ...
 }:
 let
-  active = isLinux && isFramework;
+  active = pkgs.stdenv.hostPlatform.isLinux && isFramework;
 in
 # `programs.fw-fanctrl` only exists once the fw-fanctrl module is imported.
 # On darwin (or any non-Framework host) the module isn't loaded, so emit no
