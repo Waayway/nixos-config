@@ -11,7 +11,7 @@ in
   # On darwin (or any non-Framework host) the module isn't loaded, so emit no
   # assignments at all rather than guarded ones.
   hardware.fw-fanctrl =
-    if (hostPlatform.isLinux && isFramework) then
+    if hostPlatform.isLinux then
       {
         enable = true;
         config.defaultStrategy = "medium";
