@@ -20,7 +20,7 @@
       [ ];
 
   config = lib.optional (hostPlatform.isLinux && hostPlatform.isServer) (
-    lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
+    (lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
 
       boot.initrd.availableKernelModules = [
         "virtio_pci"
@@ -34,8 +34,8 @@
         device = "/dev/disk/by-label/nixos";
         fsType = "ext4";
       };
-    }
-    // lib.optional (serverOptions.netInterface != false) {
+    })
+    // (lib.optional (serverOptions.netInterface != false) {
       networking.useDHCP = false;
 
       networking.interfaces.ens18.ipv4.addresses = [
@@ -50,6 +50,6 @@
         "10.0.10.1"
         "1.1.1.1"
       ];
-    }
+    })
   );
 }
