@@ -20,7 +20,8 @@
       [ ];
 
   config = lib.optional (hostPlatform.isLinux && hostPlatform.isServer) (
-    (lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
+    { }
+    // (lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
 
       boot.initrd.availableKernelModules = [
         "virtio_pci"
