@@ -6,9 +6,21 @@
   ...
 }:
 {
+  imports =
+    if
+      (
+        hostPlatform.isLinux
+        && hostPlatform.isServer
+        && serverOptions.useDefaultHardware
+        && serverOptions.isHomeServer
+      )
+    then
+      [ (modulesPath + "/profiles/qemu-guest.nix") ]
+    else
+      [ ];
+
   config = lib.optional (hostPlatform.isLinux && hostPlatform.isServer) (
     lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
-      imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
 
       boot.initrd.availableKernelModules = [
         "virtio_pci"
