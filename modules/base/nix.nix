@@ -5,7 +5,7 @@
   ...
 }:
 {
-  config = lib.mkMerge [
+  config = lib.attrsets.mergeAttrsList [
     {
       nixpkgs.config.allowUnfree = lib.mkForce true;
 
