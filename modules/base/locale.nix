@@ -1,12 +1,11 @@
 {
   config,
   lib,
-  pkgs,
+  hostPlatform,
   ...
 }:
 let
   locale = config.modules.locale;
-  inherit (pkgs.stdenv) hostPlatform;
 in
 {
   options.modules.locale = {

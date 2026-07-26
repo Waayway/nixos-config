@@ -1,7 +1,8 @@
-{ user, pkgs, ... }:
-let
-  inherit (pkgs.stdenv) hostPlatform;
-in
+{
+  user,
+  hostPlatform,
+  ...
+}:
 {
   users.users.${user.name} = {
     description = user.fullname;

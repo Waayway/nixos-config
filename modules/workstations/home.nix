@@ -1,11 +1,12 @@
 {
   lib,
-  isServer,
+  hostPlatform,
   umport,
   ...
 }:
 {
-  warnings = [ ] ++ lib.optional isServer [ "HOME MANAGER SHOULD NOT BE USED WITH A SERVER" ];
+  warnings =
+    [ ] ++ lib.optional hostPlatform.isServer [ "HOME MANAGER SHOULD NOT BE USED WITH A SERVER" ];
 
   imports = umport {
     paths = [

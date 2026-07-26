@@ -1,12 +1,9 @@
 {
   pkgs,
   lib,
-  isFramework,
+  hostPlatform,
   ...
 }:
-let
-  inherit (pkgs.stdenv) hostPlatform;
-in
 {
   environment.systemPackages =
     with pkgs;
@@ -73,7 +70,7 @@ in
         gcc
       ]
     )
-    ++ lib.optionals isFramework [ pkgs.framework-tool ];
+    ++ lib.optionals hostPlatform.isFramework [ pkgs.framework-tool ];
 
   environment.variables = {
     EDITOR = "nvim";

@@ -1,11 +1,9 @@
 {
   pkgs,
   lib,
+  hostPlatform,
   ...
 }:
-let
-  inherit (pkgs.stdenv) hostPlatform;
-in
 {
   config =
     # The `console.*` options don't exist on nix-darwin, so a `mkIf isLinux`

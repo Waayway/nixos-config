@@ -1,7 +1,9 @@
-{ pkgs, lib, ... }:
-let
-  inherit (pkgs.stdenv) hostPlatform;
-in
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 {
   programs.zsh.enable = true;
   environment.shells = with pkgs; [ zsh ];

@@ -1,6 +1,6 @@
 {
   lib,
-  pkgs,
+  hostPlatform,
   user,
   ...
 }:
@@ -23,7 +23,7 @@
     }
     # `nix.gc.dates` is the NixOS (systemd timer) form. nix-darwin uses
     # `nix.gc.interval` (launchd attrset) — set in modules/workstations/darwin/nix.nix.
-    (lib.optional pkgs.stdenv.hostPlatform.isLinux {
+    (lib.optional hostPlatform.isLinux {
       nix.gc.dates = lib.mkDefault "weekly";
     })
   ];

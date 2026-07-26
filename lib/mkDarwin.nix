@@ -40,6 +40,13 @@ let
     isLaptop = isLaptop;
     hardware-profiles = hardware-profiles;
 
+    hostPlatform = {
+      isLinux = false;
+      isDarwin = true;
+      isFramework = false;
+      isServer = false;
+    };
+
     upkgs = upkgs; # Unstable pkgs
 
     user = user;

@@ -1,4 +1,7 @@
-{ isServer, ... }: {
-  imports = [ ./hardware.nix ./base ]
-    ++ [ (if isServer then ./servers else ./workstations) ];
+{ hostPlatform, ... }: {
+  imports = [
+    ./hardware.nix
+    ./base
+  ]
+  ++ [ (if hostPlatform.isServer then ./servers else ./workstations) ];
 }

@@ -48,6 +48,13 @@ let
 
     user = user;
 
+    hostPlatform = {
+      isLinux = true;
+      isDarwin = false;
+      isFramework = nixpkgs.lib.strings.hasPrefix "framework" type;
+      isServer = isServer;
+    };
+
     umport = import ./umport.nix { lib = upkgs.lib; };
   };
 
