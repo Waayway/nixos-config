@@ -1,6 +1,7 @@
 { ... }:
 {
   imports = [
+    ./default_hardware.nix
     ./boot.nix
     ./firewall.nix
     ./journald.nix

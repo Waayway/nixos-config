@@ -6,15 +6,15 @@
   };
 
   type = "server";
-  use_default_hardware = true;
-  is_home_server = true;
+  useDefaultHardware = true;
+  isHomeServer = true;
 
-  net_interface = {
+  netInterface = {
     ip = "10.0.10.170";
     prefixLength = 24;
   };
 
-  tailscale_tags = [ "tag:manager" ];
+  tailscaleTags = [ "tag:manager" ];
 
   options = {
 

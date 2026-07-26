@@ -38,8 +38,12 @@ let
 
     color = colors;
 
-    isServer = isServer;
     type = type;
+    serverOptions = {
+      useDefaultHardware = machineOptions.useDefaultHardware ? false;
+      isHomeServer = machineOptions.isHomeServer ? false;
+      netInterface = machineOptions.netInterface ? false;
+    };
 
     hardware-profiles = hardware-profiles;
     tags = tags;
