@@ -40,9 +40,9 @@ let
 
     type = type;
     serverOptions = {
-      useDefaultHardware = machineOptions.useDefaultHardware ? false;
-      isHomeServer = machineOptions.isHomeServer ? false;
-      netInterface = machineOptions.netInterface ? false;
+      useDefaultHardware = machineOptions.useDefaultHardware;
+      isHomeServer = machineOptions.isHomeServer;
+      netInterface = machineOptions.netInterface;
     };
 
     hardware-profiles = hardware-profiles;

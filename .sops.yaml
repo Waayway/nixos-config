@@ -17,17 +17,20 @@ creation_rules:
   - path_regex: secrets/common\.yaml$
     key_groups:
       - age:
-          - *thijs_macbook
+          - *host_apollo
+          - *host_athena
           - *host_vms_base
 
   - path_regex: secrets/workstations/.*\.yaml$
     key_groups:
       - age:
-          - *thijs_macbook
+          - *host_apollo
+          - *host_athena
           # Add per-workstation host anchors here once derived.
 
   - path_regex: secrets/servers/.*\.yaml$
     key_groups:
       - age:
-          - *thijs_macbook
+          - *host_apollo
+          - *host_athena
           - *host_vms_base
