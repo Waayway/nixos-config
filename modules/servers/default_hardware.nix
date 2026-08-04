@@ -15,13 +15,15 @@
         && serverOptions.isHomeServer
       )
     then
-      [ (modulesPath + "/profiles/qemu-guest.nix") ]
+      [
+        (modulesPath + "/profiles/qemu-guest.nix")
+      ]
     else
       [ ];
 
-  config = lib.optional (hostPlatform.isLinux && hostPlatform.isServer) (
+  config = lib.optionalAttrs (hostPlatform.isLinux && hostPlatform.isServer) (
     { }
-    // (lib.optional (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
+    // (lib.optionalAttrs (serverOptions.useDefaultHardware && serverOptions.isHomeServer) {
 
       boot.initrd.availableKernelModules = [
         "virtio_pci"
@@ -36,13 +38,13 @@
         fsType = "ext4";
       };
     })
-    // (lib.optional (serverOptions.netInterface != false) {
+    // (lib.optionalAttrs (serverOptions.netInterface != false) {
       networking.useDHCP = false;
 
       networking.interfaces.ens18.ipv4.addresses = [
         {
-          address = serverOptions.netInteface.ip;
-          prefixLength = serverOptions.netInteface.prefixLength;
+          address = serverOptions.netInterface.ip;
+          prefixLength = serverOptions.netInterface.prefixLength;
         }
       ];
 
