@@ -44,6 +44,8 @@ let
       netInterface = machineOptions.netInterface;
     };
 
+    hardware-profiles = machineOptions.options.hardware.profiles;
+
     tags = tags;
 
     upkgs = upkgs; # Unstable pkgs

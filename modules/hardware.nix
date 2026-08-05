@@ -1,5 +1,5 @@
 {
-  config,
+  hardware-profiles,
   lib,
   inputs,
   ...
@@ -10,5 +10,5 @@
     default = [ ];
   };
 
-  imports = map (name: inputs.nixos-hardware.nixosModules.${name}) config.hardware.profiles;
+  imports = map (name: inputs.nixos-hardware.nixosModules.${name}) hardware-profiles;
 }
