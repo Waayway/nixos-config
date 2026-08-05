@@ -18,9 +18,13 @@
 
   type = "macbook";
 
-  hardware-profiles = [ ];
-
-  options = { };
+  options = {
+    workstation = {
+      terminal.enable = true;
+      neovim.enable = true;
+    };
+    server = { };
+  };
 
   config =
     { ... }:

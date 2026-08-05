@@ -4,8 +4,8 @@
   # on the disk. We match that here so future generations continue to install
   # GRUB to the right device.
   boot.loader.grub = {
-    enable             = true;
-    device             = "/dev/vda";
+    enable = true;
+    device = "/dev/vda";
     configurationLimit = 10;
   };
 }
