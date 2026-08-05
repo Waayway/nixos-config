@@ -13,6 +13,7 @@
       git
       lsof
       btop
+      neovim
 
       # Archives
       zip
@@ -68,6 +69,8 @@
         parted
 
         gcc
+
+
       ]
     )
     ++ lib.optionals hostPlatform.isFramework [ pkgs.framework-tool ];

@@ -5,21 +5,28 @@
     fullname = "Thijs van Waaij";
   };
 
-  hardware-profiles = [
-    "common-cpu-amd"
-    "common-cpu-amd-pstate"
-    "common-gpu-amd"
-    "common-pc"
-    "common-pc-ssd"
-  ];
-
   type = "desktop";
 
   options = {
-    desktop = {
-      kde.enable = false;
+    hardware = {
+      bluetooth.enable = true;
+      profiles = [
+        "common-cpu-amd"
+        "common-cpu-amd-pstate"
+        "common-gpu-amd"
+        "common-pc"
+        "common-pc-ssd"
+      ];
     };
-    bluetooth.enable = true;
+    workstation = {
+      terminal.enable = true;
+      neovim.enable = true;
+      desktop = {
+        kde.enable = false;
+        hyprland.enable = true;
+      };
+    };
+    server = { };
   };
 
   config =

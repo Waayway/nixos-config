@@ -17,7 +17,11 @@
   tailscaleTags = [ "tag:manager" ];
 
   options = {
-
+    workstation = {
+      terminal.enable = true;
+      neovim.enable = true;
+    };
+    server = { };
   };
 
   config = { ... }: { };

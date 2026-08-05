@@ -17,7 +17,6 @@ let
   };
 
   machineOptions = hostAttrs;
-  hardware-profiles = machineOptions.hardware-profiles or [ ];
   type = machineOptions.type;
   isServer = machineOptions.type == "server";
   tags = machineOptions.tags or [ ];
@@ -45,7 +44,6 @@ let
       netInterface = machineOptions.netInterface;
     };
 
-    hardware-profiles = hardware-profiles;
     tags = tags;
 
     upkgs = upkgs; # Unstable pkgs

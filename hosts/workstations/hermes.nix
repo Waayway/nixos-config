@@ -5,15 +5,21 @@
     fullname = "Thijs van Waaij";
   };
 
-  hardware-profiles = [ "framework-amd-ai-300-series" ];
-
   type = "framework13";
 
   options = {
-    desktop = {
-      kde.enable = true;
+    hardware = {
+      bluetooth.enable = true;
+      profiles = [ "framework-amd-ai-300-series" ];
     };
-    bluetooth.enable = true;
+    workstation = {
+      terminal.enable = true;
+      neovim.enable = true;
+      desktop = {
+        kde.enable = true;
+      };
+    };
+    server = { };
   };
 
   config =
