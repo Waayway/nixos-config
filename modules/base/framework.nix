@@ -11,8 +11,10 @@
     enable = lib.mkEnableOption "Enable FW Fanctrl";
   };
 
-  hardware.fw-fanctrl = lib.mkIf config.hardware.fw-fanctrl.enable {
-    enable = true;
-    config.defaultStrategy = "medium";
+  config = lib.mkIf config.hardware.fw-fanctrl.enable {
+    hardware.fw-fanctrl = {
+      enable = true;
+      config.defaultStrategy = "medium";
+    };
   };
 }
