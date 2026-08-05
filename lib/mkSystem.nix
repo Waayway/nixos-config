@@ -44,7 +44,11 @@ let
       netInterface = machineOptions.netInterface;
     };
 
-    hardware-profiles = machineOptions.options.hardware.profiles;
+    hardware-profiles =
+      if machineOptions.options ? hardware && machineOptions.options.hardware ? profiles then
+        machineOptions.options.hardware.profiles
+      else
+        [ ];
 
     tags = tags;
 
