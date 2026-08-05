@@ -58,6 +58,7 @@ let
     };
 
     umport = import ./umport.nix { lib = upkgs.lib; };
+    importCurDir = import ./importCurDir.nix upkgs.lib;
   };
 
   systemFunc = nixpkgs.lib.nixosSystem;
