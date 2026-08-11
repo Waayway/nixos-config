@@ -1,6 +1,6 @@
 { lib, hostPlatform, ... }:
 {
-  config = lib.optional hostPlatform.isLinux {
+  config = lib.optionalAttrs hostPlatform.isLinux {
     boot.loader.systemd-boot = {
       enable = true;
       configurationLimit = lib.mkDefault 10;

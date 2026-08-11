@@ -5,7 +5,7 @@
   ...
 }:
 {
-  config = lib.optional hostPlatform.isLinux {
+  config = lib.optionalAttrs hostPlatform.isLinux {
     boot.kernelPackages = pkgs.linuxPackages_latest;
   };
 }
