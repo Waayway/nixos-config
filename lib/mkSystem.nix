@@ -92,6 +92,6 @@ systemFunc rec {
     machineConfig
 
     inputs.sops-nix.nixosModules.sops
-  ]
-  ++ (if !isServer then [ homeManager ] else [ ]);
+    homeManager
+  ];
 }
