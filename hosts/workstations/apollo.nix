@@ -19,6 +19,12 @@
   type = "macbook";
 
   options = {
+    home-manager = {
+      enable = true;
+      options = {
+
+      };
+    };
     workstation = {
       terminal.enable = true;
       neovim.enable = true;
