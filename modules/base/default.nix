@@ -1,4 +1,0 @@
-{ importCurDir, ... }:
-{
-  imports = importCurDir ./.;
-}
