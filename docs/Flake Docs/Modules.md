@@ -16,7 +16,7 @@ modules are structured as follows:
       description = "DESCRIPTION";
       type = lib.types.(bool or int or ints (array) or float or number or str) (see lib.types https://github.com/NixOS/nixpkgs/blob/master/lib/types.nix);
     };
-
+a
   };
 
   config = lib.mkIf config.CATEGORY.MODULE.enable {

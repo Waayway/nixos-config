@@ -1,6 +1,7 @@
+homeManagerEnabled:
 {
   isDarwin ? false,
-  homeEntry ? ../modules/workstations/home.nix,
+  homeEntry ? ../modules/home.nix,
 }:
 user:
 extraArgs@{ inputs, version, ... }:
@@ -11,23 +12,21 @@ let
     else
       inputs.home-manager.nixosModules.home-manager;
 in
-{ lib, config, ... }:
-let
-  homeManagerEnabled = config.home-manager.enable;
-in
+{ lib, ... }:
 {
-
   options.home-manager.enable = lib.mkEnableOption "Home Manager";
 
-  imports = lib.optional homeManagerEnabled [ home-manager ];
+  imports = lib.optional homeManagerEnabled home-manager;
 
   config = lib.optionalAttrs homeManagerEnabled {
     home-manager.useGlobalPkgs = true;
     home-manager.useUserPackages = true;
     home-manager.extraSpecialArgs = extraArgs;
-    home-manager.users.${user.name} = { ... }: {
-      imports = [ homeEntry ];
-      home.stateVersion = version;
-    };
+    home-manager.users.${user.name} =
+      { ... }:
+      {
+        imports = [ homeEntry ];
+        home.stateVersion = version;
+      };
   };
 }
