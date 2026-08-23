@@ -12,14 +12,15 @@
       bluetooth.enable = true;
       profiles = [ "framework-amd-ai-300-series" ];
     };
-    workstation = {
-      terminal.enable = true;
-      neovim.enable = true;
-      desktop = {
-        kde.enable = true;
-      };
-    };
-    server = { };
+		home-manager.enable = true;
+    #workstation = {
+    #  terminal.enable = true;
+    #  neovim.enable = true;
+    #  desktop = {
+    #    kde.enable = true;
+    #  };
+    #};
+    #server = { };
   };
 
   config =

@@ -1,6 +1,6 @@
-{pkgs, ...}: {
-	services.tlp = {
-		enable = true;
-		settings = {};
-	};
+{ pkgs, ... }:
+{
+  services.power-profiles-daemon = {
+    enable = true;
+  };
 }

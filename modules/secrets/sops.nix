@@ -1,6 +1,16 @@
-{ lib, ... }:
 {
-  sops.defaultSopsFile = lib.mkDefault ../../secrets/common.yaml;
+  lib,
+  hostPlatform,
+  currentSystemName,
+  user,
+  ...
+}:
+{
+  sops.defaultSopsFile =
+    if (builtins.pathExists ../../../secrets/${currentSystemName}.yaml) then
+      ../../secrets/${currentSystemName}.yaml
+    else
+      ../../secrets/common.yaml;
 
   # Derive the age private key from the host's SSH host key — no separate
   # age key material on the host. The SSH host key has to exist for SSH
@@ -11,4 +21,6 @@
   # Per-host overrides (e.g. apollo using a user keyFile) live in their own
   # platform module and just set `sops.age.keyFile` alongside.
   sops.age.sshKeyPaths = lib.mkDefault [ "/etc/ssh/ssh_host_ed25519_key" ];
+  sops.age.keyFile =
+    if hostPlatform.isDarwin then "/Users/${user.name}/.config/sops/age/keys.txt" else "";
 }

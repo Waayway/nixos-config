@@ -69,7 +69,15 @@ let
 
   systemFunc = nixpkgs.lib.nixosSystem;
 
-  homeManager = (import ./mkHome.nix { }) user extraArgs;
+  homeManager =
+    (import ./mkHome.nix (
+      if machineOptions.options ? home-manager && machineOptions.options.home-manager ? enable then
+        machineOptions.options.home-manager.enable
+      else
+        false
+    ) { })
+      user
+      extraArgs;
 
 in
 systemFunc rec {

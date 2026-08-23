@@ -1,7 +1,6 @@
 {
   pkgs,
   lib,
-  isLaptop,
   ...
 }:
 let
@@ -76,8 +75,6 @@ in
         }
 
         # FINGERPRINT
-        (
-          if isLaptop then
             {
               monitor = "";
               text = "$FPRINTPROMPT";
@@ -88,9 +85,6 @@ in
               halign = "center";
               valign = "center";
             }
-          else
-            { }
-        )
       ];
 
       # INPUT FIELD
