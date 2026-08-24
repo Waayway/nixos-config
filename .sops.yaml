@@ -11,7 +11,7 @@ keys:
   # TODO: derive and add once each host has been booted with the merged flake:
   # - &host_apollo     <age1...>   # apollo system-level sops (separate from thijs_macbook user key)
   # - &host_hephaestus <age1...>
-  # - &host_hermes     <age1...>
+  - &host_hermes  age1fdeqkdvph8vashl76z9gtf8dcpax8npqgmfv2ccegp3jhshtr95qk2lnfs 
 
 creation_rules:
   - path_regex: secrets/common\.yaml$
@@ -19,18 +19,12 @@ creation_rules:
       - age:
           - *host_apollo
           - *host_athena
+          - *host_hermes
           - *host_vms_base
 
-  - path_regex: secrets/workstations/.*\.yaml$
+  - path_regex: secrets/.*\.yaml$
     key_groups:
       - age:
           - *host_apollo
+          - *host_hermes
           - *host_athena
-          # Add per-workstation host anchors here once derived.
-
-  - path_regex: secrets/servers/.*\.yaml$
-    key_groups:
-      - age:
-          - *host_apollo
-          - *host_athena
-          - *host_vms_base
