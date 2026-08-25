@@ -22,5 +22,5 @@
   # platform module and just set `sops.age.keyFile` alongside.
   sops.age.sshKeyPaths = lib.mkDefault [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.age.keyFile =
-    if hostPlatform.isDarwin then "/Users/${user.name}/.config/sops/age/keys.txt" else "";
+    "${if hostPlatform.isDarwin then "/Users/${user.name}" else "/home/${user.name}"}/.config/sops/age/keys.txt";
 }
