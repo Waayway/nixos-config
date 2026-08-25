@@ -11,7 +11,7 @@ keys:
   # TODO: derive and add once each host has been booted with the merged flake:
   # - &host_apollo     <age1...>   # apollo system-level sops (separate from thijs_macbook user key)
   # - &host_hephaestus <age1...>
-  - &host_hermes  age1fdeqkdvph8vashl76z9gtf8dcpax8npqgmfv2ccegp3jhshtr95qk2lnfs 
+  - &host_hermes age1fe65e3ss82xp2p60mh326n287xr9suk3et07ekky84etkyu3dy0qlawwyk
 
 creation_rules:
   - path_regex: secrets/common\.yaml$
