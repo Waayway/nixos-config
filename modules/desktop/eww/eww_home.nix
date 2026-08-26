@@ -1,6 +1,6 @@
 { pkgs, color, ... }:
 let
-  basePath = "modules/workstations/desktop/eww/config";
+  basePath = "modules/desktop/eww/config";
 in
 {
   home.packages = with pkgs; [
