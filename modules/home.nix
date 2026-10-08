@@ -1,6 +1,13 @@
-{ lib, hostPlatform, umport, ... }: {
-  warnings = [ ] ++ lib.optional hostPlatform.isServer
-    [ "HOME MANAGER SHOULD ALMOST NEVER BE USED ON A SERVER" ];
+{
+  lib,
+  hostPlatform,
+  umport,
+  ...
+}:
+{
+  warnings =
+    [ ]
+    ++ lib.optional hostPlatform.isServer [ "HOME MANAGER SHOULD ALMOST NEVER BE USED ON A SERVER" ];
 
   imports = umport {
     # Skip categories that don't exist (yet) so listing them is harmless.

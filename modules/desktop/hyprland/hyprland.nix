@@ -1,4 +1,9 @@
-{ pkgs, lib, hostPlatform, ... }:
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
   programs.hyprland.enable = true;
   environment.sessionVariables = {

@@ -1,5 +1,9 @@
-{ inputs, lib, hostPlatform, ... }:
+{
+  inputs,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
-  home.file.".config/rofi/theme.rasi".source =
-    "${inputs.rofiThemeRepo}/tokyonight/tokyonight.rasi";
+  home.file.".config/rofi/theme.rasi".source = "${inputs.rofiThemeRepo}/tokyonight/tokyonight.rasi";
 })

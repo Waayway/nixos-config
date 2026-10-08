@@ -1,8 +1,19 @@
-{ config, lib, pkgs, hostPlatform, ... }:
-lib.optionalAttrs hostPlatform.isLinux (with lib;
-  let cfg = config.bluetooth;
-  in {
-    options.bluetooth = { enable = mkEnableOption "bluetooth"; };
+{
+  config,
+  lib,
+  pkgs,
+  hostPlatform,
+  ...
+}:
+lib.optionalAttrs hostPlatform.isLinux (
+  with lib;
+  let
+    cfg = config.bluetooth;
+  in
+  {
+    options.bluetooth = {
+      enable = mkEnableOption "bluetooth";
+    };
 
     config = mkIf cfg.enable {
       boot.kernelModules = [ "btusb" ];
@@ -16,12 +27,17 @@ lib.optionalAttrs hostPlatform.isLinux (with lib;
             Experimental = true;
             FastConnectable = true;
           };
-          Policy = { AutoEnable = true; };
+          Policy = {
+            AutoEnable = true;
+          };
         };
       };
       services.blueman.enable = true;
 
-      systemd.user.services.mpris-proxy = { enable = true; };
+      systemd.user.services.mpris-proxy = {
+        enable = true;
+      };
       environment.systemPackages = with pkgs; [ blueman ];
     };
-  })
+  }
+)

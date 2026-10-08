@@ -20,6 +20,11 @@
 
   options = {
     home-manager.enable = true;
+    darwin.apps = {
+      audio.enable = true;
+      browsers.enable = true;
+      dev.enable = true;
+    };
   };
 
   config =
@@ -42,6 +47,11 @@
       # refusing to overwrite. Remove after first successful switch if you
       # want strict overwrite behavior.
       home-manager.backupFileExtension = "before-nix";
+
+      homebrew.casks = [
+        "codex" # OpenAI Codex desktop
+        "db-browser-for-sqlite"
+      ];
 
       # Host-specific darwin settings go here. Example overrides:
       #

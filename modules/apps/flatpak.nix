@@ -1,4 +1,9 @@
-{ inputs, lib, hostPlatform, ... }:
+{
+  inputs,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
   imports = [ inputs.nix-flatpak.nixosModules.nix-flatpak ];
   services.flatpak = {

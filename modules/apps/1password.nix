@@ -1,4 +1,9 @@
-{ user, lib, hostPlatform, ... }:
+{
+  user,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
   programs._1password.enable = true;
   programs._1password-gui = {
