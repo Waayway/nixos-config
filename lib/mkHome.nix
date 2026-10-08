@@ -22,6 +22,8 @@ in
     home-manager.useGlobalPkgs = true;
     home-manager.useUserPackages = true;
     home-manager.extraSpecialArgs = extraArgs;
+    # Back up existing dotfiles instead of refusing to overwrite them.
+    home-manager.backupFileExtension = lib.mkDefault "before-nix";
     home-manager.users.${user.name} =
       { ... }:
       {

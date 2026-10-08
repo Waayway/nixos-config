@@ -19,6 +19,17 @@
       ];
     };
     workstation = {
+      apps = {
+        browsers.enable = true;
+        communication = {
+          enable = true;
+          telegram.enable = false;
+          element.enable = false;
+        };
+        media.enable = true;
+        office.enable = true;
+        utilities.enable = true;
+      };
       terminal.enable = true;
       neovim.enable = true;
       desktop = {

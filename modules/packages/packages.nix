@@ -42,6 +42,17 @@
       gnutar
       rsync
       gnumake
+
+      # Everyday CLI
+      fzf
+      ripgrep
+      tmux
+      just
+      watch
+      scc
+      rclone
+      cloudflared
+      poppler-utils
     ]
     # Linux-only tools (kernel tracing, hardware probes, GNU sysadmin tools
     # that don't exist or don't make sense on darwin).
@@ -69,7 +80,6 @@
         parted
 
         gcc
-
 
       ]
     )
