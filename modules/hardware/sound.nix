@@ -1,5 +1,5 @@
-{ pkgs, ... }:
-{
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
   # Enable sound with pipewire.
   security.rtkit.enable = true;
 
@@ -26,4 +26,4 @@
     # Support the Video Audio (Hardware) Acceleration API
     gst_all_1.gst-vaapi
   ];
-}
+})

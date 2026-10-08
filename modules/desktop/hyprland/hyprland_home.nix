@@ -1,8 +1,5 @@
-{
-  lib,
-  ...
-}:
-let
+{ lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux (let
   inline = lib.generators.mkLuaInline;
 
   # Keybind helpers. In the Lua config every bind is a single `hl.bind` call
@@ -11,44 +8,27 @@ let
   #   modBind  "SHIFT + N" ''hl.dsp.exec_cmd("x")''           -> $mod + SHIFT + N
   #   keyBind  "XF86AudioPlay" ''hl.dsp.exec_cmd("x")''       -> bare key
   modBind = combo: dispatcher: {
-    _args = [
-      (inline ''mod .. " + ${combo}"'')
-      (inline dispatcher)
-    ];
+    _args = [ (inline ''mod .. " + ${combo}"'') (inline dispatcher) ];
   };
   modBindO = combo: dispatcher: opts: {
-    _args = [
-      (inline ''mod .. " + ${combo}"'')
-      (inline dispatcher)
-      opts
-    ];
+    _args = [ (inline ''mod .. " + ${combo}"'') (inline dispatcher) opts ];
   };
-  keyBind = key: dispatcher: {
-    _args = [
-      key
-      (inline dispatcher)
-    ];
-  };
+  keyBind = key: dispatcher: { _args = [ key (inline dispatcher) ]; };
   keyBindO = key: dispatcher: opts: {
-    _args = [
-      key
-      (inline dispatcher)
-      opts
-    ];
+    _args = [ key (inline dispatcher) opts ];
   };
-in
-{
-  xdg.configFile."hypr/hyprpaper.conf".text =
-    "
-wallpaper {
-    monitor =
-    path = ~/.wallpapers
-    fit_mode = cover
-    timeout = 300
-    order = random
-    recursive = true
-}
-";
+in {
+  xdg.configFile."hypr/hyprpaper.conf".text = ''
+
+    wallpaper {
+        monitor =
+        path = ~/.wallpapers
+        fit_mode = cover
+        timeout = 300
+        order = random
+        recursive = true
+    }
+  '';
   wayland.windowManager.hyprland = {
     enable = true;
 
@@ -57,9 +37,7 @@ wallpaper {
     # https://wiki.hypr.land/Configuring/Start/
     settings = {
       # `$mod = SUPER` becomes a Lua local, referenced as `mod .. " + ..."`.
-      mod = {
-        _var = "SUPER";
-      };
+      mod = { _var = "SUPER"; };
 
       monitor = [
         {
@@ -76,7 +54,8 @@ wallpaper {
           scale = 1.6;
         } # 2nd lg 1440p
         {
-          output = "desc:Philips Consumer Electronics Company Philips FTV 0x01010101";
+          output =
+            "desc:Philips Consumer Electronics Company Philips FTV 0x01010101";
           mode = "3840x2160@120.0";
           position = "1440x0";
           scale = 2.5;
@@ -91,18 +70,8 @@ wallpaper {
       ];
 
       env = [
-        {
-          _args = [
-            "HYPRCURSOR_THEME"
-            "rose-pine-hyprcursor"
-          ];
-        }
-        {
-          _args = [
-            "HYPRCURSOR_SIZE"
-            "32"
-          ];
-        }
+        { _args = [ "HYPRCURSOR_THEME" "rose-pine-hyprcursor" ]; }
+        { _args = [ "HYPRCURSOR_SIZE" "32" ]; }
       ];
 
       # Autostart. Replaces `exec-once` (which would generate an invalid
@@ -141,10 +110,7 @@ wallpaper {
           gaps_out = 20;
           border_size = 2;
           "col.active_border" = {
-            colors = [
-              "rgba(33ccffee)"
-              "rgba(00ff99ee)"
-            ];
+            colors = [ "rgba(33ccffee)" "rgba(00ff99ee)" ];
             angle = 45;
           };
           "col.inactive_border" = "rgba(595959aa)";
@@ -152,9 +118,7 @@ wallpaper {
           allow_tearing = true;
         };
 
-        decoration = {
-          rounding = 10;
-        };
+        decoration = { rounding = 10; };
 
         dwindle = {
           #pseudotile = true;
@@ -175,16 +139,7 @@ wallpaper {
             "myBezier"
             {
               type = "bezier";
-              points = [
-                [
-                  0.05
-                  0.9
-                ]
-                [
-                  0.1
-                  1.1
-                ]
-              ];
+              points = [ [ 5.0e-2 0.9 ] [ 0.1 1.1 ] ];
             }
           ];
         }
@@ -193,16 +148,7 @@ wallpaper {
             "overshot"
             {
               type = "bezier";
-              points = [
-                [
-                  0.05
-                  0.9
-                ]
-                [
-                  0.1
-                  1.01
-                ]
-              ];
+              points = [ [ 5.0e-2 0.9 ] [ 0.1 1.01 ] ];
             }
           ];
         }
@@ -264,21 +210,15 @@ wallpaper {
 
       window_rule = [
         {
-          match = {
-            class = "^(spotify)$";
-          };
+          match = { class = "^(spotify)$"; };
           workspace = "name:󰝚";
         }
         {
-          match = {
-            class = "^(discord)$";
-          };
+          match = { class = "^(discord)$"; };
           workspace = "name:󰭹";
         }
         {
-          match = {
-            class = "^(.gamescope-wrapped)$";
-          };
+          match = { class = "^(.gamescope-wrapped)$"; };
           workspace = "name:󰊴";
         }
       ];
@@ -287,20 +227,22 @@ wallpaper {
         (modBind "SHIFT + N" ''hl.dsp.exec_cmd("swaync-client -t -sw")'')
         (modBind "Return" ''hl.dsp.exec_cmd("ghostty")'')
         (modBind "B" ''hl.dsp.exec_cmd("firefox")'')
-        (modBind "Space" ''hl.dsp.exec_cmd("rofi -show drun -theme ~/.config/rofi/theme.rasi")'')
+        (modBind "Space" ''
+          hl.dsp.exec_cmd("rofi -show drun -theme ~/.config/rofi/theme.rasi")'')
         (modBind "T" ''hl.dsp.exec_cmd("nemo")'')
 
-        (modBind "SHIFT + S" ''hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy")'')
+        (modBind "SHIFT + S"
+          ''hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy")'')
         (modBind "ALT + S" ''hl.dsp.exec_cmd("grim -g \"$(slurp)\"")'')
         (modBind "SHIFT + C" ''hl.dsp.exec_cmd("hyprpicker | wl-copy")'')
         (modBind "L" ''hl.dsp.exec_cmd("killall wlogout || wlogout -b 2")'')
         (modBind "SHIFT + L" ''hl.dsp.exec_cmd("killall hyprlock")'')
 
-        (modBind "Q" ''hl.dsp.window.close()'')
+        (modBind "Q" "hl.dsp.window.close()")
         (modBind "V" ''hl.dsp.window.float({ action = "toggle" })'')
-        (modBind "P" ''hl.dsp.window.pseudo()'')
+        (modBind "P" "hl.dsp.window.pseudo()")
         (modBind "J" ''hl.dsp.layout("togglesplit")'')
-        (modBind "F" ''hl.dsp.window.fullscreen()'')
+        (modBind "F" "hl.dsp.window.fullscreen()")
 
         # Move focus with mod + arrow keys
         (modBind "left" ''hl.dsp.focus({ direction = "l" })'')
@@ -315,45 +257,47 @@ wallpaper {
         (keyBind "XF86AudioStop" ''hl.dsp.exec_cmd("playerctl stop")'')
 
         # Mouse: move/resize windows with mod + LMB/RMB drag
-        (modBindO "mouse:272" ''hl.dsp.window.drag()'' { mouse = true; })
-        (modBindO "mouse:273" ''hl.dsp.window.resize()'' { mouse = true; })
+        (modBindO "mouse:272" "hl.dsp.window.drag()" { mouse = true; })
+        (modBindO "mouse:273" "hl.dsp.window.resize()" { mouse = true; })
 
-        (modBind "SHIFT + F12" ''hl.dsp.exec_cmd("bash ~/.config/hypr/scripts/wallpaper-random.sh")'')
-      ]
-      ++ (
+        (modBind "SHIFT + F12" ''
+          hl.dsp.exec_cmd("bash ~/.config/hypr/scripts/wallpaper-random.sh")'')
+      ] ++ (
         # binds $mod + [SHIFT/ALT +] {1..0} to switch / move-to / move-monitor
         # for workspaces 1..10 (key "0" -> workspace 10).
-        builtins.concatLists (
-          builtins.genList (
-            x:
-            let
-              n = x + 1;
-              ws = builtins.toString (n - ((n / 10) * 10));
-            in
-            [
-              (modBind ws ''hl.dsp.focus({ workspace = ${toString n} })'')
-              (modBind "SHIFT + ${ws}" ''hl.dsp.window.move({ workspace = ${toString n} })'')
-              (modBind "ALT + ${ws}" ''hl.dsp.exec_cmd("bash ~/.config/hypr/scripts/move_workspace_to_monitor.sh ${toString x}")'')
-            ]
-          ) 10
-        )
-      )
-      ++ [
-        (modBind "S" ''hl.dsp.focus({ workspace = "name:󰝚" })'')
-        (modBind "D" ''hl.dsp.focus({ workspace = "name:󰭹" })'')
-        (modBind "G" ''hl.dsp.focus({ workspace = "name:󰊴" })'')
+        builtins.concatLists (builtins.genList (x:
+          let
+            n = x + 1;
+            ws = builtins.toString (n - ((n / 10) * 10));
+          in [
+            (modBind ws "hl.dsp.focus({ workspace = ${toString n} })")
+            (modBind "SHIFT + ${ws}"
+              "hl.dsp.window.move({ workspace = ${toString n} })")
+            (modBind "ALT + ${ws}" ''
+              hl.dsp.exec_cmd("bash ~/.config/hypr/scripts/move_workspace_to_monitor.sh ${
+                toString x
+              }")'')
+          ]) 10)) ++ [
+            (modBind "S" ''hl.dsp.focus({ workspace = "name:󰝚" })'')
+            (modBind "D" ''hl.dsp.focus({ workspace = "name:󰭹" })'')
+            (modBind "G" ''hl.dsp.focus({ workspace = "name:󰊴" })'')
 
-        # Volume + brightness (press-and-hold via repeating)
-        (keyBindO "XF86AudioRaiseVolume" ''hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+")'' {
-          repeating = true;
-        })
-        (keyBindO "XF86AudioLowerVolume" ''hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-")'' {
-          repeating = true;
-        })
-        (keyBind "XF86AudioMute" ''hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")'')
-        (keyBindO "XF86MonBrightnessUp" ''hl.dsp.exec_cmd("brightnessctl s +10%")'' { repeating = true; })
-        (keyBindO "XF86MonBrightnessDown" ''hl.dsp.exec_cmd("brightnessctl s 10%-")'' { repeating = true; })
-      ];
+            # Volume + brightness (press-and-hold via repeating)
+            (keyBindO "XF86AudioRaiseVolume"
+              ''hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+")'' {
+                repeating = true;
+              })
+            (keyBindO "XF86AudioLowerVolume"
+              ''hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-")'' {
+                repeating = true;
+              })
+            (keyBind "XF86AudioMute"
+              ''hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")'')
+            (keyBindO "XF86MonBrightnessUp"
+              ''hl.dsp.exec_cmd("brightnessctl s +10%")'' { repeating = true; })
+            (keyBindO "XF86MonBrightnessDown"
+              ''hl.dsp.exec_cmd("brightnessctl s 10%-")'' { repeating = true; })
+          ];
     };
   };
-}
+})

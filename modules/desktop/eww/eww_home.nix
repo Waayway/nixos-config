@@ -1,13 +1,8 @@
-{ pkgs, color, ... }:
-let
-  basePath = "modules/desktop/eww/config";
-in
-{
-  home.packages = with pkgs; [
-    eww
-    socat
-    libnotify
-  ];
+{ pkgs, color, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux
+(let basePath = "modules/desktop/eww/config";
+in {
+  home.packages = with pkgs; [ eww socat libnotify ];
 
   home.activation.installConfig = ''
     if [ ! -e ~/.config/eww ]; then
@@ -43,4 +38,4 @@ in
     $comment : #${comment};
     $accent : #${accent};
   '';
-}
+})

@@ -1,18 +1,10 @@
-{
-  pkgs,
-  ...
-}:
-
-let
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux (let
   catpuccin = pkgs.colloid-gtk-theme.override {
     colorVariants = [ "dark" ];
-    tweaks = [
-      "rimless"
-      "catppuccin"
-    ];
+    tweaks = [ "rimless" "catppuccin" ];
   };
-in
-{
+in {
   # * GTK
   gtk = {
     enable = true;
@@ -29,4 +21,4 @@ in
       package = pkgs.rose-pine-cursor;
     };
   };
-}
+})

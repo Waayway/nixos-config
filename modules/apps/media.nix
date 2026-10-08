@@ -1,5 +1,5 @@
-{ pkgs, ... }:
-{
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
   environment.systemPackages = with pkgs; [
 
     # -- Spotify --
@@ -27,4 +27,4 @@
     # -- Isos --
     popsicle
   ];
-}
+})

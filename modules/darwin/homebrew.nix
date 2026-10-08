@@ -1,14 +1,6 @@
-{
-  inputs,
-  lib,
-  hostPlatform,
-  user,
-  ...
-}:
-{
-  imports = lib.optional hostPlatform.isDarwin [
-    inputs.nix-homebrew.darwinModules.nix-homebrew
-  ];
+{ inputs, lib, hostPlatform, user, ... }: {
+  imports = lib.optionals hostPlatform.isDarwin
+    [ inputs.nix-homebrew.darwinModules.nix-homebrew ];
 
   config = lib.optionalAttrs hostPlatform.isDarwin {
     # nix-homebrew adopts any pre-existing /opt/homebrew install instead of
