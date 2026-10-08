@@ -27,3 +27,33 @@ I discovered Nixos somewhere in 2023 And basically loved it from the start. 99% 
 Nixos has been very stable for me with minimal problems and with a possibility to explore some more devops.
 
 
+
+### Installing a new Mac (e.g. atlas)
+
+1. Run macOS setup and create the account named in the host file (`thijsvanwaaij` for atlas), then install the command line tools:
+   ```sh
+   xcode-select --install
+   ```
+2. Install Nix with the official multi-user installer (not Determinate Nix — this repo manages `nix.*` itself):
+   ```sh
+   sh <(curl -L https://nixos.org/nix/install)
+   ```
+3. Give your terminal **Full Disk Access** (System Settings → Privacy & Security). The first activation writes `com.apple.universalaccess` (reduce transparency/motion), which macOS blocks otherwise.
+4. Clone and switch:
+   ```sh
+   git clone https://github.com/Waayway/nixos-waayway ~/.flake
+   git -C ~/.flake checkout merge-servers
+   sudo nix --extra-experimental-features 'nix-command flakes' run nix-darwin/nix-darwin-26.05#darwin-rebuild -- switch --flake ~/.flake#atlas
+   ```
+   Existing dotfiles are kept as `*.before-nix`. On atlas Homebrew runs with `cleanup = "zap"`: casks/brews that aren't declared get removed on every switch.
+5. Afterwards, rebuild with `sudo darwin-rebuild switch --flake ~/.flake#atlas`.
+
+Manual installs on atlas: Xcode, MacUtil. Sign in to 1Password, Microsoft 365, Google Drive, OneDrive and Tailscale by hand.
+
+#### Adding sops secrets to a Mac
+
+Darwin hosts don't declare secrets yet. To onboard one:
+
+1. `mkdir -p ~/.config/sops/age && nix run nixpkgs#age -- -keygen -o ~/.config/sops/age/keys.txt`
+2. Add the printed public key to `.sops.yaml` (keys + creation rules).
+3. On a machine that can already decrypt: `sops updatekeys secrets/*.yaml`, commit, pull on the Mac.
