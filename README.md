@@ -47,7 +47,7 @@ Nixos has been very stable for me with minimal problems and with a possibility t
    Existing dotfiles are kept as `*.before-nix`. atlas sets `workstation.homebrew.removeUndeclared = "zap"`: casks/brews that aren't declared get removed (with their app data) on every switch. Other Macs default to `"keep"`.
 5. Afterwards, rebuild with `sudo darwin-rebuild switch --flake ~/.flake#atlas`.
 
-Manual installs on atlas: Xcode, MacUtil.
+Manual installs on atlas: Xcode, MacUtil. Install **Xcode** (and run `sudo xcodebuild -license accept`) before the first switch on a host with `hardware.thermalforge.enable`: the ThermalForge formula compiles from source and needs the full Xcode app.
 
 #### Host files vs. modules
 

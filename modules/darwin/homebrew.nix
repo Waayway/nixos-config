@@ -51,8 +51,13 @@
           .${config.workstation.homebrew.removeUndeclared};
       };
 
+      # Homebrew 6+ only loads casks/formulae from third-party taps that are
+      # explicitly trusted.
       taps = [
-        "nikitabobko/tap" # aerospace
+        {
+          name = "nikitabobko/tap"; # aerospace
+          trusted = true;
+        }
       ];
 
       # CLIs come from nixpkgs (modules/packages, modules/darwin/packages.nix,
