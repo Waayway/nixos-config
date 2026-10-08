@@ -20,11 +20,11 @@
 
     nix-homebrew = {
       url = "github:zhaofengli/nix-homebrew";
-      # Upstream pins brew 5.1.1, which has a regression where
-      # `cask_struct_generator.rb` crashes with "undefined method 'to_sym'
-      # for nil" while parsing depends_on from the cask API. 5.1.14 fixes it.
+      # Pin brew ourselves: 7.0.8 is the first release here that knows
+      # macOS 27 (golden_gate), needed for atlas. (Older brew can also crash
+      # parsing the current cask API.)
       inputs.brew-src = {
-        url = "github:Homebrew/brew/5.1.14";
+        url = "github:Homebrew/brew/7.0.8";
         flake = false;
       };
     };
