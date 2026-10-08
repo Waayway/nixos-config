@@ -70,8 +70,8 @@ defaults match the current laptop. Existing hosts keep evaluating.
 
 ### 2. atlas contents
 
-Host lives in `hosts/workstations/atlas/default.nix` (directory host, so it can
-carry `aerospace.toml`). `system = "aarch64-darwin"`, user `thijsvanwaaij` /
+Host lives in `hosts/workstations/atlas.nix` (single file, like the other hosts).
+`system = "aarch64-darwin"`, user `thijsvanwaaij` /
 "Thijs van Waaij", `type = "macbook"`, `home-manager.enable = true`,
 `home-manager.backupFileExtension = "before-nix"`. No darwin app groups enabled.
 
@@ -86,6 +86,10 @@ Shared (cross-platform modules, every host):
   `push.autoSetupRemote = true`, `pull.rebase = false`, gh as credential helper
   (`programs.gh.gitCredentialHelper`). Email is per host.
 - Fix `zsh_home.nix` PATH entries with a stray space (`"$HOME/.local/bin :$PATH"`).
+- New `modules/darwin/aerospace_home.nix` + `modules/darwin/aerospace.toml`
+  (copy of the current laptop's `~/.aerospace.toml`): links `~/.aerospace.toml`
+  on every Darwin host (guarded on `hostPlatform.isDarwin`). apollo picks this up
+  too; its existing file is kept as `~/.aerospace.toml.before-nix`.
 - Darwin-only zsh additions (guarded): `eval "$(/opt/homebrew/bin/brew shellenv)"`
   in profile, `/opt/homebrew/opt/postgresql@16/bin` on PATH,
   `[ -f ~/.aliases ] && source ~/.aliases`.
@@ -107,8 +111,6 @@ atlas host config:
   lua-language-server, stylua, nixd, nixfmt, emmet-ls, intelephense,
   typescript-language-server, tailwindcss-language-server, pyright.
 - Git email `thijs@vriend.studio`.
-- `~/.aerospace.toml` from `hosts/workstations/atlas/aerospace.toml` (copy of the
-  current laptop's file).
 - macOS defaults: capture the current laptop with `defaults read` and override
   only keys that differ from `modules/darwin/system.nix` (known: Finder column
   view, 24h clock, guest login off, Dock size).
