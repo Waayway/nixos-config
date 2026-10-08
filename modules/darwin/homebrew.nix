@@ -1,4 +1,5 @@
 {
+  config,
   inputs,
   lib,
   hostPlatform,
@@ -6,6 +7,22 @@
   ...
 }:
 {
+  options.workstation.homebrew.removeUndeclared = lib.mkOption {
+    type = lib.types.enum [
+      "keep"
+      "uninstall"
+      "zap"
+    ];
+    default = "keep";
+    description = ''
+      What a switch does with Homebrew casks/brews that aren't declared in
+      this repo:
+        keep      leave them installed (safe for machines with manual installs)
+        uninstall remove them, keep their app data and preferences
+        zap       remove them including app data, caches and preferences
+    '';
+  };
+
   imports = lib.optionals hostPlatform.isDarwin [ inputs.nix-homebrew.darwinModules.nix-homebrew ];
 
   config = lib.optionalAttrs hostPlatform.isDarwin {
@@ -22,31 +39,29 @@
     homebrew = {
       enable = true;
 
-      # Do NOT remove formulae/casks that aren't listed here. Manual installs
-      # from before this flake was introduced stay intact; migrate them into
-      # nixpkgs (or into the lists below) incrementally.
       onActivation = {
         autoUpdate = true;
         upgrade = true;
-        cleanup = lib.mkDefault "none";
+        cleanup =
+          {
+            keep = "none";
+            uninstall = "uninstall";
+            zap = "zap";
+          }
+          .${config.workstation.homebrew.removeUndeclared};
       };
 
       taps = [
         "nikitabobko/tap" # aerospace
       ];
 
-      # CLI formulae are NOT declared here — they are installed via nixpkgs.
-      # See modules/darwin/packages.nix and modules/workstations/programming/*.
-      brews = [ ];
-
-      # Casks only for GUI/macOS apps that are NOT in nixpkgs for darwin.
-      # GUI apps that ARE in nixpkgs live in modules/darwin/apps.nix.
+      # CLIs come from nixpkgs (modules/packages, modules/darwin/packages.nix,
+      # modules/development). Apps come from the workstation.apps categories
+      # (modules/apps). Only the always-on Mac basics are listed here.
       casks = [
         "aerospace" # tiling WM (from nikitabobko/tap)
         "jordanbaird-ice" # menu bar manager
-        "pgadmin4"
-        "spotify" # uncertain aarch64-darwin support in nixpkgs
-        "ghostty" # settings are still managed by the home-manager module
+        "ghostty" # settings are managed by the home-manager module
       ];
     };
   };

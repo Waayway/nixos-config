@@ -44,10 +44,14 @@ Nixos has been very stable for me with minimal problems and with a possibility t
    git clone https://github.com/Waayway/nixos-waayway ~/.flake
    sudo nix --extra-experimental-features 'nix-command flakes' run nix-darwin/nix-darwin-26.05#darwin-rebuild -- switch --flake ~/.flake#atlas
    ```
-   Existing dotfiles are kept as `*.before-nix`. On atlas Homebrew runs with `cleanup = "zap"`: casks/brews that aren't declared get removed on every switch.
+   Existing dotfiles are kept as `*.before-nix`. atlas sets `workstation.homebrew.removeUndeclared = "zap"`: casks/brews that aren't declared get removed (with their app data) on every switch. Other Macs default to `"keep"`.
 5. Afterwards, rebuild with `sudo darwin-rebuild switch --flake ~/.flake#atlas`.
 
 Manual installs on atlas: Xcode, MacUtil.
+
+#### Host files vs. modules
+
+Host files stay thin: identity, which modules/categories are enabled, and a few per-host values. Apps are grouped in cross-platform categories under `modules/apps/` (`workstation.apps.<category>.enable`); a host can switch single apps off with `workstation.apps.<category>.<app>.enable = false`. macOS settings shared by every Mac live in `modules/darwin/` (`defaults.nix`, `spotlight.nix`, `system.nix`). On every Mac a random picture from `wallpapers/` becomes the desktop on each switch (`darwin.wallpaper` to pin one); macOS asks once to allow controlling System Events.
 
 Finder sidebar favorites (`darwin.finderSidebar`) are added on each switch once their folders exist, so after Google Drive has synced and repos are cloned, switch once more. atlas runs macOS 27: Homebrew is pinned to 7.0.8+ (first release that knows macOS 27). The sidebar helper and some `defaults` keys (Liquid Glass, Spotlight) were verified on macOS 26; if one stops applying on 27, it's skipped rather than failing the switch. Sign in to 1Password, Microsoft 365, Google Drive, OneDrive and Tailscale by hand.
 

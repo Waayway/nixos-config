@@ -8,11 +8,22 @@
   type = "framework13";
 
   options = {
+    workstation.apps = {
+      browsers.enable = true;
+      communication = {
+        enable = true;
+        telegram.enable = false;
+        element.enable = false;
+      };
+      media.enable = true;
+      office.enable = true;
+      utilities.enable = true;
+    };
     hardware = {
       bluetooth.enable = true;
       profiles = [ "framework-amd-ai-300-series" ];
     };
-		home-manager.enable = true;
+    home-manager.enable = true;
     #workstation = {
     #  terminal.enable = true;
     #  neovim.enable = true;

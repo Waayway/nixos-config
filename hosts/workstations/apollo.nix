@@ -20,10 +20,37 @@
 
   options = {
     home-manager.enable = true;
-    darwin.apps = {
+    workstation.apps = {
+      browsers = {
+        enable = true;
+        chromium.enable = false;
+      };
+      communication = {
+        enable = true;
+        telegram.enable = false;
+      };
+      media = {
+        enable = true;
+        tidal.enable = false;
+        obs.enable = false;
+        krita.enable = false;
+      };
+      ai = {
+        enable = true;
+        claude-code.enable = false;
+        opencode.enable = false;
+        lm-studio.enable = false;
+        ollama.enable = false;
+      };
+      editors = {
+        enable = true;
+        cursor.enable = false;
+        android-studio.enable = false;
+      };
+      database.enable = true;
+      containers.enable = true;
+      electronics.enable = true;
       audio.enable = true;
-      browsers.enable = true;
-      dev.enable = true;
     };
   };
 
@@ -42,16 +69,6 @@
       nix.linux-builder.config = {
         boot.binfmt.emulatedSystems = [ "x86_64-linux" ];
       };
-
-      # First-time bootstrap: back up any existing dotfiles instead of
-      # refusing to overwrite. Remove after first successful switch if you
-      # want strict overwrite behavior.
-      home-manager.backupFileExtension = "before-nix";
-
-      homebrew.casks = [
-        "codex" # OpenAI Codex desktop
-        "db-browser-for-sqlite"
-      ];
 
       # Host-specific darwin settings go here. Example overrides:
       #

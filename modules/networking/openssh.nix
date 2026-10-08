@@ -6,7 +6,8 @@
 # attrset per platform so darwin never sees the Linux-only assignments.
 if hostPlatform.isDarwin then
   {
-    services.openssh.enable = true;
+    # No inbound SSH (Remote Login) on the Macs.
+    services.openssh.enable = false;
   }
 else
   {
