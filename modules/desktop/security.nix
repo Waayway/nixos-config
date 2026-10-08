@@ -1,6 +1,14 @@
-{ pkgs, lib, hostPlatform, ... }:
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
-  environment.systemPackages = with pkgs; [ polkit_gnome ipmiview ];
+  environment.systemPackages = with pkgs; [
+    polkit_gnome
+    ipmiview
+  ];
 
   security.polkit.enable = true;
   services.gnome.gnome-keyring.enable = true;

@@ -1,4 +1,9 @@
-{ nixpkgs, overlays, inputs, version, }:
+{
+  nixpkgs,
+  overlays,
+  inputs,
+  version,
+}:
 name: hostAttrs:
 let
 
@@ -53,13 +58,18 @@ let
 
   systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
-  homeManager = (import ./mkHome.nix (if machineOptions.options ? home-manager
-  && machineOptions.options.home-manager ? enable then
-    machineOptions.options.home-manager.enable
-  else
-    false) { isDarwin = true; }) user extraArgs;
+  homeManager =
+    (import ./mkHome.nix (
+      if machineOptions.options ? home-manager && machineOptions.options.home-manager ? enable then
+        machineOptions.options.home-manager.enable
+      else
+        false
+    ) { isDarwin = true; })
+      user
+      extraArgs;
 
-in systemFunc {
+in
+systemFunc {
   inherit system;
 
   specialArgs = extraArgs;

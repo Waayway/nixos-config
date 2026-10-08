@@ -1,6 +1,12 @@
-{ inputs, lib, hostPlatform, user, ... }: {
-  imports = lib.optionals hostPlatform.isDarwin
-    [ inputs.nix-homebrew.darwinModules.nix-homebrew ];
+{
+  inputs,
+  lib,
+  hostPlatform,
+  user,
+  ...
+}:
+{
+  imports = lib.optionals hostPlatform.isDarwin [ inputs.nix-homebrew.darwinModules.nix-homebrew ];
 
   config = lib.optionalAttrs hostPlatform.isDarwin {
     # nix-homebrew adopts any pre-existing /opt/homebrew install instead of
@@ -22,7 +28,7 @@
       onActivation = {
         autoUpdate = true;
         upgrade = true;
-        cleanup = "none";
+        cleanup = lib.mkDefault "none";
       };
 
       taps = [
@@ -37,10 +43,7 @@
       # GUI apps that ARE in nixpkgs live in modules/darwin/apps.nix.
       casks = [
         "aerospace" # tiling WM (from nikitabobko/tap)
-        "codex" # OpenAI Codex desktop
-        "focusrite-control-2" # proprietary audio interface driver
         "jordanbaird-ice" # menu bar manager
-        "db-browser-for-sqlite"
         "pgadmin4"
         "spotify" # uncertain aarch64-darwin support in nixpkgs
         "ghostty" # settings are still managed by the home-manager module

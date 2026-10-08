@@ -1,4 +1,9 @@
-{ pkgs, lib, hostPlatform, ... }:
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 lib.optionalAttrs hostPlatform.isLinux ({
   hardware.enableRedistributableFirmware = true;
 
@@ -22,6 +27,5 @@ lib.optionalAttrs hostPlatform.isLinux ({
   systemd.packages = with pkgs; [ lact ];
   systemd.services.lactd.wantedBy = [ "multi-user.target" ];
 
-  systemd.tmpfiles.rules =
-    [ "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}" ];
+  systemd.tmpfiles.rules = [ "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}" ];
 })

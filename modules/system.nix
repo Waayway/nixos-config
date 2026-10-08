@@ -1,4 +1,5 @@
-{ umport, ... }: {
+{ umport, ... }:
+{
   imports = umport {
     # Skip categories that don't exist (yet) so listing them is harmless.
     paths = builtins.filter builtins.pathExists [
