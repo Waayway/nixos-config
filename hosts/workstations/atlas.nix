@@ -27,7 +27,21 @@
       # refusing to overwrite.
       home-manager.backupFileExtension = "before-nix";
 
-      home-manager.users.thijsvanwaaij.programs.git.settings.user.email = "thijs@vriend.studio";
+      home-manager.users.thijsvanwaaij = {
+        programs.git.settings.user.email = "thijs@vriend.studio";
+
+        # Finder sidebar Favorites (mirrors 14m2max). Folders that don't exist
+        # yet (Drive not synced, repos not cloned) are added on a later switch.
+        darwin.finderSidebar = [
+          "My Drive/Cuneus"
+          "oteny"
+          "oteny/rivermen"
+          "Desktop"
+          "Documents"
+          "Downloads"
+          "Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings"
+        ];
+      };
 
       # Fresh machine: what's declared here is what's installed.
       homebrew.onActivation.cleanup = "zap";
