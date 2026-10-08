@@ -18,6 +18,11 @@
       window-padding-color = "extend-always";
       shell-integration-features = "ssh-env,ssh-terminfo";
     }
+    // lib.optionalAttrs hostPlatform.isDarwin {
+      # Auto secure input also fires for TUIs that turn off echo (btop), and
+      # while it's on AeroSpace gets no key bindings. sudo uses Touch ID.
+      macos-auto-secure-input = false;
+    }
     // lib.optionalAttrs hostPlatform.isLinux {
       gtk-single-instance = true;
     };
