@@ -21,7 +21,7 @@
   };
 
   config =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     {
       # First-time bootstrap: back up any existing dotfiles instead of
       # refusing to overwrite.
@@ -31,6 +31,24 @@
 
       # Fresh machine: what's declared here is what's installed.
       homebrew.onActivation.cleanup = "zap";
+
+      # Work laptop: no inbound SSH (shared darwin config enables Remote Login).
+      services.openssh.enable = lib.mkForce false;
+
+      networking.applicationFirewall.enable = true;
+
+      # Same as 14m2max: display sleeps after an hour (battery and AC).
+      power.sleep.display = 60;
+
+      # Start ThermalForge (fan control) at login.
+      launchd.user.agents.thermalforge.serviceConfig = {
+        ProgramArguments = [
+          "/usr/bin/open"
+          "-a"
+          "ThermalForge"
+        ];
+        RunAtLoad = true;
+      };
 
       homebrew.taps = [
         "producerguy/tap" # thermalforge
@@ -80,7 +98,6 @@
         "krita"
 
         # System
-        "betterdisplay"
         "1password"
         "tailscale-app"
         "elgato-stream-deck"
@@ -116,13 +133,30 @@
 
       # Differences from the shared defaults (captured from 14m2max).
       system.defaults = {
-        NSGlobalDomain.AppleICUForce24HourTime = true;
+        NSGlobalDomain = {
+          AppleICUForce24HourTime = true;
+          AppleShowAllExtensions = true;
+          AppleShowScrollBars = "Always";
+          AppleScrollerPagingBehavior = true; # click in scroll bar jumps to spot
+          AppleKeyboardUIMode = 2; # Tab moves through all controls
+          "com.apple.keyboard.fnState" = true; # F1-F12 as standard function keys
+          "com.apple.springing.enabled" = false;
+          "com.apple.trackpad.forceClick" = true;
+        };
+        menuExtraClock.ShowDayOfWeek = true;
         dock = {
           tilesize = 62;
           largesize = 64;
           magnification = true;
+          minimize-to-application = true;
+          wvous-br-corner = 14; # bottom-right hot corner: Quick Note
         };
-        finder.ShowStatusBar = true;
+        finder = {
+          ShowStatusBar = true;
+          ShowPathbar = true;
+          FXDefaultSearchScope = "SCcf"; # search the current folder
+          FXRemoveOldTrashItems = true; # empty Trash after 30 days
+        };
         loginwindow.GuestEnabled = false;
 
         # Tone down Liquid Glass and simplify the UI.
@@ -132,13 +166,15 @@
           reduceTransparency = true; # solid instead of glass materials
           reduceMotion = true;
         };
-        NSGlobalDomain.NSAutomaticWindowAnimationsEnabled = false;
         dock = {
           launchanim = false;
           mineffect = "scale";
           autohide-delay = 0.0;
         };
         WindowManager = {
+          GloballyEnabled = false; # Stage Manager off
+          AppWindowGroupingBehavior = true; # group windows by app (AeroSpace recommends)
+          HideDesktop = true; # hide desktop items
           StandardHideWidgets = true;
           EnableStandardClickToShowDesktop = false; # clicking wallpaper doesn't hide windows
           # AeroSpace does the tiling; keep macOS' own tiling out of the way.
@@ -148,7 +184,47 @@
         };
         # Liquid Glass style (macOS 26); mirrors 14m2max.
         CustomUserPreferences = {
-          NSGlobalDomain.NSGlassDiffusionSetting = 0;
+          NSGlobalDomain = {
+            NSGlassDiffusionSetting = 0;
+            NSAutomaticWindowAnimationsEnabled = false;
+
+            # English UI, Dutch region formats.
+            AppleLanguages = [
+              "en-US"
+              "nl-NL"
+            ];
+            AppleLocale = "en_US@rg=nlzzzz";
+
+            AppleActionOnDoubleClick = "Fill"; # double-click title bar fills screen
+            AppleLiveTextEnabled = false;
+            "com.apple.mouse.linear" = true; # no mouse acceleration
+            "com.apple.trackpad.scrolling" = 0.3125;
+          };
+
+          "com.apple.finder".FXPreferredSearchViewStyle = "Nlsv";
+
+          # Single input source: U.S.
+          "com.apple.HIToolbox".AppleEnabledInputSources = [
+            {
+              InputSourceKind = "Keyboard Layout";
+              "KeyboardLayout ID" = 0;
+              "KeyboardLayout Name" = "U.S.";
+            }
+            {
+              "Bundle ID" = "com.apple.CharacterPaletteIM";
+              InputSourceKind = "Non Keyboard Input Method";
+            }
+            {
+              "Bundle ID" = "com.apple.PressAndHold";
+              InputSourceKind = "Non Keyboard Input Method";
+            }
+          ];
+
+          # Siri and dictation off.
+          "com.apple.assistant.support" = {
+            "Assistant Enabled" = false;
+            "Dictation Enabled" = false;
+          };
 
           # Spotlight: apps, calculator, developer sources and settings only
           # (mirrors 14m2max). `orderedItems` is the classic category list;
