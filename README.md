@@ -55,6 +55,17 @@ Finder sidebar favorites (`darwin.finderSidebar`) are added on each switch once 
 
 Darwin hosts don't declare secrets yet. To onboard one:
 
-1. `mkdir -p ~/.config/sops/age && nix run nixpkgs#age -- -keygen -o ~/.config/sops/age/keys.txt`
-2. Add the printed public key to `.sops.yaml` (keys + creation rules).
-3. On a machine that can already decrypt: `sops updatekeys secrets/*.yaml`, commit, pull on the Mac.
+1. Generate the age key (`age-keygen` ships in the `age` package, but isn't its main program, so use `nix shell`):
+   ```sh
+   mkdir -p ~/.config/sops/age
+   nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt
+   ```
+   It prints `Public key: age1…`. To show it again later:
+   ```sh
+   nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
+   ```
+2. Add that public key to `.sops.yaml`: a new `&host_<name>` entry under `keys:` and a reference in each `creation_rules` group the host should read.
+3. On a machine that can already decrypt, re-encrypt for the new key, then commit and pull on the Mac:
+   ```sh
+   nix shell nixpkgs#sops -c sops updatekeys secrets/*.yaml
+   ```
