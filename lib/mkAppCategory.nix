@@ -13,6 +13,7 @@
 #   linuxConfig  NixOS config applied when the app is enabled (e.g. programs.*)
 #   darwinPkgs   list of packages installed on nix-darwin
 #   darwinCasks  list of Homebrew casks installed on nix-darwin
+#   darwinConfig nix-darwin config applied when the app is enabled
 # An app without a field for the current platform is simply not installed there.
 #
 # Usage in a module:
@@ -56,6 +57,11 @@ in
     ++ lib.optionals hostPlatform.isLinux (
       lib.mapAttrsToList (app: a: lib.mkIf (isOn app) a.linuxConfig) (
         lib.filterAttrs (_: a: a ? linuxConfig) apps
+      )
+    )
+    ++ lib.optionals hostPlatform.isDarwin (
+      lib.mapAttrsToList (app: a: lib.mkIf (isOn app) a.darwinConfig) (
+        lib.filterAttrs (_: a: a ? darwinConfig) apps
       )
     )
   );
