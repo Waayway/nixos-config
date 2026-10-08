@@ -20,32 +20,32 @@
     # Host files can override individual keys.
     system.defaults = {
       NSGlobalDomain = {
-        AppleInterfaceStyle = "Dark";
-        InitialKeyRepeat = 30;
-        KeyRepeat = 2;
-        ApplePressAndHoldEnabled = false;
-        NSAutomaticCapitalizationEnabled = true;
-        NSAutomaticPeriodSubstitutionEnabled = true;
-        "com.apple.swipescrolldirection" = false;
+        AppleInterfaceStyle = lib.mkDefault "Dark";
+        InitialKeyRepeat = lib.mkDefault 30;
+        KeyRepeat = lib.mkDefault 2;
+        ApplePressAndHoldEnabled = lib.mkDefault false;
+        NSAutomaticCapitalizationEnabled = lib.mkDefault true;
+        NSAutomaticPeriodSubstitutionEnabled = lib.mkDefault true;
+        "com.apple.swipescrolldirection" = lib.mkDefault false;
       };
       dock = {
-        autohide = true;
-        show-recents = false;
-        tilesize = 58;
-        largesize = 16;
-        magnification = false;
+        autohide = lib.mkDefault true;
+        show-recents = lib.mkDefault false;
+        tilesize = lib.mkDefault 58;
+        largesize = lib.mkDefault 16;
+        magnification = lib.mkDefault false;
       };
       finder = {
-        ShowStatusBar = false;
-        FXPreferredViewStyle = "Nlsv";
-        ShowExternalHardDrivesOnDesktop = true;
-        ShowHardDrivesOnDesktop = false;
-        ShowRemovableMediaOnDesktop = true;
+        ShowStatusBar = lib.mkDefault false;
+        FXPreferredViewStyle = lib.mkDefault "Nlsv";
+        ShowExternalHardDrivesOnDesktop = lib.mkDefault true;
+        ShowHardDrivesOnDesktop = lib.mkDefault false;
+        ShowRemovableMediaOnDesktop = lib.mkDefault true;
       };
       trackpad = {
-        Clicking = false;
-        TrackpadRightClick = true;
-        TrackpadThreeFingerDrag = false;
+        Clicking = lib.mkDefault false;
+        TrackpadRightClick = lib.mkDefault true;
+        TrackpadThreeFingerDrag = lib.mkDefault false;
       };
     };
 
