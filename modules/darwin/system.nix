@@ -34,8 +34,18 @@
           defaults -currentHost write com.apple.coreservices.useractivityd "$key" -bool false
       done
 
+      # Drop per-folder .DS_Store files so every folder uses the default (list)
+      # view. ~/Library is skipped; protected folders need Full Disk Access
+      # for the terminal running darwin-rebuild, errors are ignored.
+      home=~${user.name}
+      sudo --user=${user.name} -- find "$home" -path "$home/Library" -prune \
+        -o -name .DS_Store -type f -delete 2>/dev/null || true
+
       launchctl asuser "$(id -u -- ${user.name})" sudo --user=${user.name} -- \
         /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u || true
+
+      # Finder only reads its view preferences on launch.
+      killall Finder 2>/dev/null || true
     '';
   };
 }

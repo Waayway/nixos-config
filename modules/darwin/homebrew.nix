@@ -65,7 +65,6 @@
       # (modules/apps). Only the always-on Mac basics are listed here.
       casks = [
         "aerospace" # tiling WM (from nikitabobko/tap)
-        "jordanbaird-ice" # menu bar manager
         "ghostty" # settings are managed by the home-manager module
       ];
     };

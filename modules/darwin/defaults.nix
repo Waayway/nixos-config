@@ -97,7 +97,18 @@
           "com.apple.trackpad.scrolling" = 0.3125;
         };
 
-        "com.apple.finder".FXPreferredSearchViewStyle = "Nlsv";
+        "com.apple.finder" = {
+          FXPreferredSearchViewStyle = "Nlsv";
+          # New windows open on Recents, which has its own view style.
+          SearchRecentsSavedViewStyle = "Nlsv";
+        };
+
+        # No .DS_Store on network shares and USB drives. macOS has no switch
+        # for local disks; system.nix deletes those on every switch.
+        "com.apple.desktopservices" = {
+          DSDontWriteNetworkStores = true;
+          DSDontWriteUSBStores = true;
+        };
 
         # Single input source: U.S.
         "com.apple.HIToolbox".AppleEnabledInputSources = [

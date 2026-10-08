@@ -64,7 +64,7 @@ partly superseded, see "Decisions since the spec").
   - `spotlight.nix`: Spotlight categories/sources.
   - `system.nix`: hostname, firewall on, display sleep 60 min, Touch ID sudo,
     post-activation `activateSettings -u` and Handoff off (per-host keys).
-  - `homebrew.nix`: nix-homebrew, trusted taps, base casks (aerospace, ice,
+  - `homebrew.nix`: nix-homebrew, trusted taps, base casks (aerospace,
     ghostty), option `workstation.homebrew.removeUndeclared` = keep|uninstall|zap.
   - `packages.nix` (coreutils, mas, cocoapods, pdf2image brew),
     `thermalforge.nix` (`hardware.thermalforge.enable`),
