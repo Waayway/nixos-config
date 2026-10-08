@@ -22,7 +22,6 @@
       ip = "ip --color=auto";
       cat = "bat";
       md = "glow";
-      cd = "z";
       sp = "spotify_player";
     };
     plugins = with pkgs; [
@@ -38,6 +37,12 @@
       }
     ];
     initContent = ''
+      # Agent shells (Claude Code) don't keep zoxide's chpwd hook, and a
+      # fuzzy `cd` there could land in the wrong directory.
+      if [[ -z $CLAUDECODE ]]; then
+        alias cd=z
+      fi
+
       bindkey "^[[1;5C" forward-word
       bindkey "^[[1;5D" backward-word
 
