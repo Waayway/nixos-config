@@ -12,6 +12,7 @@ keys:
   # - &host_apollo     <age1...>   # apollo system-level sops (separate from thijs_macbook user key)
   # - &host_hephaestus <age1...>
   - &host_hermes age1fe65e3ss82xp2p60mh326n287xr9suk3et07ekky84etkyu3dy0qlawwyk
+  - &host_atlas age16j773ulp0aak94pr4uvak7prglve646c857r8uuzmjlrp0fwfggqzqau9a
 
 creation_rules:
   - path_regex: secrets/common\.yaml$
@@ -20,6 +21,7 @@ creation_rules:
           - *host_apollo
           - *host_athena
           - *host_hermes
+          - *host_atlas
           - *host_vms_base
 
   - path_regex: secrets/.*\.yaml$
@@ -28,3 +30,4 @@ creation_rules:
           - *host_apollo
           - *host_hermes
           - *host_athena
+          - *host_atlas

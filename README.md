@@ -67,5 +67,7 @@ Darwin hosts don't declare secrets yet. To onboard one:
 2. Add that public key to `.sops.yaml`: a new `&host_<name>` entry under `keys:` and a reference in each `creation_rules` group the host should read.
 3. On a machine that can already decrypt, re-encrypt for the new key, then commit and pull on the Mac:
    ```sh
+   export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt  # sops on macOS defaults to ~/Library/Application Support/sops/age/
    nix shell nixpkgs#sops -c sops updatekeys secrets/*.yaml
    ```
+   Empty placeholder files (no `sops:` block) are skipped; only files with content need re-encrypting.
