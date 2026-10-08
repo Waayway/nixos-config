@@ -1,9 +1,6 @@
-{ pkgs, ... }:
-{
-  environment.systemPackages = with pkgs; [
-    polkit_gnome
-    ipmiview
-  ];
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
+  environment.systemPackages = with pkgs; [ polkit_gnome ipmiview ];
 
   security.polkit.enable = true;
   services.gnome.gnome-keyring.enable = true;
@@ -14,4 +11,4 @@
     enableSSHSupport = false;
     settings.default-cache-ttl = 4 * 60 * 60; # 4 hours
   };
-}
+})

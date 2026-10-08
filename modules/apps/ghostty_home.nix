@@ -1,8 +1,14 @@
-{ pkgs, ... }:
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 {
   programs.ghostty = {
     enable = true;
-    package = pkgs.ghostty;
+    # On darwin the app comes from the `ghostty` cask; home-manager only writes config.
+    package = if hostPlatform.isDarwin then null else pkgs.ghostty;
     enableZshIntegration = true;
     settings = {
       font-family = "JetBrains Mono";
@@ -10,8 +16,10 @@
       adjust-cell-height = 5;
       theme = "tokyonight_night";
       window-padding-color = "extend-always";
-      gtk-single-instance = true;
       shell-integration-features = "ssh-env,ssh-terminfo";
+    }
+    // lib.optionalAttrs hostPlatform.isLinux {
+      gtk-single-instance = true;
     };
     themes = {
       tokyonight_night = {

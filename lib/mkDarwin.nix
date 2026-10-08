@@ -1,8 +1,4 @@
-{
-  overlays,
-  inputs,
-  version,
-}:
+{ nixpkgs, overlays, inputs, version, }:
 name: hostAttrs:
 let
 
@@ -16,15 +12,15 @@ let
   };
 
   machineOptions = hostAttrs;
-  hardware-profiles = machineOptions.hardware-profiles or [ ];
-  isServer = machineOptions.isServer;
-  isLaptop = machineOptions.isLaptop;
+  type = machineOptions.type;
+  isServer = type == "server";
+  tags = machineOptions.tags or [ ];
 
   colors = import ./color.nix { };
 
   machineConfig = machineOptions.config;
 
-  baseConfig = ../modules/workstations/darwin;
+  baseConfig = ../modules/system.nix;
 
   extraArgs = {
     inherit version;
@@ -36,14 +32,15 @@ let
 
     color = colors;
 
-    isLaptop = isLaptop;
-    hardware-profiles = hardware-profiles;
+    type = type;
+    tags = tags;
+    hardware-profiles = [ ];
 
     hostPlatform = {
       isLinux = false;
       isDarwin = true;
       isFramework = false;
-      isServer = false;
+      isServer = isServer;
     };
 
     upkgs = upkgs; # Unstable pkgs
@@ -51,20 +48,18 @@ let
     user = user;
 
     umport = import ./umport.nix { lib = upkgs.lib; };
+    importCurDir = import ./importCurDir.nix upkgs.lib;
   };
 
   systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
-  homeManager =
-    (import ./mkHome.nix {
-      isDarwin = true;
-      homeEntry = ../modules/workstations/darwin/home.nix;
-    })
-      user
-      extraArgs;
+  homeManager = (import ./mkHome.nix (if machineOptions.options ? home-manager
+  && machineOptions.options.home-manager ? enable then
+    machineOptions.options.home-manager.enable
+  else
+    false) { isDarwin = true; }) user extraArgs;
 
-in
-systemFunc {
+in systemFunc {
   inherit system;
 
   specialArgs = extraArgs;
@@ -84,7 +79,6 @@ systemFunc {
     machineConfig
 
     inputs.sops-nix.darwinModules.sops
-
-    (if !isServer then homeManager else { })
+    homeManager
   ];
 }

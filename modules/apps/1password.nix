@@ -1,5 +1,5 @@
-{ user, ... }:
-{
+{ user, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
   programs._1password.enable = true;
   programs._1password-gui = {
     enable = true;
@@ -7,4 +7,4 @@
     # require enabling PolKit integration on some desktop environments (e.g. Plasma).
     polkitPolicyOwners = [ user.name ];
   };
-}
+})

@@ -1,13 +1,9 @@
-{ inputs, ... }:
-{
-  imports = [
-    inputs.nix-flatpak.nixosModules.nix-flatpak
-  ];
+{ inputs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
+  imports = [ inputs.nix-flatpak.nixosModules.nix-flatpak ];
   services.flatpak = {
     enable = true;
-    packages = [
-      "com.valvesoftware.SteamLink"
-    ];
+    packages = [ "com.valvesoftware.SteamLink" ];
     update.auto = {
       enable = true;
       onCalendar = "weekly"; # Default value
@@ -26,4 +22,4 @@
       27036
     ];
   };
-}
+})

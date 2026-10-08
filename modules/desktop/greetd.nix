@@ -1,9 +1,8 @@
-{ pkgs, currentUser, ... }:
-let
+{ pkgs, currentUser, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux (let
   tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
   session = "${pkgs.hyprland}/bin/start-hyprland";
-in
-{
+in {
   # Enable Display Manager
   services.greetd = {
     enable = true;
@@ -15,9 +14,10 @@ in
         user = "${currentUser.name}";
       };
       default_session = {
-        command = "${tuigreet} --greeting 'Welcome to NixOS!' --asterisks --remember --remember-user-session --time --cmd ${session}";
+        command =
+          "${tuigreet} --greeting 'Welcome to NixOS!' --asterisks --remember --remember-user-session --time --cmd ${session}";
         user = "greeter";
       };
     };
   };
-}
+})

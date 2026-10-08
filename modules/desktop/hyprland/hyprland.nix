@@ -1,5 +1,5 @@
-{ pkgs, ... }:
-{
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
   programs.hyprland.enable = true;
   environment.sessionVariables = {
     # Fix for Electron Apps to say to use wayland
@@ -41,4 +41,4 @@
     pkgs.hyprpicker
     pkgs.hyprpaper
   ];
-}
+})

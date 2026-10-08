@@ -1,6 +1,4 @@
-{ pkgs, ... }:
-{
-  environment.systemPackages = with pkgs; [
-    moonlight-qt
-  ];
-}
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux ({
+  environment.systemPackages = with pkgs; [ moonlight-qt ];
+})

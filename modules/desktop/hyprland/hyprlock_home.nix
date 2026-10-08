@@ -1,12 +1,7 @@
-{
-  pkgs,
-  lib,
-  ...
-}:
-let
-  catpuccinConfig = import ./catpuccin_lib.nix lib;
-in
-{
+{ pkgs, lib, hostPlatform, ... }:
+lib.optionalAttrs hostPlatform.isLinux
+(let catpuccinConfig = import ./catpuccin_lib.nix lib;
+in {
   programs.hyprlock = {
     enable = true;
     package = pkgs.hyprlock;
@@ -16,18 +11,12 @@ in
       "$font" = "JetBrainsMono Nerd Font";
 
       auth = {
-        pam = {
-          enabled = "true";
-        };
-        fingerprint = {
-          enabled = "true";
-        };
+        pam = { enabled = "true"; };
+        fingerprint = { enabled = "true"; };
       };
 
       # GENERAL
-      general = {
-        hide_cursor = "true";
-      };
+      general = { hide_cursor = "true"; };
 
       # BACKGROUND
       background = {
@@ -65,7 +54,7 @@ in
         # DATE
         {
           monitor = "";
-          text = "cmd[update:43200000] date +\"%A, %d %B %Y\"";
+          text = ''cmd[update:43200000] date +"%A, %d %B %Y"'';
           color = "$text";
           font_size = "25";
           font_family = "$font";
@@ -75,16 +64,16 @@ in
         }
 
         # FINGERPRINT
-            {
-              monitor = "";
-              text = "$FPRINTPROMPT";
-              color = "$text";
-              font_size = "14";
-              font_family = "$font";
-              position = "0, -107";
-              halign = "center";
-              valign = "center";
-            }
+        {
+          monitor = "";
+          text = "$FPRINTPROMPT";
+          color = "$text";
+          font_size = "14";
+          font_family = "$font";
+          position = "0, -107";
+          halign = "center";
+          valign = "center";
+        }
       ];
 
       # INPUT FIELD
@@ -99,7 +88,8 @@ in
         inner_color = "$surface0";
         font_color = "$text";
         fade_on_empty = "false";
-        placeholder_text = "<span foreground=\"##$textAlpha\"><i>󰌾 Logged in as </i><span foreground=\"##$accentAlpha\">$USER</span></span>";
+        placeholder_text = ''
+          <span foreground="##$textAlpha"><i>󰌾 Logged in as </i><span foreground="##$accentAlpha">$USER</span></span>'';
         hide_input = "false";
         check_color = "$accent";
         fail_color = "$red";
@@ -111,4 +101,4 @@ in
       };
     };
   };
-}
+})

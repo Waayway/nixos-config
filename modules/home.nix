@@ -1,15 +1,10 @@
-{
-  lib,
-  hostPlatform,
-  umport,
-  ...
-}:
-{
-  warnings =
-    [ ] ++ lib.optional hostPlatform.isServer [ "HOME MANAGER SHOULD ALMOST NEVER BE USED ON A SERVER" ];
+{ lib, hostPlatform, umport, ... }: {
+  warnings = [ ] ++ lib.optional hostPlatform.isServer
+    [ "HOME MANAGER SHOULD ALMOST NEVER BE USED ON A SERVER" ];
 
   imports = umport {
-    paths = [
+    # Skip categories that don't exist (yet) so listing them is harmless.
+    paths = builtins.filter builtins.pathExists [
       ./apps
       ./boot
       ./console
