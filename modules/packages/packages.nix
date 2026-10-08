@@ -13,7 +13,6 @@
       git
       lsof
       btop
-      neovim
 
       # Archives
       zip
