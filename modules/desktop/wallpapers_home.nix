@@ -18,24 +18,26 @@ in
     '';
   };
 
-  config = {
-    # Used by Hyprland's wallpaper scripts and the macOS picker below.
-    home.file.".wallpapers".source = ../../wallpapers;
-  }
-  // lib.optionalAttrs hostPlatform.isDarwin {
-    # Sets the picture on every display. macOS asks once for permission to
-    # let the terminal control "System Events".
-    home.activation.wallpaper = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      dir="$HOME/.wallpapers"
-      ${
-        if cfg == "random" then
-          ''pic="$(/usr/bin/find -L "$dir" -maxdepth 1 -type f | /usr/bin/sort -R | /usr/bin/head -n 1)"''
-        else
-          ''pic="$dir/${cfg}"''
-      }
-      if [ -f "$pic" ]; then
-        run /usr/bin/osascript -e "tell application \"System Events\" to tell every desktop to set picture to POSIX file \"$pic\"" || true
-      fi
-    '';
-  };
+  config = lib.mkMerge [
+    {
+      # Used by Hyprland's wallpaper scripts and the macOS picker below.
+      home.file.".wallpapers".source = ../../wallpapers;
+    }
+    (lib.optionalAttrs hostPlatform.isDarwin {
+      # Sets the picture on every display. macOS asks once for permission to
+      # let the terminal control "System Events".
+      home.activation.wallpaper = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        dir="$HOME/.wallpapers"
+        ${
+          if cfg == "random" then
+            ''pic="$(/usr/bin/find -L "$dir" -maxdepth 1 -type f | /usr/bin/sort -R | /usr/bin/head -n 1)"''
+          else
+            ''pic="$dir/${cfg}"''
+        }
+        if [ -f "$pic" ]; then
+          run /usr/bin/osascript -e "tell application \"System Events\" to tell every desktop to set picture to POSIX file \"$pic\"" || true
+        fi
+      '';
+    })
+  ];
 }
