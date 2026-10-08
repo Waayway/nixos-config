@@ -1,4 +1,9 @@
-{ pkgs, ... }:
+{
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
 {
   home.packages = with pkgs; [
     lsd
@@ -36,14 +41,26 @@
       bindkey "^[[1;5C" forward-word
       bindkey "^[[1;5D" backward-word
 
-      export PATH="$HOME/.local/bin :$PATH"
-      export PATH="$HOME/.cargo/bin :$PATH"
+      export PATH="$HOME/.local/bin:$PATH"
+      export PATH="$HOME/.cargo/bin:$PATH"
       export BUN_INSTALL="$HOME/.bun"
       export PATH="$BUN_INSTALL/bin:$PATH"
 
       export PATH=~/.npm-packages/bin:$PATH
       export NODE_PATH=~/.npm-packages/lib/node_modules
       export PATH=~/develop/flutter/bin:$PATH
+    ''
+    + lib.optionalString hostPlatform.isDarwin ''
+
+      export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+
+      if [ -f ~/.aliases ]; then
+        source ~/.aliases
+      fi
+    '';
+
+    profileExtra = lib.optionalString hostPlatform.isDarwin ''
+      eval "$(/opt/homebrew/bin/brew shellenv)"
     '';
   };
 
