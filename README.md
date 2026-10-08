@@ -42,13 +42,14 @@ Nixos has been very stable for me with minimal problems and with a possibility t
 4. Clone and switch:
    ```sh
    git clone https://github.com/Waayway/nixos-waayway ~/.flake
-   git -C ~/.flake checkout merge-servers
    sudo nix --extra-experimental-features 'nix-command flakes' run nix-darwin/nix-darwin-26.05#darwin-rebuild -- switch --flake ~/.flake#atlas
    ```
    Existing dotfiles are kept as `*.before-nix`. On atlas Homebrew runs with `cleanup = "zap"`: casks/brews that aren't declared get removed on every switch.
 5. Afterwards, rebuild with `sudo darwin-rebuild switch --flake ~/.flake#atlas`.
 
-Manual installs on atlas: Xcode, MacUtil. Sign in to 1Password, Microsoft 365, Google Drive, OneDrive and Tailscale by hand.
+Manual installs on atlas: Xcode, MacUtil.
+
+Finder sidebar favorites (`darwin.finderSidebar`) are added on each switch once their folders exist, so after Google Drive has synced and repos are cloned, switch once more. atlas runs macOS 27: Homebrew is pinned to 7.0.8+ (first release that knows macOS 27). The sidebar helper and some `defaults` keys (Liquid Glass, Spotlight) were verified on macOS 26; if one stops applying on 27, it's skipped rather than failing the switch. Sign in to 1Password, Microsoft 365, Google Drive, OneDrive and Tailscale by hand.
 
 #### Adding sops secrets to a Mac
 
