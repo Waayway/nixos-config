@@ -1,6 +1,6 @@
 # Fleet manager: dashboard + push agent (design)
 
-Date: 2026-10-12. Status: draft, waiting for review.
+Date: 2026-10-12. Status: complete, waiting for approval.
 
 ## Goal
 
@@ -191,9 +191,10 @@ A build from a dirty tree shows up as `<rev>-dirty`.
   nixos-manager's Tailscale IP. Two layers:
   - Tailscale ACL: only `tag:manager` may reach `tag:fleet` on the agent port.
   - The agent itself rejects any other source IP.
-- **Dashboard** listens only on nixos-manager's Tailscale address. Buttons only
-  work for the user `Waayway@` (checked with Tailscale `whois`); others get
-  read-only access, or none (open question 1).
+- **Dashboard** listens only on nixos-manager's Tailscale address. Only the user
+  `Waayway@` gets access (checked with Tailscale `whois` on every request
+  and on the WebSocket upgrade); everyone else gets `403`. Read-only access
+  for others may come later.
 
 ## Technology choices
 
@@ -242,7 +243,7 @@ Today on pve (Proxmox VE 9.1, 5900X, 78 GB RAM):
 | 140 | garage (LXC) | Debian 13, Garage S3 | NixOS VM or NixOS LXC (`services.garage`) |
 | 201 | archipelago | unknown, no guest agent | NixOS |
 | 200 | minecraft | stopped | NixOS when needed |
-| 101 | router | NixOS, stopped | decide (open question 2) |
+| 101 | router | NixOS, stopped (earlier attempt at a NixOS Main) | **delete** after a last look for anything worth keeping |
 | 170 | nixos-manager | NixOS, stopped, offline for 55 days | becomes the **fleet server** |
 | 9000 | nixos-26.05-template | NixOS image | base for new VMs |
 
@@ -302,5 +303,4 @@ on `local-lvm` (about 100 GB free).
 
 ## Open questions
 
-1. Dashboard for others on the tailnet: read-only or no access?
-2. Router VM 101 (NixOS, stopped): still needed?
+None.
