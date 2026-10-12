@@ -21,6 +21,12 @@
   # Per-host overrides (e.g. apollo using a user keyFile) live in their own
   # platform module and just set `sops.age.keyFile` alongside.
   sops.age.sshKeyPaths = lib.mkDefault [ "/etc/ssh/ssh_host_ed25519_key" ];
+  # Workstations also have a user age key; servers only decrypt with their
+  # SSH host key, and sops-install-secrets fails (and with it the whole
+  # activation) when a configured keyFile doesn't exist.
   sops.age.keyFile =
-    "${if hostPlatform.isDarwin then "/Users/${user.name}" else "/home/${user.name}"}/.config/sops/age/keys.txt";
+    lib.mkIf (!hostPlatform.isServer)
+      "${
+        if hostPlatform.isDarwin then "/Users/${user.name}" else "/home/${user.name}"
+      }/.config/sops/age/keys.txt";
 }
