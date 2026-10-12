@@ -159,6 +159,9 @@ pub struct Snapshot {
     pub channels: Vec<ChannelView>,
     pub promote_candidate: Option<String>,
     pub viewer: String,
+    /// True only when the server runs in demo mode (simulated fleet).
+    #[serde(default)]
+    pub demo: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, TS)]

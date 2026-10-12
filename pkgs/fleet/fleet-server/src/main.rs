@@ -1,28 +1,54 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use anyhow::Context;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use fleet_server::config::{ServerConfig, load_hosts};
-use fleet_server::mirror::Mirror;
-use fleet_server::state::AppState;
-use fleet_server::{api, db, poller, tailscale};
+use fleet_server::{demo, server, tailscale};
 
 #[derive(Parser)]
-#[command(name = "fleet-server", version)]
+#[command(name = "fleet-server", version, args_conflicts_with_subcommands = true)]
 struct Cli {
-    /// Server configuration (JSON).
+    /// Server configuration (JSON); same as `fleet-server serve --config`.
     #[arg(long)]
-    config: PathBuf,
+    config: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Runs the fleet server.
+    Serve {
+        /// Server configuration (JSON).
+        #[arg(long)]
+        config: PathBuf,
+    },
+    /// Runs the real server and dashboard against a simulated fleet.
+    Demo {
+        /// Dashboard address. Access control is off in demo mode.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        listen: SocketAddr,
+        /// Time multiplier for the simulation (applies, polling, new commits).
+        #[arg(long, default_value_t = 1.0)]
+        speed: f64,
+    },
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let command = match (cli.command, cli.config) {
+        (Some(c), _) => c,
+        (None, Some(config)) => Command::Serve { config },
+        (None, None) => {
+            eprintln!("fleet-server: give --config <path>, or a subcommand (see --help)");
+            return ExitCode::from(2);
+        }
+    };
     let result = tokio::runtime::Runtime::new()
         .context("starting the tokio runtime")
-        .and_then(|rt| rt.block_on(run(cli)));
+        .and_then(|rt| rt.block_on(run(command)));
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -32,24 +58,22 @@ fn main() -> ExitCode {
     }
 }
 
-async fn run(cli: Cli) -> anyhow::Result<()> {
-    let cfg = ServerConfig::load(&cli.config)?;
-    cfg.check_listen()?;
-    let hosts = load_hosts(&cfg.hosts_file)?;
-    let conn = db::connect(&cfg.state_dir).await?;
-    let mirror = Arc::new(Mirror::open_or_init(&cfg).await?);
-    let online = tailscale::provider_from_config(&cfg.online, &cfg.tailscale_bin)?;
-    let listen = cfg.listen;
-    let state = AppState::new(Arc::new(cfg), conn, mirror, online, hosts)?;
-    poller::spawn(state.clone());
-    let listener = tokio::net::TcpListener::bind(listen)
-        .await
-        .with_context(|| format!("binding {listen}"))?;
-    eprintln!("fleet-server: listening on {listen}");
-    axum::serve(
-        listener,
-        api::app(state).into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await
-    .context("serving")
+async fn run(command: Command) -> anyhow::Result<()> {
+    match command {
+        Command::Serve { config } => {
+            let cfg = ServerConfig::load(&config)?;
+            let hosts = load_hosts(&cfg.hosts_file)?;
+            let online = tailscale::provider_from_config(&cfg.online, &cfg.tailscale_bin)?;
+            server::start(cfg, hosts, online, false).await?.wait().await
+        }
+        Command::Demo { listen, speed } => {
+            let handle = demo::start(listen, speed).await?;
+            eprintln!("fleet-server: demo dashboard at http://{}/", handle.addr);
+            // On Ctrl-C the handle is dropped, which stops the demo and removes its temp dir.
+            tokio::select! {
+                r = handle.wait() => r,
+                r = tokio::signal::ctrl_c() => r.context("waiting for Ctrl-C"),
+            }
+        }
+    }
 }

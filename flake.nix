@@ -136,6 +136,18 @@
           inherit (s.fleet) fleet-agent fleet-server;
         }) perSystem;
 
+        # `nix run .#fleet-demo`: the dashboard against a simulated fleet (needs git).
+        apps = nixpkgs.lib.mapAttrs (_: s: {
+          fleet-demo = {
+            type = "app";
+            program = "${s.pkgs.writeShellScript "fleet-demo" ''
+              export PATH=${s.pkgs.git}/bin:$PATH
+              exec ${s.fleet.fleet-server}/bin/fleet-server demo "$@"
+            ''}";
+            meta.description = "fleet dashboard demo against a simulated fleet";
+          };
+        }) perSystem;
+
         checks = nixpkgs.lib.mapAttrs (_: s: {
           fleet-bindings = s.fleet.bindingsCheck;
         }) perSystem;

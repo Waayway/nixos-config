@@ -32,6 +32,8 @@ pub struct AppState {
     /// Serialises dashboard actions (apply, promote) from mirror fetch to recorded result, so
     /// the last press always records the newest channel head.
     pub(crate) actions: Arc<tokio::sync::Mutex<()>>,
+    /// Demo mode (simulated fleet); reported in the snapshot.
+    pub demo: bool,
 }
 
 impl AppState {
@@ -54,6 +56,7 @@ impl AppState {
             reachable: Arc::default(),
             followers: Arc::default(),
             actions: Arc::default(),
+            demo: false,
         })
     }
 
@@ -154,5 +157,6 @@ pub async fn snapshot(state: &AppState, viewer: String) -> Snapshot {
         channels: channels(state).await,
         promote_candidate: state.mirror.promote_candidate().await,
         viewer,
+        demo: state.demo,
     }
 }

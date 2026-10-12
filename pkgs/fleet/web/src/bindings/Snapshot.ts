@@ -2,4 +2,8 @@
 import type { ChannelView } from "./ChannelView";
 import type { HostView } from "./HostView";
 
-export type Snapshot = { hosts: Array<HostView>, channels: Array<ChannelView>, promote_candidate: string | null, viewer: string, };
+export type Snapshot = { hosts: Array<HostView>, channels: Array<ChannelView>, promote_candidate: string | null, viewer: string, 
+/**
+ * True only when the server runs in demo mode (simulated fleet).
+ */
+demo: boolean, };

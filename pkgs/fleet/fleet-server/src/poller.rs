@@ -296,10 +296,10 @@ pub async fn follow_log(state: &AppState, host: &FleetHost, apply_id: &str) {
 }
 
 /// Background loops: mirror fetch every `mirror_fetch_secs` (then `ChannelsUpdated`) and
-/// agent polling every `poll_secs`. Both run once immediately.
-pub fn spawn(state: AppState) {
+/// agent polling every `poll_secs`. Both run once immediately. Returns both tasks.
+pub fn spawn(state: AppState) -> Vec<tokio::task::JoinHandle<()>> {
     let st = state.clone();
-    tokio::spawn(async move {
+    let mirror = tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(st.cfg.mirror_fetch_secs.max(1)));
         tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
         loop {
@@ -310,7 +310,7 @@ pub fn spawn(state: AppState) {
             st.broadcast(WsMessage::ChannelsUpdated(channels(&st).await));
         }
     });
-    tokio::spawn(async move {
+    let agents = tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(state.cfg.poll_secs.max(1)));
         tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
         loop {
@@ -318,4 +318,5 @@ pub fn spawn(state: AppState) {
             poll_once(&state).await;
         }
     });
+    vec![mirror, agents]
 }
