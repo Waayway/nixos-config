@@ -148,9 +148,18 @@
           };
         }) perSystem;
 
-        checks = nixpkgs.lib.mapAttrs (_: s: {
-          fleet-bindings = s.fleet.bindingsCheck;
-        }) perSystem;
+        checks =
+          nixpkgs.lib.recursiveUpdate
+            (nixpkgs.lib.mapAttrs (_: s: {
+              fleet-bindings = s.fleet.bindingsCheck;
+            }) perSystem)
+            {
+              # Needs an x86_64-linux builder with KVM to run.
+              x86_64-linux.fleet-vm = import ./tests/fleet-vm.nix {
+                pkgs = nixpkgs.legacyPackages.x86_64-linux;
+                inherit inputs;
+              };
+            };
 
         devShells = nixpkgs.lib.mapAttrs (_: s: {
           fleet = s.pkgs.mkShell {

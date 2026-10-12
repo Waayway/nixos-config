@@ -75,39 +75,47 @@ in
         default = false;
         description = "TEST ONLY (VM test): disable dashboard access control.";
       };
+      pollSecs = lib.mkOption {
+        type = lib.types.nullOr lib.types.ints.positive;
+        default = null;
+        description = "TEST ONLY (VM test): agent poll interval in seconds; null keeps the server default (60).";
+      };
     };
   };
 
   config = lib.mkIf cfg.enable (
     lib.optionalAttrs hostPlatform.isLinux {
       environment.etc."fleet-server/hosts.json".text = builtins.toJSON fleet.hosts;
-      environment.etc."fleet-server/config.json".text = builtins.toJSON {
-        listen = "${cfg.listenAddress}:${toString cfg.listenPort}";
-        agent_port = config.services.fleet-agent.port;
-        hosts_file = "/etc/fleet-server/hosts.json";
-        repo_url = cfg.repoUrl;
-        push_url = cfg.pushUrl;
-        deploy_key_file = cfg.deployKeyFile;
-        state_dir = "/var/lib/fleet-server";
-        access =
-          if cfg.testing.disableAccess then
-            { kind = "disabled"; }
-          else
-            {
-              kind = "tailscale";
-              allowed_users = cfg.allowedUsers;
-              allowed_tags = cfg.allowedTags;
-            };
-        online =
-          if cfg.testing.staticAddresses != null then
-            {
-              kind = "static";
-              addresses = cfg.testing.staticAddresses;
-            }
-          else
-            { kind = "tailscale"; };
-        tailscale_bin = "${config.services.tailscale.package}/bin/tailscale";
-      };
+      environment.etc."fleet-server/config.json".text = builtins.toJSON (
+        {
+          listen = "${cfg.listenAddress}:${toString cfg.listenPort}";
+          agent_port = config.services.fleet-agent.port;
+          hosts_file = "/etc/fleet-server/hosts.json";
+          repo_url = cfg.repoUrl;
+          push_url = cfg.pushUrl;
+          deploy_key_file = cfg.deployKeyFile;
+          state_dir = "/var/lib/fleet-server";
+          access =
+            if cfg.testing.disableAccess then
+              { kind = "disabled"; }
+            else
+              {
+                kind = "tailscale";
+                allowed_users = cfg.allowedUsers;
+                allowed_tags = cfg.allowedTags;
+              };
+          online =
+            if cfg.testing.staticAddresses != null then
+              {
+                kind = "static";
+                addresses = cfg.testing.staticAddresses;
+              }
+            else
+              { kind = "tailscale"; };
+          tailscale_bin = "${config.services.tailscale.package}/bin/tailscale";
+        }
+        // lib.optionalAttrs (cfg.testing.pollSecs != null) { poll_secs = cfg.testing.pollSecs; }
+      );
 
       systemd.services.fleet-server = {
         description = "Fleet server";
