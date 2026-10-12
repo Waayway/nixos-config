@@ -10,6 +10,7 @@
       ./desktop
       ./development
       ./editor
+      ./fleet
       ./gaming
       ./hardware
       ./locale
