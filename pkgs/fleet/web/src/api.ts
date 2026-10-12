@@ -45,6 +45,16 @@ async function request(method: string, path: string, body?: unknown): Promise<Re
 
 const enc = encodeURIComponent;
 
+/** True when the server answers this viewer with 403 (not an allowed login or tag). */
+export async function isForbidden(): Promise<boolean> {
+  try {
+    await request("GET", "/api/snapshot");
+    return false;
+  } catch (e) {
+    return e instanceof ApiError && e.status === 403;
+  }
+}
+
 export async function getSnapshot(): Promise<Snapshot> {
   return (await request("GET", "/api/snapshot")).json();
 }

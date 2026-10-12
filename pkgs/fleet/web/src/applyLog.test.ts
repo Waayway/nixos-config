@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { fromText, mergeChunk } from "@/applyLog";
+import { finishFetch, fromText, mergeChunk, requestFetch, watchLog } from "@/applyLog";
+import type { ApplyRecord } from "@/bindings/ApplyRecord";
+import type { HostView } from "@/bindings/HostView";
+import type { WsMessage } from "@/bindings/WsMessage";
 
 const chunk = (offset: number, data: string, eof = false) => ({ apply_id: "a", offset, data, eof });
 
@@ -30,5 +33,76 @@ describe("mergeChunk", () => {
   it("reports a gap when a chunk starts past the end", () => {
     expect(mergeChunk(fromText("hello\n"), chunk(20, "later\n"))).toEqual({ kind: "gap" });
     expect(mergeChunk(undefined, chunk(5, "x"))).toEqual({ kind: "gap" });
+  });
+});
+
+describe("watchLog", () => {
+  const open = (running: boolean | null) => ({ host: "hermes", applyId: "a1", running });
+  const rec = (apply_id: string, state: ApplyRecord["state"]): ApplyRecord => ({
+    apply_id,
+    commit: "c".repeat(40),
+    state,
+    skip_reason: null,
+    message: null,
+    exit_code: null,
+    started_at: 1,
+    finished_at: null,
+  });
+  const hostMsg = (name: string, last_apply: ApplyRecord | null): WsMessage => ({
+    type: "host_updated",
+    data: {
+      name,
+      os: "nixos",
+      channel: "unstable",
+      online: "on",
+      last_seen: null,
+      running: null,
+      running_dirty: false,
+      behind: null,
+      checkout: null,
+      last_apply,
+      desired_apply_id: null,
+      last_activation: null,
+    },
+  });
+  const snapshotMsg = (last_apply: ApplyRecord | null): WsMessage => ({
+    type: "snapshot",
+    data: {
+      hosts: [(hostMsg("hermes", last_apply).data as HostView)],
+      channels: [],
+      promote_candidate: null,
+      viewer: "v",
+      demo: false,
+    },
+  });
+
+  it("refetches on every snapshot (reconnect or lagged client)", () => {
+    expect(watchLog(open(true), snapshotMsg(rec("a1", "running")))).toEqual({ refetch: true, running: true });
+    expect(watchLog(open(true), snapshotMsg(rec("a1", "ok")))).toEqual({ refetch: true, running: false });
+  });
+  it("refetches when the open apply stops running", () => {
+    expect(watchLog(open(true), hostMsg("hermes", rec("a1", "failed")))).toEqual({ refetch: true, running: false });
+  });
+  it("refetches when a newer apply replaced a running one", () => {
+    expect(watchLog(open(true), hostMsg("hermes", rec("a2", "running")))).toEqual({ refetch: true, running: false });
+  });
+  it("does nothing while it keeps running, for an apply already finished, or for other hosts", () => {
+    expect(watchLog(open(true), hostMsg("hermes", rec("a1", "running")))).toEqual({ refetch: false, running: true });
+    expect(watchLog(open(false), hostMsg("hermes", rec("a1", "ok")))).toEqual({ refetch: false, running: false });
+    expect(watchLog(open(true), hostMsg("atlas", rec("a1", "ok")))).toEqual({ refetch: false, running: true });
+    expect(watchLog(open(true), { type: "channels_updated", data: [] })).toEqual({ refetch: false, running: true });
+  });
+});
+
+describe("requestFetch / finishFetch", () => {
+  it("starts a request when none is in flight", () => {
+    expect(requestFetch({ fetching: false, again: false })).toEqual({ start: true, next: { fetching: true, again: false } });
+  });
+  it("never starts a second one; runs it once after the first finishes", () => {
+    const r = requestFetch({ fetching: true, again: false });
+    expect(r).toEqual({ start: false, next: { fetching: true, again: true } });
+    expect(requestFetch(r.next).start).toBe(false);
+    expect(finishFetch(r.next)).toEqual({ start: true, next: { fetching: true, again: false } });
+    expect(finishFetch({ fetching: true, again: false })).toEqual({ start: false, next: { fetching: false, again: false } });
   });
 });

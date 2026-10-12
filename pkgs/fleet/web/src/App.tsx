@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "preact/hooks";
 import { toast } from "sonner";
-import { getApplyLog, getSnapshot } from "@/api";
-import { fromText, type HeldLog, mergeChunk } from "@/applyLog";
+import { getApplyLog, getSnapshot, isForbidden } from "@/api";
+import {
+  type FetchState,
+  finishFetch,
+  fromText,
+  type HeldLog,
+  type LogWatch,
+  mergeChunk,
+  requestFetch,
+  watchLog,
+} from "@/applyLog";
 import type { ChannelView } from "@/bindings/ChannelView";
 import type { HostView } from "@/bindings/HostView";
 import type { LogChunk } from "@/bindings/LogChunk";
@@ -41,7 +50,8 @@ const headsKey = (channels: ChannelView[]) =>
   channels.map((c) => `${c.name}=${c.head ?? ""}`).join(" ");
 
 /** The apply whose log is open in the sheet, and what we hold of that log. */
-type OpenLog = { host: string; applyId: string; log: HeldLog | null; error: string | null };
+type OpenLog = LogWatch &
+  FetchState & { log: HeldLog | null; error: string | null };
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -67,22 +77,34 @@ export function App() {
   const candidateSeq = useRef(0);
   const heads = useRef("");
 
-  const fetchLog = useCallback(
-    async (host: string, applyId: string) => {
-      let next: Partial<OpenLog>;
-      try {
-        const fetched = fromText(await getApplyLog(host, applyId));
-        const held = openLogRef.current?.log;
-        // Chunks that arrived while the request was in flight may already be past it.
-        next = { log: held && held.bytes > fetched.bytes ? held : fetched, error: null };
-      } catch (e) {
-        next = { error: (e as Error).message };
+  // Fetches the open apply's whole log, one request at a time: asking while one is in flight
+  // only marks it to run once more when the current one finishes (see `requestFetch`).
+  const fetchLog = useCallback(() => {
+    const o = openLogRef.current;
+    if (!o) return;
+    const r = requestFetch(o);
+    setOpenLog({ ...o, ...r.next });
+    if (r.start) void runFetches(o.host, o.applyId);
+
+    async function runFetches(host: string, applyId: string) {
+      for (;;) {
+        let result: Partial<OpenLog>;
+        try {
+          const fetched = fromText(await getApplyLog(host, applyId));
+          const held = openLogRef.current?.log;
+          // Chunks that arrived while the request was in flight may already be past it.
+          result = { log: held && held.bytes > fetched.bytes ? held : fetched, error: null };
+        } catch (e) {
+          result = { error: (e as Error).message };
+        }
+        const cur = openLogRef.current;
+        if (!cur || cur.applyId !== applyId) return;
+        const f = finishFetch(cur);
+        setOpenLog({ ...cur, ...result, ...f.next });
+        if (!f.start) return;
       }
-      const o = openLogRef.current;
-      if (o && o.applyId === applyId) setOpenLog({ ...o, ...next });
-    },
-    [setOpenLog],
-  );
+    }
+  }, [setOpenLog]);
 
   const onChunk = useCallback(
     (c: LogChunk) => {
@@ -90,7 +112,7 @@ export function App() {
       if (!o || o.applyId !== c.apply_id) return;
       const m = mergeChunk(o.log ?? undefined, c);
       if (m.kind === "appended") setOpenLog({ ...o, log: m.log });
-      else if (m.kind === "gap") void fetchLog(o.host, o.applyId);
+      else if (m.kind === "gap") fetchLog();
     },
     [fetchLog, setOpenLog],
   );
@@ -99,7 +121,14 @@ export function App() {
     () =>
       connectFeed({
         onStatus: setFeed,
+        isForbidden,
         onMessage: (m: WsMessage) => {
+          const o = openLogRef.current;
+          if (o) {
+            const w = watchLog(o, m);
+            if (w.running !== o.running) setOpenLog({ ...o, running: w.running });
+            if (w.refetch) fetchLog();
+          }
           switch (m.type) {
             case "host_updated":
               dispatch({ type: "host", data: m.data });
@@ -133,15 +162,17 @@ export function App() {
           }
         },
       }),
-    [onChunk],
+    [onChunk, fetchLog, setOpenLog],
   );
 
   const showLog = useCallback(
     (host: string, applyId: string) => {
-      setOpenLog({ host, applyId, log: null, error: null });
-      void fetchLog(host, applyId);
+      const rec = snap?.hosts.find((h) => h.name === host)?.last_apply;
+      const running = rec?.apply_id === applyId ? rec.state === "running" : null;
+      setOpenLog({ host, applyId, running, log: null, error: null, fetching: false, again: false });
+      fetchLog();
     },
-    [fetchLog, setOpenLog],
+    [fetchLog, setOpenLog, snap],
   );
 
   const reportError = useCallback((what: string, e: unknown) => {
@@ -176,7 +207,14 @@ export function App() {
         </header>
 
         <main className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 pb-10 sm:px-6">
-          {snap === null ? (
+          {feed.kind === "forbidden" ? (
+            <div className="py-16 text-center">
+              <p className="text-sm font-medium">You don't have access to this dashboard</p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                The fleet server only lets in the owner's Tailscale login and tagged fleet devices.
+              </p>
+            </div>
+          ) : snap === null ? (
             <p className="text-muted-foreground py-16 text-center text-sm">
               {feed.kind === "waiting" ? "Can't reach the fleet server. Retrying." : "Loading fleet"}
             </p>
@@ -216,7 +254,9 @@ function FeedIndicator({ feed }: { feed: FeedStatus }) {
       ? "Live"
       : feed.kind === "connecting"
         ? "Connecting"
-        : `Disconnected · retry in ${Math.max(0, Math.ceil((feed.retryAt - Date.now()) / 1000))}s`;
+        : feed.kind === "forbidden"
+          ? "No access"
+          : `Disconnected · retry in ${Math.max(0, Math.ceil((feed.retryAt - Date.now()) / 1000))}s`;
   return (
     <span className="flex items-center gap-1.5" role="status">
       <span
