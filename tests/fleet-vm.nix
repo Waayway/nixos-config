@@ -180,13 +180,14 @@ pkgs.testers.runNixOSTest {
     assert snapshot_host("laptop1")["checkout"]["head"] == head1
 
     # 4. A dirty laptop2 skips the apply and keeps its HEAD.
-    before = laptop2.succeed("git -C /home/alice/.flake rev-parse HEAD").strip()
+    # (git as alice: root would refuse the repo as "dubious ownership")
+    before = laptop2.succeed("su - alice -c 'git -C ~/.flake rev-parse HEAD'").strip()
     laptop2.succeed("echo local >> /home/alice/.flake/flake.nix")
     l2_id = apply("laptop2")["apply_id"]
     manager.wait_until_succeeds(
         f"curl -sf localhost:8080/api/snapshot | jq -e '.hosts[] | select(.name==\"laptop2\") | .last_apply | .apply_id == \"{l2_id}\" and .skip_reason == \"dirty\"'"
     )
-    assert laptop2.succeed("git -C /home/alice/.flake rev-parse HEAD").strip() == before
+    assert laptop2.succeed("su - alice -c 'git -C ~/.flake rev-parse HEAD'").strip() == before
     assert snapshot_host("laptop2")["running"] != head1
 
     # 5. Source check: laptop1 is not the manager, so laptop2's agent refuses it.
