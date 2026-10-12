@@ -7,6 +7,9 @@
 
   type = "framework13";
 
+  # Managed by Lodestar (docs/lodestar.md); workstations follow `unstable`.
+  fleet = true;
+
   options = {
     workstation.apps = {
       browsers.enable = true;
