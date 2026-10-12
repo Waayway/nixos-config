@@ -26,6 +26,9 @@ pub struct Mirror {
     repo_url: String,
     push_url: String,
     deploy_key: Option<PathBuf>,
+    /// Serialises ref writers (fetch, promote): concurrent `git fetch`es on one bare repo
+    /// fail with "cannot lock ref".
+    write_lock: tokio::sync::Mutex<()>,
 }
 
 struct Output {
@@ -59,6 +62,7 @@ impl Mirror {
             repo_url: cfg.repo_url.clone(),
             push_url: cfg.push_url.clone(),
             deploy_key: cfg.deploy_key_file.clone(),
+            write_lock: tokio::sync::Mutex::new(()),
         };
         if !mirror.path.join("HEAD").exists() {
             std::fs::create_dir_all(&mirror.path)
@@ -109,6 +113,7 @@ impl Mirror {
     }
 
     pub async fn fetch(&self) -> anyhow::Result<()> {
+        let _guard = self.write_lock.lock().await;
         let out = self
             .git([
                 "fetch",
@@ -204,6 +209,7 @@ impl Mirror {
     /// Fast-forwards `stable` to `commit` (non-force push). `commit` must be on `unstable` and
     /// `stable` must be an ancestor of it; otherwise `PromoteError::Rejected`.
     pub async fn promote(&self, commit: &str) -> Result<(), PromoteError> {
+        let _guard = self.write_lock.lock().await;
         let reject = |msg: String| Err(PromoteError::Rejected(msg));
         if !is_commit_hash(commit) {
             return reject("not a commit hash".into());

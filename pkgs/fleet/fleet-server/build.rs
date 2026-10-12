@@ -28,6 +28,10 @@ fn main() {
     let dist = write_placeholder(&manifest.join("../web/dist"))
         .or_else(|_| write_placeholder(&out.join("web-dist")))
         .expect("creating a placeholder web dist");
+    println!(
+        "cargo:warning=FLEET_WEB_DIST unset; embedding {}",
+        dist.display()
+    );
     println!("cargo:rerun-if-changed={}", dist.display());
     println!("cargo:rustc-env=FLEET_WEB_DIST={}", dist.display());
 }

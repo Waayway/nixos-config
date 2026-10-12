@@ -29,6 +29,9 @@ pub struct AppState {
     pub(crate) reachable: Arc<Mutex<HashMap<String, bool>>>,
     /// `(host, apply_id)` pairs with a live log follower.
     pub(crate) followers: Arc<Mutex<HashSet<(String, String)>>>,
+    /// Serialises dashboard actions (apply, promote) from mirror fetch to recorded result, so
+    /// the last press always records the newest channel head.
+    pub(crate) actions: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl AppState {
@@ -50,6 +53,7 @@ impl AppState {
             cfg,
             reachable: Arc::default(),
             followers: Arc::default(),
+            actions: Arc::default(),
         })
     }
 

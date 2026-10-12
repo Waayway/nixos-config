@@ -182,17 +182,31 @@ async fn send_apply(state: &AppState, host: &FleetHost, apply_id: &str, commit: 
     }
 }
 
+/// Fetches the mirror, resolves `channel`'s head and records a new desired apply of it for
+/// each host. Holds the action lock throughout, so of two overlapping presses the later one
+/// always records the newer head. Returns the commit and the new apply ids.
+async fn request_applies(
+    state: &AppState,
+    actor: &str,
+    hosts: &[&FleetHost],
+    channel: &str,
+) -> Result<(String, Vec<String>), ApiError> {
+    let _action = state.actions.lock().await;
+    fetch_mirror(state).await?;
+    let commit = channel_head(state, channel).await?;
+    let ids = create_applies(state, actor, hosts, &commit)
+        .await
+        .map_err(internal)?;
+    Ok((commit, ids))
+}
+
 async fn apply_host(
     State(state): State<AppState>,
     Extension(Actor(actor)): Extension<Actor>,
     Path(name): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let host = find_host(&state, &name)?;
-    fetch_mirror(&state).await?;
-    let commit = channel_head(&state, &host.channel).await?;
-    let ids = create_applies(&state, &actor, &[host], &commit)
-        .await
-        .map_err(internal)?;
+    let (commit, ids) = request_applies(&state, &actor, &[host], &host.channel).await?;
     let apply_id = &ids[0];
     let agent_status = send_apply(&state, host, apply_id, &commit).await;
     Ok((
@@ -217,11 +231,7 @@ async fn apply_channel(
             format!("no fleet host on channel {channel}"),
         ));
     }
-    fetch_mirror(&state).await?;
-    let commit = channel_head(&state, &channel).await?;
-    let ids = create_applies(&state, &actor, &hosts, &commit)
-        .await
-        .map_err(internal)?;
+    let (commit, ids) = request_applies(&state, &actor, &hosts, &channel).await?;
     let statuses = join_all(
         hosts
             .iter()
@@ -257,6 +267,7 @@ async fn promote(
             "commit must be 40 lowercase hex characters".into(),
         ));
     }
+    let action = state.actions.lock().await;
     fetch_mirror(&state).await?;
     let previous = state.mirror.head("stable").await;
     state
@@ -278,6 +289,7 @@ async fn promote(
     if let Err(e) = state.mirror.fetch().await {
         eprintln!("fleet-server: api: mirror fetch after promote: {e:#}");
     }
+    drop(action);
     state.broadcast(WsMessage::ChannelsUpdated(channels(&state).await));
     Ok(Json(json!({ "commit": body.commit })))
 }

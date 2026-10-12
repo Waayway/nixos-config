@@ -533,3 +533,39 @@ async fn access_denied_on_api_ws_and_static() {
         other => panic!("expected 403 on upgrade, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn concurrent_applies_all_accepted() {
+    let dir = tempfile::tempdir().unwrap();
+    let o = Origin::new(dir.path());
+    o.commit("one", "main");
+    let fake = Shared::default();
+    let agent = fake_agent(fake.clone()).await;
+    let names: Vec<String> = (1..=8).map(|i| format!("H{i}")).collect();
+    let hosts = names.iter().map(|n| host(n, "main")).collect();
+    let e = env(dir, o.bare.to_str().unwrap(), agent, hosts).await;
+    // A push right before the presses, so every fetch has refs to write.
+    let head = o.commit("two", "main");
+    let http = reqwest::Client::new();
+
+    let presses = names.iter().map(|n| {
+        let (http, url) = (http.clone(), format!("{}/api/hosts/{n}/apply", e.base));
+        async move { http.post(url).send().await.unwrap().status() }
+    });
+    // The background fetch runs at the same time.
+    let background = async {
+        for _ in 0..4 {
+            e.state.mirror.fetch().await.unwrap();
+        }
+    };
+    let (statuses, ()) = tokio::join!(futures::future::join_all(presses), background);
+    assert!(
+        statuses.iter().all(|s| *s == StatusCode::ACCEPTED),
+        "{statuses:?}"
+    );
+    for n in &names {
+        let d = db::desired(&e.state.db, n).await.unwrap().unwrap();
+        assert_eq!(d.commit, head, "{n}");
+    }
+    assert_eq!(fake.lock().unwrap().applied.len(), names.len());
+}
