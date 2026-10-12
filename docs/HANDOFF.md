@@ -194,23 +194,32 @@ default), then switch it once by hand. After that it appears in the dashboard
 once the server can reach it over Tailscale on port 7461. Hosts also need
 `tag:fleet` in Tailscale (see below).
 
+### Verified on nixos-manager (2026-10-12)
+
+- nixos-manager is the Linux builder: `ssh -J pve manager@10.0.10.170`
+  (flakes on, `manager` is a trusted user). Linux packages, `fleet-bindings`,
+  `fleet-firewall` and the VM test `checks.x86_64-linux.fleet-vm` all build
+  and pass there. The VM test exercises a real apply as root with the
+  root-to-user privilege drop.
+- nixos-manager itself runs this branch (`nixos-rebuild boot` + reboot from
+  `~/.flake`, branch `fleet-manager` for now): fleet-server and fleet-agent
+  active, LAN 10.0.10.170, Tailscale 100.92.102.84.
+
 ### Not verified
 
-- `checks.x86_64-linux.fleet-vm` (server, two agents and a git remote) only
-  **evaluates**; it has **not been run**. This Mac has no Linux builder, so the
-  Linux packages and the test have never been built either.
-- The agent's root-to-user privilege drop has never run as root on a real host.
+- The darwin agent (launchd, Detach launcher) has not run on a Mac yet.
+- The proxmox template image evaluates but has not been built or booted.
 
 ### Still needs the user
 
 1. **Branch rename on GitHub:** `main` to `unstable` (also the default branch),
    create `stable`, add a ruleset on `stable`. Then rename the branch in each
    checkout and update the push command and branch name in this file.
-2. **nixos-manager bootstrap:** start VM 170; clone the repo to
-   `/home/manager/.flake` on `stable`; add the host's age key to `.sops.yaml`;
-   create `secrets/nixos-manager.yaml` with a write deploy key and a Tailscale
-   auth key; confirm `listenAddress` (currently `100.92.102.84`, last known
-   tailnet IP) and point `deployKeyFile` at the sops secret path; the secret
+2. **nixos-manager bootstrap (partly done):** it runs this branch and its host
+   key already decrypts `secrets/common.yaml` (`host_vms_base`), and
+   `listenAddress` 100.92.102.84 is confirmed. Left: move `~/.flake` to
+   `stable` once it exists; create `secrets/nixos-manager.yaml` with a write
+   deploy key and point `deployKeyFile` at the sops secret path; the secret
    must be readable by the server's user (`sops.secrets.<name> = { owner =
    "fleet-server"; mode = "0400"; };`); first switch.
 3. **Tailscale ACL:** `tag:fleet` on enrolled hosts; `tag:manager` to
@@ -218,8 +227,6 @@ once the server can reach it over Tailscale on port 7461. Hosts also need
    `tag:personal`.
 4. **Enrolment:** `fleet = true` on atlas, apollo, hermes and hephaestus, then
    a first real apply on hermes and on atlas.
-5. **A Linux builder** (`nix.linux-builder` on atlas, or a remote builder on
-   pve) to run the VM test and build the Linux packages.
-6. Fix `template/proxmox.nix`; it imports the non-existent `modules/base/*`
-   and `modules/servers/*`.
-7. VM migration (spec, "Migration of the homelab").
+5. Build and boot the proxmox template once (`nix build .#proxmox-template`
+   on nixos-manager) before creating new VMs from it.
+6. VM migration (spec, "Migration of the homelab").

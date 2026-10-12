@@ -37,7 +37,7 @@ nix run .#fleet-demo        # simulated fleet at http://127.0.0.1:8080
 nix develop .#fleet         # dev shell: cargo, node, sqlite
 ```
 
-A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). The server runs on `nixos-manager`. The NixOS VM test (`checks.x86_64-linux.fleet-vm`) has only been evaluated, not run, and the real rollout is not done yet. Details and open steps: `docs/HANDOFF.md`.
+A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). The server runs on `nixos-manager`. The NixOS VM test (`checks.x86_64-linux.fleet-vm`) passes on nixos-manager, which also serves as the Linux builder; enrolling the other machines is not done yet. Details and open steps: `docs/HANDOFF.md`.
 
 ### Installing a new Mac (e.g. atlas)
 
