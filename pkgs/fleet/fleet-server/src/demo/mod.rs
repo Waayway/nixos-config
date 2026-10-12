@@ -7,7 +7,7 @@ mod online;
 mod repo;
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -134,12 +134,6 @@ fn scaled_secs(secs: f64, speed: f64) -> u64 {
     ((secs / speed).round() as u64).max(1)
 }
 
-/// A local port with nothing listening on it.
-fn closed_port() -> anyhow::Result<u16> {
-    let l = std::net::TcpListener::bind("127.0.0.1:0").context("finding a free port")?;
-    Ok(l.local_addr()?.port())
-}
-
 /// Starts the demo; returns once the dashboard is listening on `listen`.
 pub async fn start(listen: SocketAddr, speed: f64) -> anyhow::Result<DemoHandle> {
     anyhow::ensure!(
@@ -162,6 +156,10 @@ pub async fn start(listen: SocketAddr, speed: f64) -> anyhow::Result<DemoHandle>
     let mut peers = Vec::new();
     let mut addresses = HashMap::new();
     let start = now();
+    // The port for agents that don't answer. Held until every simulated agent is bound, so
+    // none of them can get it; dropped afterwards, so nothing listens on it.
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").context("finding a free port")?;
+    let closed_addr = closed.local_addr()?;
     for (i, h) in FLEET.iter().enumerate() {
         let os = if h.system.ends_with("darwin") {
             "darwin"
@@ -175,7 +173,7 @@ pub async fn start(listen: SocketAddr, speed: f64) -> anyhow::Result<DemoHandle>
         };
         let running = commits[head - 1 - h.behind].clone();
         let addr = if h.unreachable {
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), closed_port()?)
+            closed_addr
         } else {
             let setup = HostSetup {
                 name: h.name.into(),
@@ -206,6 +204,7 @@ pub async fn start(listen: SocketAddr, speed: f64) -> anyhow::Result<DemoHandle>
             os: os.into(),
         });
     }
+    drop(closed);
 
     let hosts_file = tmp.path().join("hosts.json");
     std::fs::write(&hosts_file, serde_json::to_vec_pretty(&hosts)?)

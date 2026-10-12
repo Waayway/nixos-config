@@ -52,23 +52,55 @@ pub fn agent_base(
     Some(SocketAddr::new(ip, cfg.agent_port).to_string())
 }
 
-/// Polls all hosts concurrently.
-pub async fn poll_once(state: &AppState) {
+/// Polls all hosts concurrently. Returns the agent reachability changes it logged.
+pub async fn poll_once(state: &AppState) -> Vec<String> {
     let peers = state.online.peers().await;
-    join_all(state.hosts.iter().map(|h| poll_host(state, h, &peers))).await;
+    join_all(state.hosts.iter().map(|h| poll_host(state, h, &peers)))
+        .await
+        .into_iter()
+        .flatten()
+        .collect()
 }
 
-async fn poll_host(state: &AppState, host: &FleetHost, peers: &HashMap<String, PeerInfo>) {
+/// Remembers whether `host`'s agent answered and returns a log line when that changed:
+/// the first failure (and the first after a success), and the first success after a failure.
+/// An unchanged state logs nothing, so an unreachable agent doesn't fill the log every poll.
+fn reachability_change(
+    state: &AppState,
+    host: &str,
+    result: Result<(), &anyhow::Error>,
+) -> Option<String> {
+    let prev = state
+        .agent_up
+        .lock()
+        .unwrap()
+        .insert(host.to_string(), result.is_ok());
+    match (result, prev) {
+        (Err(e), None | Some(true)) => {
+            Some(format!("{host}: agent unreachable: {}", e.root_cause()))
+        }
+        (Ok(()), Some(false)) => Some(format!("{host}: agent reachable again")),
+        _ => None,
+    }
+}
+
+async fn poll_host(
+    state: &AppState,
+    host: &FleetHost,
+    peers: &HashMap<String, PeerInfo>,
+) -> Option<String> {
+    let mut change = None;
     let status = match agent_base(&state.cfg, host, peers) {
-        Some(base) => match state.client.status(&base).await {
-            Ok(s) => Some((base, s)),
-            Err(e) => {
-                eprintln!("fleet-server: {}: agent unreachable: {e:#}", host.name);
-                None
-            }
-        },
+        Some(base) => {
+            let res = state.client.status(&base).await;
+            change = reachability_change(state, &host.name, res.as_ref().map(|_| ()));
+            res.ok().map(|s| (base, s))
+        }
         None => None,
     };
+    if let Some(line) = &change {
+        eprintln!("fleet-server: {line}");
+    }
     state
         .reachable
         .lock()
@@ -79,6 +111,7 @@ async fn poll_host(state: &AppState, host: &FleetHost, peers: &HashMap<String, P
     }
     let view = host_view_with(state, host, peers).await;
     state.broadcast(WsMessage::HostUpdated(Box::new(view)));
+    change
 }
 
 async fn handle_status(state: &AppState, host: &FleetHost, base: &str, status: &AgentStatus) {

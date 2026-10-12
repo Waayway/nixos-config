@@ -55,10 +55,14 @@ struct LogQ {
 }
 
 async fn fake_agent(fake: Shared) -> SocketAddr {
-    async fn status(State(f): State<Shared>) -> Json<AgentStatus> {
+    /// `503` while `status` is unset.
+    async fn status(State(f): State<Shared>) -> Result<Json<AgentStatus>, StatusCode> {
         let mut f = f.lock().unwrap();
         f.status_hits += 1;
-        Json(f.status.clone().unwrap())
+        f.status
+            .clone()
+            .map(Json)
+            .ok_or(StatusCode::SERVICE_UNAVAILABLE)
     }
     async fn activations(
         State(f): State<Shared>,
@@ -491,4 +495,37 @@ async fn follow_log_streams_running_apply_once() {
     assert_eq!(stored, "one\ntwo\nthree\n");
     // One follower only: exactly one read per scripted state.
     assert_eq!(fake.lock().unwrap().log_hits, 3);
+}
+
+#[tokio::test]
+async fn unreachable_agent_logged_once_per_change() {
+    // Nothing listens on this port once the listener is dropped.
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let closed_addr = closed.local_addr().unwrap();
+    drop(closed);
+    let e = env(closed_addr, None).await;
+    let mut lines = Vec::new();
+    for _ in 0..3 {
+        lines.extend(poll_once(&e.state).await);
+    }
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].starts_with("H1: agent unreachable: "), "{lines:?}");
+}
+
+#[tokio::test]
+async fn agent_recovery_logged_once() {
+    let fake = Shared::default();
+    let addr = fake_agent(fake.clone()).await;
+    let e = env(addr, None).await;
+    let mut lines = Vec::new();
+    for _ in 0..2 {
+        lines.extend(poll_once(&e.state).await);
+    }
+    fake.lock().unwrap().status = Some(agent_status(OLD, None));
+    for _ in 0..2 {
+        lines.extend(poll_once(&e.state).await);
+    }
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(lines[0].starts_with("H1: agent unreachable: "), "{lines:?}");
+    assert_eq!(lines[1], "H1: agent reachable again");
 }

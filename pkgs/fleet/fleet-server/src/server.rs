@@ -18,23 +18,24 @@ pub struct ServerHandle {
     /// The address actually bound (useful with port 0).
     pub addr: SocketAddr,
     pub state: AppState,
-    serve: Option<JoinHandle<std::io::Result<()>>>,
+    serve: JoinHandle<std::io::Result<()>>,
     background: Vec<JoinHandle<()>>,
 }
 
 impl ServerHandle {
-    /// Serves until the listener fails.
+    /// Serves until the listener fails. Dropping this future (and the handle) still stops
+    /// the server.
     pub async fn wait(mut self) -> anyhow::Result<()> {
-        let serve = self.serve.take().context("server already stopped")?;
-        serve.await.context("server task")?.context("serving")
+        (&mut self.serve)
+            .await
+            .context("server task")?
+            .context("serving")
     }
 }
 
 impl Drop for ServerHandle {
     fn drop(&mut self) {
-        if let Some(s) = &self.serve {
-            s.abort();
-        }
+        self.serve.abort();
         for t in &self.background {
             t.abort();
         }
@@ -65,7 +66,7 @@ pub async fn start(
     Ok(ServerHandle {
         addr,
         state,
-        serve: Some(serve),
+        serve,
         background,
     })
 }
