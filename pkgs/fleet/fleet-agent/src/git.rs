@@ -22,12 +22,11 @@ pub fn drop_privileges(cmd: &mut Command, user: &str, uid: u32, gid: u32, home: 
     // setgroups, setgid, setuid) and does not allocate.
     unsafe {
         cmd.pre_exec(move || {
-            #[cfg(not(target_os = "macos"))]
-            initgroups(&cuser, gid)?;
-            // nix has no initgroups/setgroups on macOS; the darwin agent is
-            // not expected to run as root anyway.
-            #[cfg(target_os = "macos")]
-            let _ = &cuser;
+            // SAFETY: cuser is a valid NUL-terminated string; initgroups is
+            // async-signal-safe enough for the post-fork, pre-exec window.
+            if libc::initgroups(cuser.as_ptr(), gid.as_raw() as _) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
             setgid(gid)?;
             setuid(uid)?;
             Ok(())
