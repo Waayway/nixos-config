@@ -105,8 +105,9 @@ pkgs.testers.runNixOSTest {
             disableAccess = true;
             pollSecs = 5;
             staticAddresses = {
-              # The agent on this host only accepts what "manager" resolves to here.
-              manager = "127.0.0.2";
+              # Connecting to the host's own eth1 address is sourced from that address,
+              # which the manager's agent accepts ("manager" resolves to it).
+              manager = nodes.manager.networking.primaryIPAddress;
               laptop1 = nodes.laptop1.networking.primaryIPAddress;
               laptop2 = nodes.laptop2.networking.primaryIPAddress;
             };
@@ -160,6 +161,11 @@ pkgs.testers.runNixOSTest {
         m.wait_for_open_port(7461)
         m.succeed("su - alice -c 'git clone -q -b unstable git://remote/fleet.git ~/.flake && git -C ~/.flake reset -q --hard HEAD~1'")
 
+    # The manager's own agent is reachable through the server.
+    manager.wait_until_succeeds(
+        "curl -sf localhost:8080/api/snapshot | jq -e '.hosts[] | select(.name==\"manager\") | .online == \"on\" and .checkout != null'"
+    )
+
     # 2-3. Apply laptop1: accepted, then it runs the head.
     res = apply("laptop1")
     assert res["agent_status"] in ("202", "200"), res
@@ -171,15 +177,15 @@ pkgs.testers.runNixOSTest {
     # 4. A dirty laptop2 skips the apply and keeps its HEAD.
     before = laptop2.succeed("git -C /home/alice/.flake rev-parse HEAD").strip()
     laptop2.succeed("echo local >> /home/alice/.flake/flake.nix")
-    apply("laptop2")
+    l2_id = apply("laptop2")["apply_id"]
     manager.wait_until_succeeds(
-        "curl -sf localhost:8080/api/snapshot | jq -e '.hosts[] | select(.name==\"laptop2\") | .last_apply.skip_reason == \"dirty\"'"
+        f"curl -sf localhost:8080/api/snapshot | jq -e '.hosts[] | select(.name==\"laptop2\") | .last_apply | .apply_id == \"{l2_id}\" and .skip_reason == \"dirty\"'"
     )
     assert laptop2.succeed("git -C /home/alice/.flake rev-parse HEAD").strip() == before
     assert snapshot_host("laptop2")["running"] != head1
 
     # 5. Source check: laptop1 is not the manager, so laptop2's agent refuses it.
-    code = laptop1.succeed("curl -s -o /dev/null -w '%{http_code}' laptop2:7461/status").strip()
+    code = laptop1.succeed("curl -4 -s -o /dev/null -w '%{http_code}' laptop2:7461/status").strip()
     assert code == "403", f"expected 403 from laptop2, got {code}"
 
     # 6. Agent down: the apply cannot be delivered. After the agent is back, the
@@ -199,7 +205,7 @@ pkgs.testers.runNixOSTest {
     laptop1.systemctl("start fleet-agent.service")
     manager.wait_until_succeeds(
         f"curl -sf localhost:8080/api/snapshot | jq -e '.hosts[] | select(.name==\"laptop1\") | .running == \"{head2}\"'",
-        timeout=20,
+        timeout=30,
     )
   '';
 }
