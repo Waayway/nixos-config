@@ -157,7 +157,10 @@ A dashboard and agent that roll out config changes across the hosts. Design:
   built dashboard (`fleet-web` package).
 - Modules in `modules/fleet/`: `agent.nix` (`services.fleet-agent`, systemd or
   launchd), `server.nix` (`services.fleet-server`, Linux only), `audit-hook.nix`
-  (logs every activation, also manual rebuilds).
+  (logs every activation, also manual rebuilds). Both open their port on
+  `tailscale0` only (agent 7461, dashboard 8080). The server runs as the
+  `fleet-server` system user, which is made a Tailscale operator
+  (`services.tailscale.extraSetFlags`) for `tailscale status`/`whois`.
 - Host attributes: `fleet = true;` enrols a host, `channel = "stable" | "unstable";`
   picks its branch. Defaults: servers `stable`, workstations `unstable`.
   `nixos-manager` has `fleet = true` and runs the server.
@@ -171,14 +174,18 @@ nix run .#fleet-demo -- --listen 127.0.0.1:18080 --speed 4
 ```
 Frontend work: run the demo on another port, then from `pkgs/fleet/web`:
 ```sh
-FLEET_API=http://127.0.0.1:18080 npm run dev   # Vite proxies /api to the demo
+FLEET_API=http://127.0.0.1:18080 nix develop ../../..#fleet -c npm run dev   # Vite proxies /api to the demo
 ```
-Tests:
+Tests (cargo and node only exist in the dev shell; the `cargo` on PATH is an
+unconfigured rustup):
 ```sh
-cd pkgs/fleet && cargo test --workspace
-cd pkgs/fleet/web && npx vitest run
+cd pkgs/fleet && nix develop ../..#fleet -c cargo test --workspace
+cd pkgs/fleet/web && nix develop ../../..#fleet -c npx vitest run
 nix build .#checks.aarch64-darwin.fleet-bindings   # generated TS types are up to date
+nix eval .#checks.x86_64-linux.fleet-firewall.drvPath   # agent/dashboard ports open on tailscale0
 ```
+State-changing API calls need the header `X-Fleet: 1` (CSRF guard), e.g.
+`curl -X POST -H 'X-Fleet: 1' http://127.0.0.1:18080/api/hosts/hermes/apply`.
 
 ### Adding a host to the fleet
 
@@ -203,7 +210,9 @@ once the server can reach it over Tailscale on port 7461. Hosts also need
    `/home/manager/.flake` on `stable`; add the host's age key to `.sops.yaml`;
    create `secrets/nixos-manager.yaml` with a write deploy key and a Tailscale
    auth key; confirm `listenAddress` (currently `100.92.102.84`, last known
-   tailnet IP) and point `deployKeyFile` at the sops secret path; first switch.
+   tailnet IP) and point `deployKeyFile` at the sops secret path; the secret
+   must be readable by the server's user (`sops.secrets.<name> = { owner =
+   "fleet-server"; mode = "0400"; };`); first switch.
 3. **Tailscale ACL:** `tag:fleet` on enrolled hosts; `tag:manager` to
    `tag:fleet:7461`; dashboard access for `Waayway@github`, `tag:nixos` and
    `tag:personal`.
