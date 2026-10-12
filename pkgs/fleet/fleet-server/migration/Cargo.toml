@@ -1,7 +1,0 @@
-[package]
-name = "fleet-migration"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-sea-orm-migration = { version = "1", default-features = false, features = ["sqlx-sqlite", "runtime-tokio-rustls"] }

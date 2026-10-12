@@ -20,7 +20,7 @@
 
   # No options: terminal/neovim are always on (no enable options declared).
   options = {
-    services.fleet-server = {
+    services.lodestar-server = {
       enable = true;
       # Last known tailnet IP (`tailscale status`): confirm at bootstrap.
       listenAddress = "100.92.102.84";

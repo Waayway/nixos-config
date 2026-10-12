@@ -48,7 +48,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    crane.url = "github:ipetkov/crane";
+    lodestar = {
+      url = "github:Waayway/lodestar";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
@@ -56,29 +59,19 @@
     };
   };
 
-  # Machines live in systems.nix, our own programs (packages, apps, checks,
-  # dev shells) in programs.nix.
+  # Machines live in systems.nix, our own programs (packages) in programs.nix.
   outputs =
     inputs:
     let
       systems = import ./systems.nix { inherit inputs; };
-      programs = import ./programs.nix {
-        inherit inputs;
-        inherit (systems) nixosConfigurations;
-      };
+      programs = import ./programs.nix { inherit inputs; };
     in
     {
       inherit (systems)
         nixosConfigurations
         darwinConfigurations
         deploy
-        fleetHosts
         ;
-      inherit (programs)
-        packages
-        apps
-        checks
-        devShells
-        ;
+      inherit (programs) packages;
     };
 }

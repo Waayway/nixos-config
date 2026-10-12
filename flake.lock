@@ -179,6 +179,27 @@
         "type": "github"
       }
     },
+    "lodestar": {
+      "inputs": {
+        "crane": "crane",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791821087,
+        "narHash": "sha256-fOVn7o/QGUa6w+7GNtvw6weDDaed99o/y/4zbbj9KTc=",
+        "owner": "Waayway",
+        "repo": "lodestar",
+        "rev": "d10948bf15af6ffc0b55d216c15ea7d85c505789",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Waayway",
+        "repo": "lodestar",
+        "type": "github"
+      }
+    },
     "nix-darwin": {
       "inputs": {
         "nixpkgs": [
@@ -447,9 +468,9 @@
     },
     "root": {
       "inputs": {
-        "crane": "crane",
         "deploy-rs": "deploy-rs",
         "home-manager": "home-manager",
+        "lodestar": "lodestar",
         "nix-darwin": "nix-darwin",
         "nix-flatpak": "nix-flatpak",
         "nix-homebrew": "nix-homebrew",

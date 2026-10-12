@@ -12,9 +12,6 @@ let
   # name -> host attrs (system, user, type, options, config, ...) from hosts/*/
   hosts = import ./lib/discoverHosts.nix { inherit lib; } ./hosts;
 
-  # The hosts enrolled in the fleet, with their channel (stable/unstable).
-  fleetHosts = import ./lib/fleetHosts.nix { inherit lib; } hosts;
-
   isDarwinHost = host: lib.hasSuffix "darwin" host.system;
   nixosHosts = lib.filterAttrs (_: host: !(isDarwinHost host)) hosts;
   darwinHosts = lib.filterAttrs (_: host: isDarwinHost host) hosts;
@@ -27,7 +24,6 @@ let
       inputs
       version
       overlays
-      fleetHosts
       ;
   };
   mkSystem = import ./lib/mkSystem.nix builderArgs;
@@ -41,6 +37,6 @@ let
   ) deployHosts;
 in
 {
-  inherit nixosConfigurations darwinConfigurations fleetHosts;
+  inherit nixosConfigurations darwinConfigurations;
   deploy.nodes = deployNodes;
 }

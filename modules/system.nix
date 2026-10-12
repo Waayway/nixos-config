@@ -10,10 +10,10 @@
       ./desktop
       ./development
       ./editor
-      ./fleet
       ./gaming
       ./hardware
       ./locale
+      ./lodestar
       ./networking
       ./nix
       ./packages
