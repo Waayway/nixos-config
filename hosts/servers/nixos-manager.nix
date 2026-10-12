@@ -14,15 +14,10 @@
     prefixLength = 24;
   };
 
-  tailscaleTags = [ "tag:manager" ];
+  tags = [ "tag:manager" ];
 
-  options = {
-    workstation = {
-      terminal.enable = true;
-      neovim.enable = true;
-    };
-    server = { };
-  };
+  # No options: terminal/neovim are always on (no enable options declared).
+  options = { };
 
   config = { ... }: { };
 }

@@ -30,14 +30,9 @@
         office.enable = true;
         utilities.enable = true;
       };
-      terminal.enable = true;
-      neovim.enable = true;
-      desktop = {
-        kde.enable = false;
-        hyprland.enable = true;
-      };
+      # terminal/neovim/hyprland are always on (no enable options declared).
     };
-    server = { };
+    desktop.kde.enable = false;
   };
 
   config =
