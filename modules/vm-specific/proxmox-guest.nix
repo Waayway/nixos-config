@@ -24,7 +24,8 @@ lib.optionalAttrs enabled {
         autoResize = true;
       };
 
-      boot.loader.grub.device = "/dev/vda";
+      # BIOS + single ext4 root, no ESP: GRUB on the disk (modules/boot/boot.nix).
+      bootloader = "grub";
       boot.growPartition = true;
       services.qemuGuest.enable = true;
     }
