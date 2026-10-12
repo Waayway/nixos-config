@@ -106,6 +106,19 @@ async fn head_after_fetch() {
 }
 
 #[tokio::test]
+async fn try_head_tells_absent_from_git_error() {
+    let o = Origin::new();
+    let c1 = o.commit("first", "unstable");
+    let (m, s) = mirror_of(&o).await;
+    assert_eq!(m.try_head("unstable").await.unwrap(), Some(c1));
+    assert_eq!(m.try_head("stable").await.unwrap(), None);
+    // A broken mirror: git fails, which is not the same as "no stable branch".
+    std::fs::remove_file(s.path().join("mirror.git/HEAD")).unwrap();
+    assert!(m.try_head("stable").await.is_err());
+    assert_eq!(m.head("stable").await, None);
+}
+
+#[tokio::test]
 async fn behind_strips_dirty() {
     let o = Origin::new();
     let c1 = o.commit("one", "unstable");

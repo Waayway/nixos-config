@@ -130,18 +130,33 @@ impl Mirror {
         Ok(())
     }
 
-    /// Commit at the head of `channel`, if the branch exists in the mirror.
+    /// Commit at the head of `channel`, if the branch exists in the mirror (git errors read as
+    /// absent; see `try_head`).
     pub async fn head(&self, channel: &str) -> Option<String> {
+        self.try_head(channel).await.ok().flatten()
+    }
+
+    /// Commit at the head of `channel`: `Ok(None)` when the branch does not exist (or the name
+    /// is not a valid channel), `Err` when git itself failed.
+    pub async fn try_head(&self, channel: &str) -> anyhow::Result<Option<String>> {
         if !valid_channel(channel) {
-            return None;
+            return Ok(None);
         }
         let refname = format!("refs/heads/{channel}^{{commit}}");
         let out = self
             .git(["rev-parse", "--verify", "--quiet", &refname])
-            .await
-            .ok()?;
+            .await?;
         let hash = out.stdout.trim();
-        (out.ok() && is_commit_hash(hash)).then(|| hash.to_string())
+        match out.code {
+            Some(0) if is_commit_hash(hash) => Ok(Some(hash.to_string())),
+            // --verify --quiet: exit 1 and no output for a missing ref.
+            Some(1) if hash.is_empty() => Ok(None),
+            _ => bail!(
+                "git rev-parse {refname} failed ({:?}): {}",
+                out.code,
+                out.stderr.trim()
+            ),
+        }
     }
 
     /// First line of the commit message.
@@ -220,7 +235,8 @@ impl Mirror {
         if !self.is_ancestor(commit, "refs/heads/unstable").await? {
             return reject(format!("commit {commit} is not on unstable"));
         }
-        if let Some(stable) = self.head("stable").await
+        // A git error here must not read as "no stable yet" (which would skip the check).
+        if let Some(stable) = self.try_head("stable").await?
             && !self.is_ancestor(&stable, commit).await?
         {
             return reject(format!("stable ({stable}) is not an ancestor of {commit}"));
@@ -246,7 +262,7 @@ impl Mirror {
 pub enum PromoteError {
     /// The commit is not a valid promote target (hash, ancestry); nothing was pushed.
     Rejected(String),
-    /// git itself failed (merge-base, push).
+    /// git itself failed (rev-parse, merge-base, push).
     Git(anyhow::Error),
 }
 
