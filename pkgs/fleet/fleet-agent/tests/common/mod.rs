@@ -80,6 +80,7 @@ pub fn fixture() -> Fixture {
         state_dir: tmp.path().join("state"),
         rebuild_command: None,
         launcher: Launcher::Inline,
+        agent_exe: None,
         os: "linux".into(),
     };
     Fixture {

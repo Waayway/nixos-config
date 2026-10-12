@@ -24,8 +24,8 @@ pub fn applies_dir(cfg: &AgentConfig) -> PathBuf {
 
 /// Apply ids become file names, so anything that could escape the directory
 /// is refused.
-fn valid_id(id: &str) -> bool {
-    !id.is_empty()
+pub fn is_valid_apply_id(id: &str) -> bool {
+    id.bytes().next().is_some_and(|b| b.is_ascii_alphanumeric())
         && id.len() <= 64
         && id
             .bytes()
@@ -69,7 +69,7 @@ fn pid_alive(pid: i32) -> bool {
 /// The stored record, with a `Running` record whose wrapper died reported as
 /// failed ("interrupted").
 pub fn read_record(cfg: &AgentConfig, id: &str) -> Option<ApplyRecord> {
-    if !valid_id(id) {
+    if !is_valid_apply_id(id) {
         return None;
     }
     let raw = fs::read(file(cfg, id, "json")).ok()?;
@@ -97,7 +97,7 @@ fn record_ids(cfg: &AgentConfig) -> Vec<String> {
             return None;
         }
         let id = p.file_stem()?.to_str()?.to_string();
-        valid_id(&id).then_some(id)
+        is_valid_apply_id(&id).then_some(id)
     })
     .collect()
 }
@@ -131,11 +131,21 @@ pub fn read_log(cfg: &AgentConfig, id: &str, offset: u64) -> Option<LogChunk> {
         }
         at_end = offset + buf.len() as u64 >= len;
     }
+    let eof = at_end && rec.state != ApplyState::Running;
+    let data = match std::str::from_utf8(&buf) {
+        Ok(s) => s.to_string(),
+        // A multibyte char cut off by the end of a still-growing log: leave it
+        // for the next read so `data.len()` stays the number of bytes consumed.
+        Err(e) if !eof && e.error_len().is_none() => {
+            String::from_utf8_lossy(&buf[..e.valid_up_to()]).into_owned()
+        }
+        Err(_) => String::from_utf8_lossy(&buf).into_owned(),
+    };
     Some(LogChunk {
         apply_id: id.to_string(),
         offset,
-        data: String::from_utf8_lossy(&buf).into_owned(),
-        eof: at_end && rec.state != ApplyState::Running,
+        data,
+        eof,
     })
 }
 
@@ -297,7 +307,7 @@ pub fn run_apply(cfg: &AgentConfig, id: &str, commit: &str) -> ApplyRecord {
         started_at: Some(now()),
         finished_at: None,
     };
-    if !valid_id(id) {
+    if !is_valid_apply_id(id) {
         rec.message = Some("invalid apply id".into());
         return rec;
     }

@@ -182,3 +182,72 @@ fn read_log_not_eof_while_running() {
     let c = read_log(&f.cfg, "run", 0).unwrap();
     assert_eq!((c.data.as_str(), c.eof), ("partial", false));
 }
+
+#[test]
+fn read_log_does_not_split_multibyte_char_while_running() {
+    let f = fixture();
+    write_record(&f, "mb", ApplyState::Running, 1);
+    let dir = applies_dir(&f.cfg);
+    std::fs::write(dir.join("mb.pid"), std::process::id().to_string()).unwrap();
+    // "a" then the first byte of "é" (c3 a9).
+    std::fs::write(dir.join("mb.log"), [b'a', 0xc3]).unwrap();
+    let c = read_log(&f.cfg, "mb", 0).unwrap();
+    assert_eq!((c.data.as_str(), c.eof), ("a", false));
+    std::fs::write(dir.join("mb.log"), [b'a', 0xc3, 0xa9]).unwrap();
+    let next = c.offset + c.data.len() as u64;
+    let c = read_log(&f.cfg, "mb", next).unwrap();
+    assert_eq!(c.data, "é");
+}
+
+#[test]
+fn launch_command_rejects_bad_input() {
+    use fleet_agent::launcher::launch_command;
+    let f = fixture();
+    let p = std::path::Path::new("/c.json");
+    let ok = "a".repeat(40);
+    assert!(launch_command(&f.cfg, p, "-x", &ok).is_err());
+    assert!(launch_command(&f.cfg, p, "ééééé", &ok).is_err());
+    assert!(launch_command(&f.cfg, p, "id", "--evil").is_err());
+}
+
+#[test]
+fn launch_command_systemd_run_argv() {
+    use fleet_agent::config::Launcher;
+    use fleet_agent::launcher::{DAEMON_PATH, launch_command};
+    let mut f = fixture();
+    f.cfg.launcher = Launcher::SystemdRun;
+    f.cfg.agent_exe = Some("/bin/fa".into());
+    let c = "b".repeat(40);
+    let (prog, args) =
+        launch_command(&f.cfg, std::path::Path::new("/c.json"), "12345678-90", &c).unwrap();
+    assert_eq!(prog.to_str(), Some("systemd-run"));
+    let want = [
+        "--unit",
+        "fleet-apply-12345678",
+        "--collect",
+        "--property=Type=exec",
+        &format!("--setenv=PATH={DAEMON_PATH}"),
+        "--setenv=HOME=/root",
+        "/bin/fa",
+        "apply",
+        "--config",
+        "/c.json",
+        "--",
+        "12345678-90",
+        &c,
+    ];
+    assert_eq!(args, want);
+}
+
+#[test]
+fn launch_command_detach_uses_agent_exe() {
+    use fleet_agent::config::Launcher;
+    use fleet_agent::launcher::launch_command;
+    let mut f = fixture();
+    f.cfg.launcher = Launcher::Detach;
+    f.cfg.agent_exe = Some("/bin/fa".into());
+    let c = "b".repeat(40);
+    let (prog, args) = launch_command(&f.cfg, std::path::Path::new("/c.json"), "id1", &c).unwrap();
+    assert_eq!(prog.to_str(), Some("/bin/fa"));
+    assert_eq!(args, ["apply", "--config", "/c.json", "--", "id1", &c]);
+}

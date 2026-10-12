@@ -31,6 +31,9 @@ pub struct AgentConfig {
     #[serde(default)]
     pub rebuild_command: Option<Vec<String>>,
     pub launcher: Launcher,
+    /// Binary the launcher starts for an apply; defaults to the current executable.
+    #[serde(default)]
+    pub agent_exe: Option<PathBuf>,
     /// "linux" or "darwin"
     pub os: String,
 }
