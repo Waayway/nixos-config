@@ -79,6 +79,7 @@ pub fn fixture() -> Fixture {
         listen: None,
         state_dir: tmp.path().join("state"),
         rebuild_command: None,
+        revision_command: None,
         launcher: Launcher::Inline,
         agent_exe: None,
         os: "linux".into(),

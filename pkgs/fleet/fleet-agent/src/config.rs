@@ -30,6 +30,10 @@ pub struct AgentConfig {
     pub state_dir: PathBuf,
     #[serde(default)]
     pub rebuild_command: Option<Vec<String>>,
+    /// Command whose output (with `--configuration-revision` appended) is the
+    /// running revision; defaults to the system's `nixos-version`/`darwin-version`.
+    #[serde(default)]
+    pub revision_command: Option<Vec<String>>,
     pub launcher: Launcher,
     /// Binary the launcher starts for an apply; defaults to the current executable.
     #[serde(default)]

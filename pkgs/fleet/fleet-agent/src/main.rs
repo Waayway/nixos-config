@@ -41,8 +41,9 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> anyhow::Result<ExitCode> {
     match cli.command {
         Command::Serve { config } => {
-            config::load(&config)?;
-            eprintln!("fleet-agent: serve is not implemented yet");
+            let cfg = config::load(&config)?;
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(fleet_agent::api::serve(cfg, config))?;
             Ok(ExitCode::FAILURE)
         }
         Command::Apply { config, id, commit } => {

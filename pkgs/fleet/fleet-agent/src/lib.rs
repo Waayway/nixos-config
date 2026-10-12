@@ -1,5 +1,9 @@
+pub mod activations;
+pub mod api;
 pub mod apply;
 pub mod checks;
 pub mod config;
 pub mod git;
 pub mod launcher;
+pub mod net;
+pub mod status;

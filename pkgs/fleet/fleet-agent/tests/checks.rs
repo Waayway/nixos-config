@@ -39,7 +39,10 @@ fn commit_only_on_other_branch() {
 #[test]
 fn no_remote_channel_ref() {
     let f = fixture();
-    git(&f.clone, &["update-ref", "-d", "refs/remotes/origin/stable"]);
+    git(
+        &f.clone,
+        &["update-ref", "-d", "refs/remotes/origin/stable"],
+    );
     let head = git(&f.clone, &["rev-parse", "HEAD"]);
     let g = Git::new(&f.cfg).unwrap();
     assert_eq!(
