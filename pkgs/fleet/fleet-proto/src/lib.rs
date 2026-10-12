@@ -180,7 +180,7 @@ pub struct AuditEvent {
 #[ts(export)]
 pub enum WsMessage {
     Snapshot(Snapshot),
-    HostUpdated(HostView),
+    HostUpdated(Box<HostView>),
     ChannelsUpdated(Vec<ChannelView>),
     ApplyLog(LogChunk),
 }
@@ -218,7 +218,7 @@ mod tests {
             desired_apply_id: None,
             last_activation: None,
         };
-        let s = serde_json::to_string(&WsMessage::HostUpdated(hv)).unwrap();
+        let s = serde_json::to_string(&WsMessage::HostUpdated(Box::new(hv))).unwrap();
         assert!(s.contains("\"type\":\"host_updated\""), "{s}");
         assert!(s.contains("\"data\":{"), "{s}");
     }

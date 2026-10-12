@@ -251,3 +251,60 @@ fn is_tailscale_ranges() {
     assert!(!is_tailscale("fd7a:115c:a1e1::1".parse().unwrap()));
     assert!(!is_tailscale("10.0.0.1".parse().unwrap()));
 }
+
+#[tokio::test]
+async fn back_to_back_applies_second_is_409() {
+    let mut f = configured();
+    f.cfg.rebuild_command = Some(vec!["sh".into(), "-c".into(), "sleep 1".into()]);
+    let c = push_remote_commit(&f, "b.txt");
+    fleet_agent::git::Git::new(&f.cfg)
+        .unwrap()
+        .fetch(&f.cfg.repo_url)
+        .unwrap();
+    let app = app(&f, MANAGER);
+    let (c1, _) = call(&app, Method::POST, "/apply", apply_body("id-1", &c)).await;
+    let (c2, _) = call(&app, Method::POST, "/apply", apply_body("id-2", &c)).await;
+    let (c3, _) = call(&app, Method::POST, "/apply", apply_body("id-1", &c)).await;
+    assert_eq!(
+        (c1, c2, c3),
+        (
+            StatusCode::ACCEPTED,
+            StatusCode::CONFLICT,
+            StatusCode::ACCEPTED
+        )
+    );
+    wait_state(&app, ApplyState::Ok).await;
+    let (code, _) = call(&app, Method::POST, "/apply", apply_body("id-1", &c)).await;
+    assert_eq!(code, StatusCode::OK);
+}
+
+#[test]
+fn second_run_apply_exits_while_lock_held() {
+    let f = configured();
+    let lock = fleet_agent::apply::try_lock_apply(&f.cfg).unwrap();
+    let rec = fleet_agent::apply::run_apply(&f.cfg, "id-9", &"0".repeat(40));
+    assert_eq!(rec.state, ApplyState::Failed);
+    assert_eq!(rec.message.as_deref(), Some("another apply is running"));
+    assert!(fleet_agent::apply::read_record(&f.cfg, "id-9").is_none());
+    assert!(!f.cfg.state_dir.join("apply-in-progress.json").exists());
+    drop(lock);
+    // A concurrently forking test thread can briefly inherit the descriptor
+    // (O_CLOEXEC only applies at exec), so allow a moment for it to close.
+    let end = Instant::now() + Duration::from_secs(5);
+    while fleet_agent::apply::try_lock_apply(&f.cfg).is_none() {
+        assert!(Instant::now() < end, "lock never released");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+#[tokio::test]
+async fn apply_records_last_fetch() {
+    let f = configured();
+    let c = push_remote_commit(&f, "b.txt");
+    let app = app(&f, MANAGER);
+    assert!(status(&app).await.checkout.last_fetch_at.is_none());
+    let (code, _) = call(&app, Method::POST, "/apply", apply_body("id-1", &c)).await;
+    assert_eq!(code, StatusCode::ACCEPTED);
+    let s = wait_state(&app, ApplyState::Ok).await;
+    assert!(s.checkout.last_fetch_at.is_some());
+}

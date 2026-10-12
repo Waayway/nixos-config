@@ -18,6 +18,27 @@ use crate::git::Git;
 
 const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 
+/// Exclusive, non-blocking lock on `<state_dir>/apply.lock`; held (by the
+/// returned file) for as long as an apply runs. None if another holds it.
+pub fn try_lock_apply(cfg: &AgentConfig) -> Option<File> {
+    use std::os::fd::AsRawFd;
+    fs::create_dir_all(&cfg.state_dir).ok()?;
+    let f = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(cfg.state_dir.join("apply.lock"))
+        .ok()?;
+    // SAFETY: flock on a descriptor we own.
+    (unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0).then_some(f)
+}
+
+/// Records a successful fetch in `<state_dir>/last_fetch` (unix seconds).
+pub fn record_fetch(cfg: &AgentConfig) {
+    let _ = fs::create_dir_all(&cfg.state_dir);
+    let _ = fs::write(cfg.state_dir.join("last_fetch"), now().to_string());
+}
+
 pub fn applies_dir(cfg: &AgentConfig) -> PathBuf {
     cfg.state_dir.join("applies")
 }
@@ -277,6 +298,7 @@ fn steps(cfg: &AgentConfig, commit: &str, log: &mut Log) -> Outcome {
         log.line(&msg);
         return Outcome::Skipped(SkipReason::FetchFailed, msg);
     }
+    record_fetch(cfg);
     log.line("checks");
     if let Err(reason) = check_apply(&git, &cfg.channel, commit) {
         let msg = format!("skipped: {reason:?}");
@@ -311,6 +333,12 @@ pub fn run_apply(cfg: &AgentConfig, id: &str, commit: &str) -> ApplyRecord {
         rec.message = Some("invalid apply id".into());
         return rec;
     }
+    // Held until the function returns; keeps a second wrapper out.
+    let Some(_lock) = try_lock_apply(cfg) else {
+        eprintln!("fleet-agent: another apply is running; not starting {id}");
+        rec.message = Some("another apply is running".into());
+        return rec;
+    };
     if let Err(e) = start(cfg, &mut rec) {
         rec.message = Some(format!("{e:#}"));
         rec.finished_at = Some(now());

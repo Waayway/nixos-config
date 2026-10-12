@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use axum::extract::{ConnectInfo, DefaultBodyLimit, Query, Request, State};
 use axum::http::StatusCode;
@@ -14,9 +14,11 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use fleet_proto::{ApplyRequest, ApplyState, is_commit_hash};
 use serde::Deserialize;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, OwnedMutexGuard};
 
-use crate::apply::{is_valid_apply_id, latest_record, read_log, read_record};
+use crate::apply::{
+    is_valid_apply_id, latest_record, read_log, read_record, record_fetch, try_lock_apply,
+};
 use crate::config::AgentConfig;
 use crate::git::Git;
 use crate::net::{SourceGuard, tailscale_addrs};
@@ -24,7 +26,10 @@ use crate::{activations, launcher, status};
 
 const BODY_LIMIT: usize = 4096;
 const FETCH_INTERVAL: Duration = Duration::from_secs(600);
+const PENDING_TTL: Duration = Duration::from_secs(30);
 const ADDR_RECHECK: Duration = Duration::from_secs(60);
+
+type Pending = (String, Instant);
 
 #[derive(Clone)]
 pub struct AppState {
@@ -32,8 +37,10 @@ pub struct AppState {
     config_path: Arc<PathBuf>,
     git: Arc<Git>,
     guard: Arc<SourceGuard>,
-    /// Serialises the "is anything running?" check with the launch.
-    apply_lock: Arc<Mutex<()>>,
+    /// Serialises the "is anything running?" check with the launch (and the
+    /// background fetch). Holds the apply launched but not yet visible as a
+    /// record, for up to `PENDING_TTL`.
+    apply_lock: Arc<Mutex<Option<Pending>>>,
 }
 
 impl AppState {
@@ -48,7 +55,7 @@ impl AppState {
             cfg: Arc::new(cfg),
             config_path: Arc::new(config_path),
             guard: Arc::new(guard),
-            apply_lock: Arc::new(Mutex::new(())),
+            apply_lock: Arc::new(Mutex::new(None)),
         })
     }
 }
@@ -93,21 +100,47 @@ async fn post_apply(State(st): State<AppState>, Json(req): Json<ApplyRequest>) -
     if !is_commit_hash(&req.commit) || !is_valid_apply_id(&req.apply_id) {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    let _guard = st.apply_lock.lock().await;
-    let res = tokio::task::spawn_blocking(move || {
-        if let Some(rec) = read_record(&st.cfg, &req.apply_id) {
-            return (StatusCode::OK, Json(rec)).into_response();
-        }
-        if latest_record(&st.cfg).is_some_and(|r| r.state == ApplyState::Running) {
-            return StatusCode::CONFLICT.into_response();
-        }
-        match launcher::launch(&st.cfg, &st.config_path, &req.apply_id, &req.commit) {
-            Ok(()) => StatusCode::ACCEPTED.into_response(),
-            Err(e) => internal(format!("launching apply: {e:#}")),
-        }
-    })
-    .await;
+    let guard = st.apply_lock.clone().lock_owned().await;
+    let res = tokio::task::spawn_blocking(move || launch_apply(st, guard, req)).await;
     res.unwrap_or_else(internal)
+}
+
+/// The pending apply, if its record has not appeared yet and it is recent.
+fn live_pending(st: &AppState, pending: &mut Option<Pending>) -> Option<String> {
+    if let Some((id, at)) = pending.as_ref()
+        && (at.elapsed() >= PENDING_TTL || read_record(&st.cfg, id).is_some())
+    {
+        *pending = None;
+    }
+    pending.as_ref().map(|(id, _)| id.clone())
+}
+
+fn launch_apply(
+    st: AppState,
+    mut guard: OwnedMutexGuard<Option<Pending>>,
+    req: ApplyRequest,
+) -> Response {
+    let pending = live_pending(&st, &mut guard);
+    if let Some(rec) = read_record(&st.cfg, &req.apply_id) {
+        return (StatusCode::OK, Json(rec)).into_response();
+    }
+    if let Some(id) = pending {
+        return if id == req.apply_id {
+            StatusCode::ACCEPTED.into_response()
+        } else {
+            StatusCode::CONFLICT.into_response()
+        };
+    }
+    if latest_record(&st.cfg).is_some_and(|r| r.state == ApplyState::Running) {
+        return StatusCode::CONFLICT.into_response();
+    }
+    match launcher::launch(&st.cfg, &st.config_path, &req.apply_id, &req.commit) {
+        Ok(()) => {
+            *guard = Some((req.apply_id, Instant::now()));
+            StatusCode::ACCEPTED.into_response()
+        }
+        Err(e) => internal(format!("launching apply: {e:#}")),
+    }
 }
 
 #[derive(Deserialize)]
@@ -142,13 +175,6 @@ async fn get_activations(State(st): State<AppState>, Query(q): Query<SinceQuery>
 
 // ---- daemon ----
 
-fn now() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
 async fn serve_on(listener: tokio::net::TcpListener, app: Router) {
     let app = app.into_make_service_with_connect_info::<SocketAddr>();
     if let Err(e) = axum::serve(listener, app).await {
@@ -156,20 +182,25 @@ async fn serve_on(listener: tokio::net::TcpListener, app: Router) {
     }
 }
 
-/// Every 600 s, unless an apply is running.
+/// Every 600 s, unless an apply is running or starting. Holds the apply lock
+/// throughout so it never overlaps with an apply's own fetch.
 async fn background_fetch(st: AppState) {
     loop {
         tokio::time::sleep(FETCH_INTERVAL).await;
+        let mut guard = st.apply_lock.clone().lock_owned().await;
         let st = st.clone();
         let _ = tokio::task::spawn_blocking(move || {
-            if latest_record(&st.cfg).is_some_and(|r| r.state == ApplyState::Running) {
+            if live_pending(&st, &mut guard).is_some()
+                || latest_record(&st.cfg).is_some_and(|r| r.state == ApplyState::Running)
+            {
                 return;
             }
+            // The wrapper may be running without a record yet (or a daemon restart).
+            let Some(_flock) = try_lock_apply(&st.cfg) else {
+                return;
+            };
             match st.git.fetch(&st.cfg.repo_url) {
-                Ok(()) => {
-                    let _ = std::fs::create_dir_all(&st.cfg.state_dir);
-                    let _ = std::fs::write(st.cfg.state_dir.join("last_fetch"), now().to_string());
-                }
+                Ok(()) => record_fetch(&st.cfg),
                 Err(e) => eprintln!("fleet-agent: background fetch failed: {e:#}"),
             }
         })
