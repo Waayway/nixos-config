@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["fleet-proto", "fleet-agent", "fleet-server", "fleet-server/migration"]
+members = ["fleet-proto", "fleet-agent", "fleet-server", "fleet-server/migration", "fleetctl"]
 
 [workspace.package]
 version = "0.1.0"

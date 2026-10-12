@@ -717,6 +717,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleetctl"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fleet-proto",
+ "fleet-server",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "flume"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

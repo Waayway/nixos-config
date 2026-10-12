@@ -65,11 +65,17 @@ in
       default = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.fleet-agent;
       description = "The fleet-agent package.";
     };
+    ctlPackage = lib.mkOption {
+      type = lib.types.package;
+      default = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.fleetctl;
+      description = "The fleetctl CLI, installed on every enrolled host.";
+    };
   };
 
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       {
+        environment.systemPackages = [ cfg.ctlPackage ];
         environment.etc."fleet-agent/config.json".text = builtins.toJSON {
           host = currentSystemName;
           user = user.name;

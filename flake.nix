@@ -133,11 +133,16 @@
       }
       {
         packages = nixpkgs.lib.mapAttrs (_: s: {
-          inherit (s.fleet) fleet-agent fleet-server fleet-web;
+          inherit (s.fleet) fleet-agent fleet-server fleet-web fleetctl;
         }) perSystem;
 
         # `nix run .#fleet-demo`: the dashboard against a simulated fleet (needs git).
         apps = nixpkgs.lib.mapAttrs (_: s: {
+          fleetctl = {
+            type = "app";
+            program = "${s.fleet.fleetctl}/bin/fleetctl";
+            meta.description = "CLI for the fleet manager (status, force rebuild, promote)";
+          };
           fleet-demo = {
             type = "app";
             program = "${s.pkgs.writeShellScript "fleet-demo" ''

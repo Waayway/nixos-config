@@ -50,6 +50,7 @@ in
 {
   inherit fleet-web;
   fleet-agent = mkBin "fleet-agent" { };
+  fleetctl = mkBin "fleetctl" { };
   fleet-server = mkBin "fleet-server" { FLEET_WEB_DIST = "${fleet-web}"; };
 
   bindingsCheck = craneLib.cargoTest (

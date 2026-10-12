@@ -37,6 +37,8 @@ nix run .#fleet-demo        # simulated fleet at http://127.0.0.1:8080
 nix develop .#fleet         # dev shell: cargo, node, sqlite
 ```
 
+`fleetctl` (installed on every enrolled host) is the CLI for the same API: `fleetctl status`, `fleetctl rebuild hermes --wait` (force a rebuild of one host), `fleetctl rebuild --channel stable`. Without installing: `nix run .#fleetctl -- status`. It talks to `http://nixos-manager:8080` over the tailnet; override with `--server` or `FLEET_SERVER`.
+
 A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). The server runs on `nixos-manager`. The NixOS VM test (`checks.x86_64-linux.fleet-vm`) passes on nixos-manager, which also serves as the Linux builder; enrolling the other machines is not done yet. Details and open steps: `docs/HANDOFF.md`.
 
 ### Installing a new Mac (e.g. atlas)

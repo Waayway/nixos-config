@@ -187,6 +187,28 @@ nix eval .#checks.x86_64-linux.fleet-firewall.drvPath   # agent/dashboard ports 
 State-changing API calls need the header `X-Fleet: 1` (CSRF guard), e.g.
 `curl -X POST -H 'X-Fleet: 1' http://127.0.0.1:18080/api/hosts/hermes/apply`.
 
+### fleetctl
+
+`pkgs/fleet/fleetctl` is a small CLI over the server API (library plus thin
+`main.rs`; tests run it against the demo server). It is installed on every
+fleet host via `services.fleet-agent` (`ctlPackage`), or run it from the repo
+with `nix run .#fleetctl -- <args>`. Access is by Tailscale identity as for the
+dashboard (no tokens); a 403 means this device is not allowed. Server URL:
+`--server` or `FLEET_SERVER`, default `http://nixos-manager:8080`.
+
+```sh
+fleetctl status                          # host, os, channel, online, running, behind, last apply
+fleetctl rebuild hermes --wait           # force rebuild: re-applies the channel head even if
+                                         # the host already runs it; exit 0 only if it ended ok
+fleetctl rebuild --channel stable --wait [--timeout 900]
+fleetctl log hermes [APPLY_ID]           # default: the host's last apply
+fleetctl promote [--yes]                 # shows candidate + subject; --yes moves stable
+fleetctl audit --limit 20
+FLEET_SERVER=http://127.0.0.1:18080 fleetctl status   # against the local demo
+```
+An offline host answers `unreachable`: the apply is recorded and the server
+re-sends it when the host comes online (`--wait` then blocks until timeout).
+
 ### Adding a host to the fleet
 
 Set `fleet = true;` in its host file (and `channel = ...` to override the
