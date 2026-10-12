@@ -4,27 +4,31 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux ({
+lib.optionalAttrs hostPlatform.isLinux {
   imports = [ inputs.nix-flatpak.nixosModules.nix-flatpak ];
-  services.flatpak = {
-    enable = true;
-    packages = [ "com.valvesoftware.SteamLink" ];
-    update.auto = {
+
+  # Workstation-only: skipped on servers (type = "server").
+  config = lib.mkIf (!hostPlatform.isServer) {
+    services.flatpak = {
       enable = true;
-      onCalendar = "weekly"; # Default value
+      packages = [ "com.valvesoftware.SteamLink" ];
+      update.auto = {
+        enable = true;
+        onCalendar = "weekly"; # Default value
+      };
+    };
+
+    networking.firewall = {
+      allowedTCPPorts = [
+        # Steam link
+        27036
+        27037
+      ];
+      allowedUDPPorts = [
+        # Steam link
+        27031
+        27036
+      ];
     };
   };
-
-  networking.firewall = {
-    allowedTCPPorts = [
-      # Steam link
-      27036
-      27037
-    ];
-    allowedUDPPorts = [
-      # Steam link
-      27031
-      27036
-    ];
-  };
-})
+}

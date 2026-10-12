@@ -4,28 +4,31 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux ({
-  hardware.enableRedistributableFirmware = true;
+lib.optionalAttrs hostPlatform.isLinux {
+  # Workstation-only: skipped on servers (type = "server").
+  config = lib.mkIf (!hostPlatform.isServer) {
+    hardware.enableRedistributableFirmware = true;
 
-  services.xserver.enable = true;
-  services.xserver.videoDrivers = [ "amdgpu" ];
+    services.xserver.enable = true;
+    services.xserver.videoDrivers = [ "amdgpu" ];
 
-  hardware.amdgpu.opencl.enable = true;
+    hardware.amdgpu.opencl.enable = true;
 
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
-    extraPackages = with pkgs; [
-      rocmPackages.rocm-smi
-      rocmPackages.clr.icd
-      mesa
-    ];
+    hardware.graphics = {
+      enable = true;
+      enable32Bit = true;
+      extraPackages = with pkgs; [
+        rocmPackages.rocm-smi
+        rocmPackages.clr.icd
+        mesa
+      ];
+    };
+
+    # Lact: Linux Amdgpu ConTroller
+    environment.systemPackages = with pkgs; [ lact ];
+    systemd.packages = with pkgs; [ lact ];
+    systemd.services.lactd.wantedBy = [ "multi-user.target" ];
+
+    systemd.tmpfiles.rules = [ "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}" ];
   };
-
-  # Lact: Linux Amdgpu ConTroller
-  environment.systemPackages = with pkgs; [ lact ];
-  systemd.packages = with pkgs; [ lact ];
-  systemd.services.lactd.wantedBy = [ "multi-user.target" ];
-
-  systemd.tmpfiles.rules = [ "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}" ];
-})
+}

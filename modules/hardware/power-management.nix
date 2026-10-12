@@ -4,8 +4,11 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux ({
-  services.power-profiles-daemon = {
-    enable = true;
+lib.optionalAttrs hostPlatform.isLinux {
+  # Workstation-only: skipped on servers (type = "server").
+  config = lib.mkIf (!hostPlatform.isServer) {
+    services.power-profiles-daemon = {
+      enable = true;
+    };
   };
-})
+}
