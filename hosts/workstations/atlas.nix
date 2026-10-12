@@ -19,6 +19,7 @@
 
     workstation = {
       homebrew.removeUndeclared = "zap";
+      debloat.enable = true;
 
       apps = {
         browsers.enable = true;
