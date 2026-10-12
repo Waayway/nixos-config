@@ -4,7 +4,8 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux ({
+# Caps Lock: tap for Escape, hold for Control.
+lib.optionalAttrs hostPlatform.isLinux {
   services.interception-tools =
     let
       itools = pkgs.interception-tools;
@@ -21,4 +22,10 @@ lib.optionalAttrs hostPlatform.isLinux ({
               EV_KEY: [KEY_CAPSLOCK, KEY_ESC]
       '';
     };
-})
+}
+// lib.optionalAttrs hostPlatform.isDarwin {
+  # Karabiner-Elements does the remap; its config is in caps_to_esc_home.nix.
+  # First launch needs a manual approval of its driver extension and Input
+  # Monitoring permission in System Settings.
+  homebrew.casks = [ "karabiner-elements" ];
+}
