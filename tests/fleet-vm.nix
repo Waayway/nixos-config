@@ -135,7 +135,7 @@ pkgs.testers.runNixOSTest {
 
     def apply(name):
         out = manager.succeed(
-            f"curl -s -w '\\n%{{http_code}}' -X POST localhost:8080/api/hosts/{name}/apply"
+            f"curl -s -w '\\n%{{http_code}}' -X POST -H 'X-Fleet: 1' localhost:8080/api/hosts/{name}/apply"
         )
         body, code = out.strip().rsplit("\n", 1)
         assert code == "202", f"apply {name}: HTTP {code}: {body}"

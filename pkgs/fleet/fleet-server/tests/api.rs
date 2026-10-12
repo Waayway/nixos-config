@@ -23,6 +23,16 @@ use sea_orm::EntityTrait;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+/// A client that sends the header the dashboard sends (`X-Fleet: 1`, CSRF guard).
+fn dashboard_client() -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("x-fleet", reqwest::header::HeaderValue::from_static("1"));
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap()
+}
+
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .current_dir(dir)
@@ -208,7 +218,7 @@ async fn apply_endpoint_creates_desired_and_hits_agent() {
     )
     .await;
     let mut rx = e.state.tx.subscribe();
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
 
     let resp = http
         .post(format!("{}/api/hosts/H1/apply", e.base))
@@ -281,6 +291,84 @@ async fn apply_endpoint_creates_desired_and_hits_agent() {
 }
 
 #[tokio::test]
+async fn state_changing_requests_need_the_dashboard_header() {
+    let dir = tempfile::tempdir().unwrap();
+    let o = Origin::new(dir.path());
+    o.commit("one", "main");
+    let fake = Shared::default();
+    let agent = fake_agent(fake.clone()).await;
+    let e = env(
+        dir,
+        o.bare.to_str().unwrap(),
+        agent,
+        vec![host("H1", "main")],
+    )
+    .await;
+    let bare = reqwest::Client::new();
+    let url = format!("{}/api/hosts/H1/apply", e.base);
+
+    // No header (a cross-site form or no-cors fetch): refused, nothing applied.
+    let resp = bare.post(&url).send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = resp.json().await.unwrap();
+    assert!(body["error"].is_string(), "{body}");
+    let resp = bare
+        .post(format!("{}/api/channels/main/apply", e.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let resp = bare
+        .post(format!("{}/api/promote", e.base))
+        .json(&json!({"commit": "0".repeat(40)}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+
+    // The header, but the browser says the request is cross-site: refused.
+    for site in ["cross-site", "same-site"] {
+        let resp = bare
+            .post(&url)
+            .header("x-fleet", "1")
+            .header("sec-fetch-site", site)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{site}");
+    }
+    assert!(fake.lock().unwrap().applied.is_empty());
+    assert!(
+        applies::Entity::find()
+            .all(&e.state.db)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    // GETs need no header.
+    let resp = bare
+        .get(format!("{}/api/snapshot", e.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The header from the dashboard's own origin (or without Sec-Fetch-Site): accepted.
+    let resp = bare
+        .post(&url)
+        .header("x-fleet", "1")
+        .header("sec-fetch-site", "same-origin")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    let resp = bare.post(&url).header("x-fleet", "1").send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    assert_eq!(fake.lock().unwrap().applied.len(), 2);
+}
+
+#[tokio::test]
 async fn apply_endpoint_502_when_mirror_fetch_fails() {
     let dir = tempfile::tempdir().unwrap();
     let bogus = dir.path().join("does-not-exist.git");
@@ -294,7 +382,7 @@ async fn apply_endpoint_502_when_mirror_fetch_fails() {
     )
     .await;
 
-    let resp = reqwest::Client::new()
+    let resp = dashboard_client()
         .post(format!("{}/api/hosts/H1/apply", e.base))
         .send()
         .await
@@ -323,7 +411,7 @@ async fn channel_apply_targets_only_that_channel() {
     let agent = fake_agent(fake.clone()).await;
     let hosts = vec![host("H1", "main"), host("H2", "stable"), host("H3", "main")];
     let e = env(dir, o.bare.to_str().unwrap(), agent, hosts).await;
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
 
     let resp = http
         .post(format!("{}/api/channels/main/apply", e.base))
@@ -375,7 +463,7 @@ async fn promote_moves_stable_and_audits() {
     )
     .await;
     let mut rx = e.state.tx.subscribe();
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
     let promote = |body: Value| {
         let (http, url) = (http.clone(), format!("{}/api/promote", e.base));
         async move { http.post(url).json(&body).send().await.unwrap() }
@@ -457,7 +545,7 @@ async fn spa_fallback_serves_index() {
         vec![host("H1", "main")],
     )
     .await;
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
 
     for path in ["/", "/index.html", "/hosts/H1"] {
         let resp = http.get(format!("{}{path}", e.base)).send().await.unwrap();
@@ -505,7 +593,7 @@ async fn access_denied_on_api_ws_and_static() {
         access,
     )
     .await;
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
 
     for path in [
         "/",
@@ -546,7 +634,7 @@ async fn concurrent_applies_all_accepted() {
     let e = env(dir, o.bare.to_str().unwrap(), agent, hosts).await;
     // A push right before the presses, so every fetch has refs to write.
     let head = o.commit("two", "main");
-    let http = reqwest::Client::new();
+    let http = dashboard_client();
 
     let presses = names.iter().map(|n| {
         let (http, url) = (http.clone(), format!("{}/api/hosts/{n}/apply", e.base));

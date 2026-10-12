@@ -1,13 +1,15 @@
 //! The dashboard HTTP surface: JSON API under `/api`, the WebSocket at `/api/ws`, and the
 //! embedded frontend for everything else. Every route, the WebSocket upgrade and the static
-//! files included, sits behind `require_access`.
+//! files included, sits behind `require_access`; state-changing requests also need
+//! `require_same_site` (CSRF).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::extract::{Path, Query, State};
-use axum::http::{StatusCode, header};
+use axum::extract::{Path, Query, Request, State};
+use axum::http::{Method, StatusCode, header};
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router, middleware};
@@ -43,7 +45,8 @@ pub fn app(state: AppState) -> Router {
         .route("/hosts/{name}/applies/{id}/log", get(apply_log))
         .route("/audit", get(audit))
         .route("/ws", get(ws::handler))
-        .fallback(|| async { ApiError(StatusCode::NOT_FOUND, "not found".into()) });
+        .fallback(|| async { ApiError(StatusCode::NOT_FOUND, "not found".into()) })
+        .layer(middleware::from_fn(require_same_site));
     Router::new()
         .nest("/api", api)
         .fallback(embed::static_handler)
@@ -58,6 +61,35 @@ struct ApiError(StatusCode, String);
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         (self.0, Json(json!({ "error": self.1 }))).into_response()
+    }
+}
+
+/// The header the dashboard sends on every request. A cross-site form cannot set it, and a
+/// cross-site `fetch` cannot set it without a CORS preflight, which this server never allows.
+pub const FLEET_HEADER: &str = "x-fleet";
+
+/// CSRF guard: a state-changing request (anything but GET/HEAD/OPTIONS) needs `X-Fleet: 1`
+/// and, when the browser says where it comes from, `Sec-Fetch-Site: same-origin` or `none`.
+/// Otherwise 403.
+async fn require_same_site(req: Request, next: Next) -> Response {
+    if matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
+        return next.run(req).await;
+    }
+    let headers = req.headers();
+    let fleet_ok = headers
+        .get(FLEET_HEADER)
+        .is_some_and(|v| v.as_bytes() == b"1");
+    let site_ok = headers
+        .get("sec-fetch-site")
+        .is_none_or(|v| matches!(v.as_bytes(), b"same-origin" | b"none"));
+    if fleet_ok && site_ok {
+        next.run(req).await
+    } else {
+        ApiError(
+            StatusCode::FORBIDDEN,
+            "cross-site or non-dashboard request refused (needs X-Fleet: 1)".into(),
+        )
+        .into_response()
     }
 }
 

@@ -54,8 +54,18 @@ async fn wait_for(
     }
 }
 
+/// A client that sends the header the dashboard sends (`X-Fleet: 1`, CSRF guard).
+fn dashboard_client() -> reqwest::Client {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("x-fleet", reqwest::header::HeaderValue::from_static("1"));
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+        .unwrap()
+}
+
 async fn post(d: &DemoHandle, path: &str, body: Value) -> (u16, Value) {
-    let resp = reqwest::Client::new()
+    let resp = dashboard_client()
         .post(format!("http://{}{path}", d.addr))
         .json(&body)
         .send()

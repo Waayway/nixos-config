@@ -20,11 +20,14 @@ export class ApiError extends Error {
 }
 
 async function request(method: string, path: string, body?: unknown): Promise<Response> {
+  // X-Fleet: the server refuses state-changing requests without it (CSRF guard).
+  const headers: Record<string, string> = { "x-fleet": "1" };
+  if (body !== undefined) headers["content-type"] = "application/json";
   let res: Response;
   try {
     res = await fetch(path, {
       method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
