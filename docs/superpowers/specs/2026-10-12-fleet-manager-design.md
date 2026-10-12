@@ -68,8 +68,9 @@ the server.
 - **Promote** (dashboard button, or plain `git push`): fast-forward `stable` to
   a commit on `unstable`. The server only offers a commit if it's an ancestor
   of `unstable`.
-- To push `stable`, the server needs write access to the GitHub repo: a deploy
-  key with write access, stored with sops (`secrets/nixos-manager.yaml`).
+- Only the fleet server pushes, and only `stable` on promote. It is the only
+  machine with a credential: a GitHub deploy key with write access, stored
+  with sops (`secrets/nixos-manager.yaml`). Everything else only pulls.
   With GitHub branch protection, only fast-forwards to `stable` are allowed.
 
 ### Fleet server
@@ -104,12 +105,11 @@ the server.
 - Runs as root because the rebuild needs it. Every `git` command runs as the
   main user (`sudo -u <user> git -C ~/.flake …`), so file ownership and
   `safe.directory` stay right.
-- **Git access:** the agent fetches with the user's own Git setup. A launchd or
-  systemd daemon has no login session, so it can't reach the macOS keychain
-  or a `gh` credential helper. The `~/.flake` remote must therefore use **SSH
-  with a key file** (no passphrase-only agent), or a read-only deploy key
-  that the agent passes through `GIT_SSH_COMMAND`. Check this per host at
-  enrollment.
+- **Git access:** the repo is public, so agents fetch anonymously over HTTPS
+  and need no credentials. The agent fetches explicitly from
+  `https://github.com/Waayway/nixos-waayway` into `refs/remotes/origin/*`, so
+  it works no matter how the user's `origin` remote is set up (SSH or HTTPS),
+  and never pushes.
 - **API** (only on the Tailscale address):
   - `GET /status`:
     - the running system's commit (`system.configurationRevision`, see below)
@@ -235,19 +235,22 @@ Today on pve (Proxmox VE 9.1, 5900X, 78 GB RAM):
 | ID | Name | Now | Plan |
 |---|---|---|---|
 | 100 | Main (production) | Rocky 10.2, Docker incl. Traefik | NixOS, services ported (inventory needed) |
-| 105 | deploy-box / jenkins-vm | Rocky 10.1 | NixOS, or retire (see open question 3) |
+| 105 | deploy-box / jenkins-vm | Rocky 10.1 | **retire** (Jenkins leaves the stack); not migrated |
 | 110 | vpn | Rocky 10.1 | NixOS |
 | 120 | media | Rocky 10.1, GPU passthrough WX7100 | NixOS (amdgpu, passthrough stays) |
 | 130 | truenas | TrueNAS 26 beta, HBA passthrough | **stays TrueNAS** (storage appliance) |
 | 140 | garage (LXC) | Debian 13, Garage S3 | NixOS VM or NixOS LXC (`services.garage`) |
 | 201 | archipelago | unknown, no guest agent | NixOS |
 | 200 | minecraft | stopped | NixOS when needed |
-| 101 | router | NixOS, stopped | decide (open question 4) |
+| 101 | router | NixOS, stopped | decide (open question 2) |
 | 170 | nixos-manager | NixOS, stopped, offline for 55 days | becomes the **fleet server** |
 | 9000 | nixos-26.05-template | NixOS image | base for new VMs |
 
-Out of scope: the Proxmox host itself (stays PVE) and the Hetzner
-`primary-server` (open question 2).
+Out of scope, not moving to NixOS:
+- the Proxmox host itself (stays PVE)
+- the Hetzner `primary-server`
+- the old work laptop (`14m2max`)
+- Jenkins (deploy-box), which is being removed
 
 Per VM, on `stable`:
 
@@ -300,7 +303,4 @@ on `local-lvm` (about 100 GB free).
 ## Open questions
 
 1. Dashboard for others on the tailnet: read-only or no access?
-2. Hetzner `primary-server`: add it to this flake and fleet (`stable`) now, or later?
-3. Is the deploy-box/Jenkins VM still needed once the fleet manager exists?
-4. Router VM 101 (NixOS, stopped): still needed?
-5. The old work laptop (`14m2max`) is outside this repo: should it join or stay out?
+2. Router VM 101 (NixOS, stopped): still needed?
