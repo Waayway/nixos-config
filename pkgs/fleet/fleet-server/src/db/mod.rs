@@ -9,8 +9,8 @@ use fleet_migration::{Migrator, MigratorTrait};
 use fleet_proto::{AgentStatus, ApplyRecord, AuditEvent};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder, QuerySelect,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 
@@ -36,7 +36,7 @@ fn enum_str<T: Serialize>(v: &T) -> anyhow::Result<String> {
 }
 
 pub async fn insert_apply(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
     requested_by: &str,
     requested_at: i64,
@@ -64,7 +64,7 @@ pub async fn insert_apply(
 /// Updates state fields of an existing apply from an agent's record. Leaves host,
 /// requester and log untouched. Errors if the apply is unknown.
 pub async fn update_apply_from_record(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     rec: &ApplyRecord,
 ) -> anyhow::Result<()> {
     let existing = applies::Entity::find_by_id(rec.apply_id.clone())
@@ -83,7 +83,7 @@ pub async fn update_apply_from_record(
 }
 
 pub async fn get_apply(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     apply_id: &str,
 ) -> anyhow::Result<Option<applies::Model>> {
     Ok(applies::Entity::find_by_id(apply_id.to_string())
@@ -93,7 +93,7 @@ pub async fn get_apply(
 
 /// Stores the server's copy of an apply's full log. Errors if the apply is unknown.
 pub async fn set_apply_log(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     apply_id: &str,
     log: &str,
 ) -> anyhow::Result<()> {
@@ -107,7 +107,7 @@ pub async fn set_apply_log(
 }
 
 pub async fn set_desired(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
     apply_id: &str,
 ) -> anyhow::Result<()> {
@@ -126,7 +126,7 @@ pub async fn set_desired(
 }
 
 pub async fn desired(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
 ) -> anyhow::Result<Option<applies::Model>> {
     let Some(d) = desired_applies::Entity::find_by_id(host.to_string())
@@ -140,7 +140,7 @@ pub async fn desired(
 
 /// Stores the latest agent status and marks the host as last seen OK at `now`.
 pub async fn save_status(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
     status: &AgentStatus,
     now: i64,
@@ -163,7 +163,7 @@ pub async fn save_status(
 
 /// Last stored status and the time it was received, if any.
 pub async fn load_status(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
 ) -> anyhow::Result<Option<(AgentStatus, Option<i64>)>> {
     let Some(row) = host_state::Entity::find_by_id(host.to_string())
@@ -179,7 +179,7 @@ pub async fn load_status(
 }
 
 pub async fn insert_audit(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     time: i64,
     host: Option<&str>,
     kind: &str,
@@ -200,7 +200,10 @@ pub async fn insert_audit(
 }
 
 /// Newest first (by time, then id).
-pub async fn recent_audit(db: &DatabaseConnection, limit: u64) -> anyhow::Result<Vec<AuditEvent>> {
+pub async fn recent_audit(
+    db: &impl ConnectionTrait,
+    limit: u64,
+) -> anyhow::Result<Vec<AuditEvent>> {
     let rows = audit_events::Entity::find()
         .order_by_desc(audit_events::Column::Time)
         .order_by_desc(audit_events::Column::Id)
@@ -223,7 +226,7 @@ fn audit_from_row(r: audit_events::Model) -> AuditEvent {
 
 /// Newest audit event of `kind` for `host`.
 pub async fn last_audit(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
     kind: &str,
 ) -> anyhow::Result<Option<AuditEvent>> {
@@ -237,7 +240,7 @@ pub async fn last_audit(
     Ok(row.map(audit_from_row))
 }
 
-pub async fn activations_next(db: &DatabaseConnection, host: &str) -> anyhow::Result<i64> {
+pub async fn activations_next(db: &impl ConnectionTrait, host: &str) -> anyhow::Result<i64> {
     Ok(host_state::Entity::find_by_id(host.to_string())
         .one(db)
         .await?
@@ -245,7 +248,7 @@ pub async fn activations_next(db: &DatabaseConnection, host: &str) -> anyhow::Re
 }
 
 pub async fn set_activations_next(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
     host: &str,
     n: i64,
 ) -> anyhow::Result<()> {

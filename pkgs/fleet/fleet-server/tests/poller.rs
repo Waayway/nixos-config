@@ -5,6 +5,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -32,6 +33,12 @@ struct Fake {
     applied: Vec<ApplyRequest>,
     status_hits: u32,
     log: String,
+    /// `/apply/log` answers 500 this many times first.
+    log_failures: u32,
+    /// When non-empty: successive (log so far, finished) states, one per `/apply/log` call
+    /// (the last one repeats). Overrides `log`.
+    log_script: Vec<(String, bool)>,
+    log_hits: u32,
 }
 
 type Shared = Arc<Mutex<Fake>>;
@@ -72,19 +79,33 @@ async fn fake_agent(fake: Shared) -> SocketAddr {
         f.lock().unwrap().applied.push(req);
         StatusCode::ACCEPTED
     }
-    async fn log(State(f): State<Shared>, Query(q): Query<LogQ>) -> Json<LogChunk> {
-        let f = f.lock().unwrap();
-        let data = f
-            .log
+    async fn log(
+        State(f): State<Shared>,
+        Query(q): Query<LogQ>,
+    ) -> Result<Json<LogChunk>, StatusCode> {
+        let mut f = f.lock().unwrap();
+        f.log_hits += 1;
+        if f.log_failures > 0 {
+            f.log_failures -= 1;
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        let (full, eof) = if f.log_script.is_empty() {
+            (f.log.clone(), true)
+        } else if f.log_script.len() == 1 {
+            f.log_script[0].clone()
+        } else {
+            f.log_script.remove(0)
+        };
+        let data = full
             .get(q.offset as usize..)
             .unwrap_or_default()
             .to_string();
-        Json(LogChunk {
+        Ok(Json(LogChunk {
             apply_id: q.apply_id,
             offset: q.offset,
             data,
-            eof: true,
-        })
+            eof,
+        }))
     }
     let app = Router::new()
         .route("/status", get(status))
@@ -355,4 +376,119 @@ async fn offline_host_not_contacted() {
         }
         other => panic!("unexpected {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn apply_finished_retried_when_log_fetch_fails() {
+    let fake = Shared::default();
+    {
+        let mut f = fake.lock().unwrap();
+        f.status = Some(agent_status(
+            OLD,
+            Some(record("a1", NEW, ApplyState::Failed)),
+        ));
+        f.log = "error: boom\n".into();
+        f.log_failures = 1;
+    }
+    let addr = fake_agent(fake.clone()).await;
+    let e = env(addr, None).await;
+    db::insert_apply(
+        &e.state.db,
+        "H1",
+        "alice",
+        1,
+        &record("a1", NEW, ApplyState::Running),
+    )
+    .await
+    .unwrap();
+
+    poll_once(&e.state).await;
+    let row = db::get_apply(&e.state.db, "a1").await.unwrap().unwrap();
+    assert_eq!(row.state, "running");
+    assert_eq!(row.log, None);
+    let audit = db::recent_audit(&e.state.db, 100).await.unwrap();
+    assert_eq!(count_kind(&audit, "apply_finished"), 0, "{audit:?}");
+
+    poll_once(&e.state).await;
+    poll_once(&e.state).await;
+    let row = db::get_apply(&e.state.db, "a1").await.unwrap().unwrap();
+    assert_eq!(row.state, "failed");
+    assert_eq!(row.log.as_deref(), Some("error: boom\n"));
+    let audit = db::recent_audit(&e.state.db, 100).await.unwrap();
+    assert_eq!(count_kind(&audit, "apply_finished"), 1, "{audit:?}");
+}
+
+#[tokio::test]
+async fn follow_log_streams_running_apply_once() {
+    let fake = Shared::default();
+    {
+        let mut f = fake.lock().unwrap();
+        f.status = Some(agent_status(
+            OLD,
+            Some(record("a1", NEW, ApplyState::Running)),
+        ));
+        f.log_script = vec![
+            ("one\n".into(), false),
+            ("one\ntwo\n".into(), false),
+            ("one\ntwo\nthree\n".into(), true),
+        ];
+    }
+    let addr = fake_agent(fake.clone()).await;
+    let e = env(addr, None).await;
+    db::insert_apply(
+        &e.state.db,
+        "H1",
+        "alice",
+        1,
+        &record("a1", NEW, ApplyState::Running),
+    )
+    .await
+    .unwrap();
+    let mut rx = e.state.tx.subscribe();
+
+    poll_once(&e.state).await;
+    poll_once(&e.state).await;
+
+    let mut chunks = Vec::new();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            if let WsMessage::ApplyLog(c) = rx.recv().await.unwrap() {
+                let eof = c.eof;
+                chunks.push(c);
+                if eof {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .expect("log reached eof");
+    let got: Vec<(u64, &str, bool)> = chunks
+        .iter()
+        .map(|c| (c.offset, c.data.as_str(), c.eof))
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            (0, "one\n", false),
+            (4, "two\n", false),
+            (8, "three\n", true)
+        ]
+    );
+    assert!(chunks.iter().all(|c| c.apply_id == "a1"));
+
+    let stored = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let row = db::get_apply(&e.state.db, "a1").await.unwrap().unwrap();
+            if let Some(log) = row.log {
+                return log;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("log stored");
+    assert_eq!(stored, "one\ntwo\nthree\n");
+    // One follower only: exactly one read per scripted state.
+    assert_eq!(fake.lock().unwrap().log_hits, 3);
 }

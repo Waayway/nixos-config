@@ -7,6 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleet_proto::{AgentStatus, ApplyRecord, ApplyRequest, ApplyState, WsMessage};
 use futures::future::join_all;
+use sea_orm::TransactionTrait;
 use tokio::time::MissedTickBehavior;
 
 use crate::config::{FleetHost, OnlineSource, ServerConfig};
@@ -144,8 +145,10 @@ fn is_terminal(s: &str) -> bool {
 }
 
 /// Mirrors the agent's latest apply record into the server's copy. On the first terminal
-/// state: audit `apply_finished` and store the full log. Applies the server didn't create
-/// are ignored. A running apply gets a log follower.
+/// state: audit `apply_finished` and store the full log. The log is fetched before any row
+/// is touched, and the row update, audit row and log are written in one transaction, so a
+/// failure leaves the row non-terminal and the next poll retries. Applies the server didn't
+/// create are ignored. A running apply gets a log follower.
 async fn record_apply(
     state: &AppState,
     host: &FleetHost,
@@ -166,20 +169,24 @@ async fn record_apply(
     if row.state == new_state {
         return Ok(());
     }
-    db::update_apply_from_record(&state.db, rec).await?;
-    if is_terminal(new_state) {
-        db::insert_audit(
-            &state.db,
-            rec.finished_at.unwrap_or_else(now),
-            Some(&host.name),
-            "apply_finished",
-            "agent",
-            serde_json::to_value(rec)?,
-        )
-        .await?;
-        let log = read_full_log(state, base, &rec.apply_id).await?;
-        db::set_apply_log(&state.db, &rec.apply_id, &log).await?;
+    if !is_terminal(new_state) {
+        return db::update_apply_from_record(&state.db, rec).await;
     }
+    let log = read_full_log(state, base, &rec.apply_id).await?;
+    let details = serde_json::to_value(rec)?;
+    let txn = state.db.begin().await?;
+    db::update_apply_from_record(&txn, rec).await?;
+    db::insert_audit(
+        &txn,
+        rec.finished_at.unwrap_or_else(now),
+        Some(&host.name),
+        "apply_finished",
+        "agent",
+        details,
+    )
+    .await?;
+    db::set_apply_log(&txn, &rec.apply_id, &log).await?;
+    txn.commit().await?;
     Ok(())
 }
 
@@ -195,14 +202,20 @@ async fn read_full_log(state: &AppState, base: &str, apply_id: &str) -> anyhow::
     }
 }
 
-/// Copies new activation lines into the audit log (kind `activation`).
+/// Copies new activation lines into the audit log (kind `activation`). Rows and the
+/// cursor are written in one transaction, so a failure never duplicates rows.
 async fn ingest_activations(state: &AppState, host: &str, base: &str) -> anyhow::Result<()> {
     let since = db::activations_next(&state.db, host).await?;
     let resp = state.client.activations(base, since.max(0) as u64).await?;
+    let next = resp.next as i64;
+    if resp.events.is_empty() && next == since {
+        return Ok(());
+    }
+    let txn = state.db.begin().await?;
     for ev in &resp.events {
         let actor = ev.sudo_user.clone().unwrap_or_else(|| ev.trigger.clone());
         db::insert_audit(
-            &state.db,
+            &txn,
             ev.time,
             Some(host),
             "activation",
@@ -211,10 +224,8 @@ async fn ingest_activations(state: &AppState, host: &str, base: &str) -> anyhow:
         )
         .await?;
     }
-    let next = resp.next as i64;
-    if next != since {
-        db::set_activations_next(&state.db, host, next).await?;
-    }
+    db::set_activations_next(&txn, host, next).await?;
+    txn.commit().await?;
     Ok(())
 }
 
