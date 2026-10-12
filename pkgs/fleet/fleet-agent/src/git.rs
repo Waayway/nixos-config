@@ -120,18 +120,25 @@ impl Git {
         })
     }
 
+    /// A command for `program` that runs as the configured user (privileges
+    /// are dropped when the agent runs as root; otherwise it runs as-is).
+    pub fn user_command(&self, program: &str) -> anyhow::Result<Command> {
+        let mut cmd = Command::new(program);
+        if let Some((uid, gid, home)) = &self.run_as {
+            drop_privileges(&mut cmd, &self.user, *uid, *gid, home)
+                .context("preparing privilege drop")?;
+        }
+        Ok(cmd)
+    }
+
     /// Runs `git -C <flake_path> <args>`. Non-zero exit is not an error here.
     pub fn run(&self, args: &[&str]) -> anyhow::Result<Output> {
-        let mut cmd = Command::new("git");
+        let mut cmd = self.user_command("git")?;
         cmd.arg("-C")
             .arg(&self.flake_path)
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C");
-        if let Some((uid, gid, home)) = &self.run_as {
-            drop_privileges(&mut cmd, &self.user, *uid, *gid, home)
-                .context("preparing privilege drop")?;
-        }
         cmd.output()
             .with_context(|| format!("running git {}", args.join(" ")))
     }
