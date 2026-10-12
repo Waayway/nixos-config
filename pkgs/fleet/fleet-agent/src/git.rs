@@ -3,9 +3,38 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 
 use anyhow::{Context, bail};
-use nix::unistd::{Uid, User};
+#[cfg(not(target_os = "macos"))]
+use nix::unistd::initgroups;
+use nix::unistd::{Gid, Uid, User, setgid, setuid};
 
 use crate::config::AgentConfig;
+
+/// Makes `cmd` run as `user` instead of root, with the user's own groups.
+///
+/// std applies `.uid()/.gid()` before `pre_exec` hooks, and root's supplementary
+/// groups (wheel etc.) survive a plain uid/gid switch. So the whole drop happens
+/// in one `pre_exec` hook, in the only safe order: supplementary groups first
+/// (needs root), then gid, then uid (after which no further change is possible).
+pub fn drop_privileges(cmd: &mut Command, user: &str, uid: u32, gid: u32, home: &std::path::Path) {
+    let cuser = std::ffi::CString::new(user).expect("user name contains NUL");
+    let (uid, gid) = (Uid::from_raw(uid), Gid::from_raw(gid));
+    // SAFETY: the hook only calls async-signal-safe libc wrappers (initgroups,
+    // setgroups, setgid, setuid) and does not allocate.
+    unsafe {
+        cmd.pre_exec(move || {
+            #[cfg(not(target_os = "macos"))]
+            initgroups(&cuser, gid)?;
+            // nix has no initgroups/setgroups on macOS; the darwin agent is
+            // not expected to run as root anyway.
+            #[cfg(target_os = "macos")]
+            let _ = &cuser;
+            setgid(gid)?;
+            setuid(uid)?;
+            Ok(())
+        });
+    }
+    cmd.env("HOME", home).env("USER", user).env("LOGNAME", user);
+}
 
 /// Runs git against the user's flake checkout, as that user.
 pub struct Git {
@@ -41,11 +70,7 @@ impl Git {
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C");
         if let Some((uid, gid, home)) = &self.run_as {
-            cmd.uid(*uid)
-                .gid(*gid)
-                .env("HOME", home)
-                .env("USER", &self.user)
-                .env("LOGNAME", &self.user);
+            drop_privileges(&mut cmd, &self.user, *uid, *gid, home);
         }
         cmd.output()
             .with_context(|| format!("running git {}", args.join(" ")))
