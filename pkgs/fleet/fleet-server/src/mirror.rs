@@ -202,21 +202,22 @@ impl Mirror {
     }
 
     /// Fast-forwards `stable` to `commit` (non-force push). `commit` must be on `unstable` and
-    /// `stable` must be an ancestor of it.
-    pub async fn promote(&self, commit: &str) -> anyhow::Result<()> {
+    /// `stable` must be an ancestor of it; otherwise `PromoteError::Rejected`.
+    pub async fn promote(&self, commit: &str) -> Result<(), PromoteError> {
+        let reject = |msg: String| Err(PromoteError::Rejected(msg));
         if !is_commit_hash(commit) {
-            bail!("not a commit hash");
+            return reject("not a commit hash".into());
         }
         if !self.has_commit(commit).await {
-            bail!("commit {commit} is not in the mirror");
+            return reject(format!("commit {commit} is not in the mirror"));
         }
         if !self.is_ancestor(commit, "refs/heads/unstable").await? {
-            bail!("commit {commit} is not on unstable");
+            return reject(format!("commit {commit} is not on unstable"));
         }
         if let Some(stable) = self.head("stable").await
             && !self.is_ancestor(&stable, commit).await?
         {
-            bail!("stable ({stable}) is not an ancestor of {commit}");
+            return reject(format!("stable ({stable}) is not an ancestor of {commit}"));
         }
         let out = self
             .git([
@@ -228,8 +229,34 @@ impl Mirror {
             ])
             .await?;
         if !out.ok() {
-            bail!("git push failed: {}", out.stderr.trim());
+            return Err(anyhow::anyhow!("git push failed: {}", out.stderr.trim()).into());
         }
         Ok(())
     }
 }
+
+/// Why a promote did not happen.
+#[derive(Debug)]
+pub enum PromoteError {
+    /// The commit is not a valid promote target (hash, ancestry); nothing was pushed.
+    Rejected(String),
+    /// git itself failed (merge-base, push).
+    Git(anyhow::Error),
+}
+
+impl From<anyhow::Error> for PromoteError {
+    fn from(e: anyhow::Error) -> Self {
+        PromoteError::Git(e)
+    }
+}
+
+impl std::fmt::Display for PromoteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PromoteError::Rejected(msg) => f.write_str(msg),
+            PromoteError::Git(e) => write!(f, "{e:#}"),
+        }
+    }
+}
+
+impl std::error::Error for PromoteError {}

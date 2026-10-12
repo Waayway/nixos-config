@@ -1,7 +1,7 @@
 //! Server configuration (JSON file) and the fleet host list (`hosts.json`).
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
@@ -69,6 +69,37 @@ impl ServerConfig {
     }
 }
 
+/// True for Tailscale addresses: `100.64.0.0/10` and `fd7a:115c:a1e0::/48`.
+pub fn is_tailscale_ip(ip: IpAddr) -> bool {
+    match ip.to_canonical() {
+        IpAddr::V4(v4) => {
+            let o = v4.octets();
+            o[0] == 100 && (o[1] & 0xc0) == 64
+        }
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            s[0] == 0xfd7a && s[1] == 0x115c && s[2] == 0xa1e0
+        }
+    }
+}
+
+impl ServerConfig {
+    /// With Tailscale access control the dashboard must listen only on a Tailscale address:
+    /// on any other address `whois` can't vouch for the peer.
+    pub fn check_listen(&self) -> anyhow::Result<()> {
+        if matches!(self.access, AccessConfig::Tailscale { .. })
+            && !is_tailscale_ip(self.listen.ip())
+        {
+            anyhow::bail!(
+                "listen address {} is not a Tailscale address (100.64.0.0/10 or fd7a:115c:a1e0::/48); \
+                 with Tailscale access control the dashboard must listen only on the tailnet",
+                self.listen
+            );
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct FleetHost {
     pub name: String,
@@ -103,6 +134,45 @@ mod tests {
         assert!(matches!(c.access, AccessConfig::Tailscale { .. }));
         let d: AccessConfig = serde_json::from_str(r#"{"kind":"disabled"}"#).unwrap();
         assert_eq!(d, AccessConfig::Disabled);
+    }
+
+    #[test]
+    fn tailscale_ips() {
+        for ip in [
+            "100.64.0.1",
+            "100.127.255.254",
+            "fd7a:115c:a1e0::1",
+            "::ffff:100.100.1.1",
+        ] {
+            assert!(is_tailscale_ip(ip.parse().unwrap()), "{ip}");
+        }
+        for ip in [
+            "100.63.255.255",
+            "100.128.0.1",
+            "127.0.0.1",
+            "0.0.0.0",
+            "::",
+            "fd7a:115c:a1e1::1",
+        ] {
+            assert!(!is_tailscale_ip(ip.parse().unwrap()), "{ip}");
+        }
+    }
+
+    #[test]
+    fn listen_must_be_tailscale_with_tailscale_access() {
+        let mut c: ServerConfig = serde_json::from_str(
+            r#"{"listen":"0.0.0.0:8080","agent_port":7461,"hosts_file":"/h.json",
+            "repo_url":"u","push_url":"p","state_dir":"/s",
+            "access":{"kind":"tailscale"},"online":{"kind":"tailscale"}}"#,
+        )
+        .unwrap();
+        let err = c.check_listen().unwrap_err().to_string();
+        assert!(err.contains("not a Tailscale address"), "{err}");
+        c.listen = "100.100.1.2:8080".parse().unwrap();
+        c.check_listen().unwrap();
+        c.listen = "127.0.0.1:8080".parse().unwrap();
+        c.access = AccessConfig::Disabled;
+        c.check_listen().unwrap();
     }
 
     #[test]

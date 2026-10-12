@@ -1,9 +1,12 @@
 pub mod access;
 pub mod agent_client;
+pub mod api;
 pub mod config;
 pub mod db;
+pub mod embed;
 pub mod mirror;
 pub mod poller;
 pub mod resend;
 pub mod state;
 pub mod tailscale;
+pub mod ws;
