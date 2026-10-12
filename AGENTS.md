@@ -35,8 +35,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 - `secrets/`: sops-nix files; recipients in `.sops.yaml`.
 - `template/proxmox.nix`: base image for new Proxmox VMs.
 - `docs/`: `lodestar.md`, `plans/` (designs and implementation plans, one pair per
-  feature: `<date>-<topic>-design.md` and `<date>-<topic>-plan.md`),
-  `Flake Docs/` (Obsidian notes on structure and module style).
+  feature: `<date>-<topic>-design.md` and `<date>-<topic>-plan.md`), `modules.md` (module style).
 
 ## Rules (the user's conventions; follow them)
 
@@ -57,7 +56,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
     ```
   - Feature modules declare `options.<category>.<module>.enable` and wrap their
     config in `lib.mkIf config.<category>.<module>.enable` (see
-    `docs/Flake Docs/Modules.md`).
+    `docs/modules.md`).
 - **Host files are thin:** identity (`system`, `user`, `type`, `tags`,
   `channel`, `fleet`), which modules/categories are enabled (`options`), and a
   few per-host values in `config`. No package lists, casks or macOS settings in
