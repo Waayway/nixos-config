@@ -6,7 +6,9 @@
   ...
 }:
 lib.optionalAttrs
-  (hostPlatform.isLinux && hostPlatform.isServer && serverOptions.useDefaultHardware or false)
+  (
+    hostPlatform.isLinux && hostPlatform.isServer && (serverOptions.useDefaultHardware or null) == true
+  )
   {
     # Matches the nixos-generators `proxmox` format the VMs are built from.
     imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
