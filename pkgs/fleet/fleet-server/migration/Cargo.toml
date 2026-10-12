@@ -1,0 +1,4 @@
+[package]
+name = "fleet-migration"
+version.workspace = true
+edition.workspace = true

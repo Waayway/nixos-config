@@ -48,6 +48,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    crane.url = "github:ipetkov/crane";
+
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -99,15 +101,57 @@
       deployNodes = nixpkgs.lib.mapAttrs (
         name: h: mkDeployNode name h nixosConfigurations.${name}
       ) deployHosts;
-    in
-    {
-      inherit nixosConfigurations darwinConfigurations fleetHosts;
-      deploy.nodes = deployNodes;
 
-      packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {
-        system = "x86_64-linux";
-        format = "proxmox";
-        modules = [ ./template/proxmox.nix ];
+      fleetSystems = [
+        "aarch64-darwin"
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+
+      fleetFor =
+        system:
+        import ./pkgs/fleet {
+          pkgs = nixpkgs.legacyPackages.${system};
+          crane = inputs.crane;
+        };
+
+      perSystem = nixpkgs.lib.genAttrs fleetSystems (system: {
+        fleet = fleetFor system;
+        pkgs = nixpkgs.legacyPackages.${system};
+      });
+    in
+    nixpkgs.lib.recursiveUpdate
+      {
+        inherit nixosConfigurations darwinConfigurations fleetHosts;
+        deploy.nodes = deployNodes;
+
+        packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {
+          system = "x86_64-linux";
+          format = "proxmox";
+          modules = [ ./template/proxmox.nix ];
+        };
+      }
+      {
+        packages = nixpkgs.lib.mapAttrs (_: s: {
+          inherit (s.fleet) fleet-agent fleet-server;
+        }) perSystem;
+
+        checks = nixpkgs.lib.mapAttrs (_: s: {
+          fleet-bindings = s.fleet.bindingsCheck;
+        }) perSystem;
+
+        devShells = nixpkgs.lib.mapAttrs (_: s: {
+          fleet = s.pkgs.mkShell {
+            packages = with s.pkgs; [
+              cargo
+              rustc
+              clippy
+              rustfmt
+              nodejs_22
+              sqlite
+              git
+            ];
+          };
+        }) perSystem;
       };
-    };
 }

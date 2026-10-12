@@ -1,0 +1,7 @@
+[package]
+name = "fleet-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+fleet-proto = { path = "../fleet-proto" }
