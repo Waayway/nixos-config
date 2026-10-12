@@ -9,22 +9,62 @@ use nix::unistd::{Gid, Uid, User, setgid, setuid};
 
 use crate::config::AgentConfig;
 
+/// Element type `getgrouplist` fills: `c_int` on Apple, `gid_t` elsewhere.
+#[cfg(target_vendor = "apple")]
+type GroupElem = libc::c_int;
+#[cfg(not(target_vendor = "apple"))]
+type GroupElem = libc::gid_t;
+
+/// The user's group list (including `gid`), resolved in the parent process.
+/// `getgrouplist` may allocate and consult NSS, so it must not run after fork.
+fn group_list(user: &std::ffi::CStr, gid: u32) -> std::io::Result<Vec<libc::gid_t>> {
+    let mut buf: Vec<GroupElem> = vec![0; 32];
+    loop {
+        let mut n = buf.len() as libc::c_int;
+        // SAFETY: `user` is NUL-terminated; `buf` holds `n` elements and `n` is
+        // a valid out-pointer for the duration of the call.
+        let rc = unsafe { libc::getgrouplist(user.as_ptr(), gid as _, buf.as_mut_ptr(), &mut n) };
+        if rc >= 0 {
+            buf.truncate(n as usize);
+            return Ok(buf.into_iter().map(|g| g as libc::gid_t).collect());
+        }
+        // -1: buffer too small, `n` now holds the required size. Grow and retry
+        // (always at least doubling, so a misbehaving libc cannot loop forever).
+        let want = (n.max(0) as usize).max(buf.len() * 2);
+        if want > 65536 {
+            return Err(std::io::Error::other("getgrouplist: too many groups"));
+        }
+        buf.resize(want, 0);
+    }
+}
+
 /// Makes `cmd` run as `user` instead of root, with the user's own groups.
 ///
 /// std applies `.uid()/.gid()` before `pre_exec` hooks, and root's supplementary
 /// groups (wheel etc.) survive a plain uid/gid switch. So the whole drop happens
 /// in one `pre_exec` hook, in the only safe order: supplementary groups first
 /// (needs root), then gid, then uid (after which no further change is possible).
-pub fn drop_privileges(cmd: &mut Command, user: &str, uid: u32, gid: u32, home: &std::path::Path) {
-    let cuser = std::ffi::CString::new(user).expect("user name contains NUL");
+/// The group list is resolved before fork (see [`group_list`]); the hook itself
+/// only issues the `setgroups`, `setgid` and `setuid` syscalls, which are
+/// async-signal-safe and do not allocate.
+pub fn drop_privileges(
+    cmd: &mut Command,
+    user: &str,
+    uid: u32,
+    gid: u32,
+    home: &std::path::Path,
+) -> std::io::Result<()> {
+    let cuser = std::ffi::CString::new(user)
+        .map_err(|_| std::io::Error::other("user name contains NUL"))?;
+    let groups = group_list(&cuser, gid)?;
     let (uid, gid) = (Uid::from_raw(uid), Gid::from_raw(gid));
-    // SAFETY: the hook only calls async-signal-safe libc wrappers (initgroups,
-    // setgroups, setgid, setuid) and does not allocate.
+    // SAFETY: the hook runs between fork and exec and calls only
+    // async-signal-safe functions (setgroups, setgid, setuid) on data that was
+    // fully prepared before the fork; it neither allocates nor takes locks.
     unsafe {
         cmd.pre_exec(move || {
-            // SAFETY: cuser is a valid NUL-terminated string; initgroups is
-            // async-signal-safe enough for the post-fork, pre-exec window.
-            if libc::initgroups(cuser.as_ptr(), gid.as_raw() as _) != 0 {
+            // `len as _`: the length parameter is size_t on Linux, c_int on Apple.
+            if libc::setgroups(groups.len() as _, groups.as_ptr()) != 0 {
                 return Err(std::io::Error::last_os_error());
             }
             setgid(gid)?;
@@ -33,6 +73,7 @@ pub fn drop_privileges(cmd: &mut Command, user: &str, uid: u32, gid: u32, home: 
         });
     }
     cmd.env("HOME", home).env("USER", user).env("LOGNAME", user);
+    Ok(())
 }
 
 /// Runs git against the user's flake checkout, as that user.
@@ -69,7 +110,8 @@ impl Git {
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C");
         if let Some((uid, gid, home)) = &self.run_as {
-            drop_privileges(&mut cmd, &self.user, *uid, *gid, home);
+            drop_privileges(&mut cmd, &self.user, *uid, *gid, home)
+                .context("preparing privilege drop")?;
         }
         cmd.output()
             .with_context(|| format!("running git {}", args.join(" ")))
