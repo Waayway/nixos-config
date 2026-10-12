@@ -133,7 +133,7 @@
       }
       {
         packages = nixpkgs.lib.mapAttrs (_: s: {
-          inherit (s.fleet) fleet-agent fleet-server;
+          inherit (s.fleet) fleet-agent fleet-server fleet-web;
         }) perSystem;
 
         # `nix run .#fleet-demo`: the dashboard against a simulated fleet (needs git).

@@ -16,8 +16,16 @@
 
   tags = [ "tag:manager" ];
 
+  fleet = true;
+
   # No options: terminal/neovim are always on (no enable options declared).
-  options = { };
+  options = {
+    services.fleet-server = {
+      enable = true;
+      # Last known tailnet IP (`tailscale status`): confirm at bootstrap.
+      listenAddress = "100.92.102.84";
+    };
+  };
 
   config = { ... }: { };
 }

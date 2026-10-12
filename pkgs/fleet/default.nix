@@ -21,7 +21,7 @@ let
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
   mkBin =
-    crate:
+    crate: extra:
     craneLib.buildPackage (
       commonArgs
       // {
@@ -30,14 +30,27 @@ let
         cargoExtraArgs = "-p ${crate}";
         doCheck = false;
       }
+      // extra
     );
+
+  # The dashboard bundle (Vite build output), embedded into fleet-server.
+  fleet-web = pkgs.buildNpmPackage {
+    pname = "fleet-web";
+    version = "0.1.0";
+    # Flake sources never contain the git-ignored node_modules/ and dist/.
+    src = ./web;
+    npmDepsHash = "sha256-Ry6RH2Kod1bShU3orxHvvsuGc3Hia3gmReZD7krChSs=";
+    installPhase = ''
+      runHook preInstall
+      cp -r dist $out
+      runHook postInstall
+    '';
+  };
 in
 {
-  fleet-agent = mkBin "fleet-agent";
-  # Stub until Task 9.
-  fleet-server = mkBin "fleet-server";
-  # Stub until Task 14.
-  fleet-web = pkgs.runCommand "fleet-web" { } "mkdir -p $out";
+  inherit fleet-web;
+  fleet-agent = mkBin "fleet-agent" { };
+  fleet-server = mkBin "fleet-server" { FLEET_WEB_DIST = "${fleet-web}"; };
 
   bindingsCheck = craneLib.cargoTest (
     commonArgs
