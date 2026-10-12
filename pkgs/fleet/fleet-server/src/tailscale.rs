@@ -48,6 +48,8 @@ struct RawStatus {
 struct RawPeer {
     #[serde(default)]
     host_name: String,
+    #[serde(rename = "DNSName", default)]
+    dns_name: String,
     #[serde(default)]
     online: bool,
     #[serde(default)]
@@ -59,14 +61,20 @@ struct RawPeer {
 }
 
 /// Parses `tailscale status --json`, including this node. Key = lowercased HostName.
+///
+/// HostName is not unique in a tailnet. Collisions resolve deterministically:
+/// Self wins, else online beats offline, then the later `last_seen`, then the
+/// lexicographically smaller DNSName. A warning is logged for each collision.
 pub fn parse_status(json: &str) -> anyhow::Result<HashMap<String, PeerInfo>> {
     let raw: RawStatus = serde_json::from_str(json).context("parsing tailscale status")?;
-    let mut out = HashMap::new();
-    for p in raw
-        .this
-        .into_iter()
-        .chain(raw.peer.into_iter().flat_map(|m| m.into_values()))
-    {
+    let candidates = raw.this.into_iter().map(|p| (true, p)).chain(
+        raw.peer
+            .into_iter()
+            .flat_map(|m| m.into_values())
+            .map(|p| (false, p)),
+    );
+    let mut out: HashMap<String, (bool, String, PeerInfo)> = HashMap::new();
+    for (is_self, p) in candidates {
         let host = p.host_name.to_lowercase();
         if host.is_empty() {
             continue;
@@ -77,18 +85,37 @@ pub fn parse_status(json: &str) -> anyhow::Result<HashMap<String, PeerInfo>> {
             .find(|ip| ip.is_ipv4())
             .or_else(|| p.tailscale_ips.first())
             .copied();
-        out.insert(
-            host.clone(),
-            PeerInfo {
-                host,
-                online: p.online,
-                last_seen: p.last_seen.as_deref().and_then(parse_last_seen),
-                os: p.os,
-                addr,
-            },
-        );
+        let info = PeerInfo {
+            host: host.clone(),
+            online: p.online,
+            last_seen: p.last_seen.as_deref().and_then(parse_last_seen),
+            os: p.os,
+            addr,
+        };
+        let new = (is_self, p.dns_name, info);
+        match out.remove(&host) {
+            None => {
+                out.insert(host, new);
+            }
+            Some(old) => {
+                eprintln!(
+                    "fleet-server: duplicate tailscale HostName {host:?}; picking one deterministically"
+                );
+                out.insert(host, if wins(&new, &old) { new } else { old });
+            }
+        }
     }
-    Ok(out)
+    Ok(out.into_iter().map(|(k, (_, _, info))| (k, info)).collect())
+}
+
+/// True if `a` should replace `b` for the same host name.
+fn wins(a: &(bool, String, PeerInfo), b: &(bool, String, PeerInfo)) -> bool {
+    // Self first, then online, then later last_seen (None is oldest), then smaller DNSName.
+    let key = |x: &(bool, String, PeerInfo)| (x.0, x.2.online, x.2.last_seen);
+    match key(a).cmp(&key(b)) {
+        std::cmp::Ordering::Equal => a.1 < b.1,
+        o => o.is_gt(),
+    }
 }
 
 fn parse_last_seen(s: &str) -> Option<i64> {

@@ -172,3 +172,89 @@ async fn middleware_403() {
         StatusCode::OK
     );
 }
+
+fn peer_json(key: &str, dns: &str, ip: &str, online: bool, seen: &str) -> String {
+    format!(
+        r#""{key}":{{"HostName":"Box","DNSName":"{dns}","OS":"linux","TailscaleIPs":["{ip}"],"Online":{online},"LastSeen":"{seen}"}}"#
+    )
+}
+
+#[test]
+fn duplicate_hostname_prefers_online_regardless_of_order() {
+    let off = peer_json(
+        "k1",
+        "box-old.ts.net.",
+        "100.64.0.50",
+        false,
+        "2026-10-12T09:00:00Z",
+    );
+    let on = peer_json(
+        "k2",
+        "box.ts.net.",
+        "100.64.0.51",
+        true,
+        "2026-10-01T00:00:00Z",
+    );
+    for (a, b) in [(&off, &on), (&on, &off)] {
+        let json = format!(r#"{{"Peer":{{{a},{b}}}}}"#);
+        let peers = parse_status(&json).unwrap();
+        assert_eq!(peers.len(), 1);
+        assert!(peers["box"].online);
+        assert_eq!(
+            peers["box"].addr,
+            Some("100.64.0.51".parse::<IpAddr>().unwrap())
+        );
+    }
+}
+
+#[test]
+fn duplicate_hostname_tiebreaks_on_last_seen_then_dnsname() {
+    let a = peer_json(
+        "k1",
+        "b.ts.net.",
+        "100.64.0.60",
+        false,
+        "2026-10-01T00:00:00Z",
+    );
+    let b = peer_json(
+        "k2",
+        "a.ts.net.",
+        "100.64.0.61",
+        false,
+        "2026-10-01T00:00:00Z",
+    );
+    let c = peer_json(
+        "k3",
+        "z.ts.net.",
+        "100.64.0.62",
+        false,
+        "2026-10-05T00:00:00Z",
+    );
+    let peers = parse_status(&format!(r#"{{"Peer":{{{a},{b}}}}}"#)).unwrap();
+    assert_eq!(
+        peers["box"].addr,
+        Some("100.64.0.61".parse::<IpAddr>().unwrap())
+    );
+    let peers = parse_status(&format!(r#"{{"Peer":{{{a},{b},{c}}}}}"#)).unwrap();
+    assert_eq!(
+        peers["box"].addr,
+        Some("100.64.0.62".parse::<IpAddr>().unwrap())
+    );
+}
+
+#[test]
+fn self_wins_over_colliding_peer() {
+    let me = r#""Self":{"HostName":"box","DNSName":"zzz.ts.net.","OS":"linux","TailscaleIPs":["100.64.0.1"],"Online":false,"LastSeen":"0001-01-01T00:00:00Z"}"#;
+    let other = peer_json(
+        "k1",
+        "aaa.ts.net.",
+        "100.64.0.70",
+        true,
+        "2026-10-12T09:00:00Z",
+    );
+    let peers = parse_status(&format!(r#"{{{me},"Peer":{{{other}}}}}"#)).unwrap();
+    assert_eq!(
+        peers["box"].addr,
+        Some("100.64.0.1".parse::<IpAddr>().unwrap())
+    );
+}
