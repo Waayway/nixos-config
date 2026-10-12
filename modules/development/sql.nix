@@ -39,6 +39,14 @@ in
             --locale=en_US.UTF-8 -E UTF-8 --auth=trust -U ${user.name} -D ${dataDir}
           launchctl kickstart -k "gui/$(id -u -- ${user.name})/org.nixos.postgresql" 2>/dev/null || true
         fi
+
+        # Leftover `brew services` agent: fights org.nixos.postgresql for
+        # port 5432 and keeps exiting 1.
+        brew_agent=~${user.name}/Library/LaunchAgents/sh.brew.postgresql@18.plist
+        if [ -f "$brew_agent" ]; then
+          launchctl bootout "gui/$(id -u -- ${user.name})/sh.brew.postgresql@18" 2>/dev/null || true
+          rm -f "$brew_agent"
+        fi
       '';
 
       launchd.user.agents.postgresql.serviceConfig = {
