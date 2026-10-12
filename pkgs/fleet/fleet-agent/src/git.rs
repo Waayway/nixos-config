@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 
 use anyhow::{Context, bail};
-#[cfg(not(target_os = "macos"))]
-use nix::unistd::initgroups;
 use nix::unistd::{Gid, Uid, User, setgid, setuid};
 
 use crate::config::AgentConfig;
@@ -38,6 +36,19 @@ fn group_list(user: &std::ffi::CStr, gid: u32) -> std::io::Result<Vec<libc::gid_
     }
 }
 
+/// Caps a group list at `max` entries for `setgroups`, keeping `primary` first
+/// when present. Apple's `setgroups` rejects more than `NGROUPS_MAX` (16)
+/// entries with EINVAL, while `getgrouplist` can return more.
+#[cfg_attr(not(target_vendor = "apple"), allow(dead_code))]
+fn cap_groups(mut groups: Vec<libc::gid_t>, primary: libc::gid_t, max: usize) -> Vec<libc::gid_t> {
+    if let Some(pos) = groups.iter().position(|&g| g == primary) {
+        let g = groups.remove(pos);
+        groups.insert(0, g);
+    }
+    groups.truncate(max);
+    groups
+}
+
 /// Makes `cmd` run as `user` instead of root, with the user's own groups.
 ///
 /// std applies `.uid()/.gid()` before `pre_exec` hooks, and root's supplementary
@@ -57,6 +68,14 @@ pub fn drop_privileges(
     let cuser = std::ffi::CString::new(user)
         .map_err(|_| std::io::Error::other("user name contains NUL"))?;
     let groups = group_list(&cuser, gid)?;
+    #[cfg(target_vendor = "apple")]
+    let groups = {
+        // SAFETY: sysconf has no preconditions.
+        let max = unsafe { libc::sysconf(libc::_SC_NGROUPS_MAX) };
+        // Fallback: NGROUPS_MAX from <sys/syslimits.h> (not exported by libc).
+        let max = if max > 0 { max as usize } else { 16 };
+        cap_groups(groups, gid as libc::gid_t, max)
+    };
     let (uid, gid) = (Uid::from_raw(uid), Gid::from_raw(gid));
     // SAFETY: the hook runs between fork and exec and calls only
     // async-signal-safe functions (setgroups, setgid, setuid) on data that was
@@ -191,5 +210,24 @@ impl Git {
             );
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cap_groups;
+
+    #[test]
+    fn cap_groups_keeps_primary_first_and_truncates() {
+        let groups: Vec<libc::gid_t> = (1..=20).collect();
+        let capped = cap_groups(groups, 18, 16);
+        assert_eq!(capped.len(), 16);
+        assert_eq!(capped[0], 18);
+        assert_eq!(&capped[1..], &(1..=15).collect::<Vec<_>>()[..]);
+    }
+
+    #[test]
+    fn cap_groups_leaves_short_list_unchanged_when_primary_absent() {
+        assert_eq!(cap_groups(vec![5, 6, 7], 1, 16), vec![5, 6, 7]);
     }
 }
