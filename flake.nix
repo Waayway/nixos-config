@@ -56,140 +56,29 @@
     };
   };
 
+  # Machines live in systems.nix, our own programs (packages, apps, checks,
+  # dev shells) in programs.nix.
   outputs =
-    inputs@{ nixpkgs, ... }:
+    inputs:
     let
-      version = "26.05";
-
-      overlays = [ ];
-
-      isDarwinHost = h: nixpkgs.lib.hasSuffix "darwin" h.system;
-
-      mkSystem = import ./lib/mkSystem.nix {
-        inherit
-          overlays
-          nixpkgs
-          inputs
-          version
-          fleetHosts
-          ;
+      systems = import ./systems.nix { inherit inputs; };
+      programs = import ./programs.nix {
+        inherit inputs;
+        inherit (systems) nixosConfigurations;
       };
-
-      mkDarwin = import ./lib/mkDarwin.nix {
-        inherit
-          overlays
-          nixpkgs
-          inputs
-          version
-          fleetHosts
-          ;
-      };
-
-      mkDeployNode = import ./lib/mkDeployNode.nix { inherit inputs; };
-
-      hosts = (import ./lib/discoverHosts.nix { lib = nixpkgs.lib; }) ./hosts;
-
-      fleetHosts = (import ./lib/fleetHosts.nix { lib = nixpkgs.lib; }) hosts;
-
-      nixosHosts = nixpkgs.lib.filterAttrs (_: h: !(isDarwinHost h)) hosts;
-      darwinHosts = nixpkgs.lib.filterAttrs (_: h: (isDarwinHost h)) hosts;
-      deployHosts = nixpkgs.lib.filterAttrs (_: h: h ? deploy) hosts;
-
-      nixosConfigurations = nixpkgs.lib.mapAttrs mkSystem nixosHosts;
-      darwinConfigurations = nixpkgs.lib.mapAttrs mkDarwin darwinHosts;
-
-      deployNodes = nixpkgs.lib.mapAttrs (
-        name: h: mkDeployNode name h nixosConfigurations.${name}
-      ) deployHosts;
-
-      fleetSystems = [
-        "aarch64-darwin"
-        "x86_64-linux"
-        "aarch64-linux"
-      ];
-
-      fleetFor =
-        system:
-        import ./pkgs/fleet {
-          pkgs = nixpkgs.legacyPackages.${system};
-          crane = inputs.crane;
-        };
-
-      perSystem = nixpkgs.lib.genAttrs fleetSystems (system: {
-        fleet = fleetFor system;
-        pkgs = nixpkgs.legacyPackages.${system};
-      });
     in
-    nixpkgs.lib.recursiveUpdate
-      {
-        inherit nixosConfigurations darwinConfigurations fleetHosts;
-        deploy.nodes = deployNodes;
-
-        packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {
-          system = "x86_64-linux";
-          format = "proxmox";
-          modules = [ ./template/proxmox.nix ];
-        };
-      }
-      {
-        packages = nixpkgs.lib.mapAttrs (_: s: {
-          inherit (s.fleet) fleet-agent fleet-server fleet-web fleetctl;
-        }) perSystem;
-
-        # `nix run .#fleet-demo`: the dashboard against a simulated fleet (needs git).
-        apps = nixpkgs.lib.mapAttrs (_: s: {
-          fleetctl = {
-            type = "app";
-            program = "${s.fleet.fleetctl}/bin/fleetctl";
-            meta.description = "CLI for the fleet manager (status, force rebuild, promote)";
-          };
-          fleet-demo = {
-            type = "app";
-            program = "${s.pkgs.writeShellScript "fleet-demo" ''
-              export PATH=${s.pkgs.git}/bin:$PATH
-              exec ${s.fleet.fleet-server}/bin/fleet-server demo "$@"
-            ''}";
-            meta.description = "fleet dashboard demo against a simulated fleet";
-          };
-        }) perSystem;
-
-        checks =
-          nixpkgs.lib.recursiveUpdate
-            (nixpkgs.lib.mapAttrs (_: s: {
-              fleet-bindings = s.fleet.bindingsCheck;
-            }) perSystem)
-            {
-              # Evaluation-time check: the NixOS firewall only opens 22, so the fleet
-              # modules must open the agent and dashboard ports on tailscale0.
-              x86_64-linux.fleet-firewall =
-                let
-                  pkgs = nixpkgs.legacyPackages.x86_64-linux;
-                  ports =
-                    nixosConfigurations.nixos-manager.config.networking.firewall.interfaces.tailscale0.allowedTCPPorts;
-                in
-                assert nixpkgs.lib.assertMsg (
-                  builtins.elem 7461 ports && builtins.elem 8080 ports
-                ) "nixos-manager must open 7461 and 8080 on tailscale0 (has ${builtins.toJSON ports})";
-                pkgs.runCommand "fleet-firewall" { } "touch $out";
-              # Needs an x86_64-linux builder with KVM to run.
-              x86_64-linux.fleet-vm = import ./tests/fleet-vm.nix {
-                pkgs = nixpkgs.legacyPackages.x86_64-linux;
-                inherit inputs;
-              };
-            };
-
-        devShells = nixpkgs.lib.mapAttrs (_: s: {
-          fleet = s.pkgs.mkShell {
-            packages = with s.pkgs; [
-              cargo
-              rustc
-              clippy
-              rustfmt
-              nodejs_22
-              sqlite
-              git
-            ];
-          };
-        }) perSystem;
-      };
+    {
+      inherit (systems)
+        nixosConfigurations
+        darwinConfigurations
+        deploy
+        fleetHosts
+        ;
+      inherit (programs)
+        packages
+        apps
+        checks
+        devShells
+        ;
+    };
 }
