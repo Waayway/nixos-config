@@ -49,7 +49,10 @@ let
       isNormalUser = true;
     };
     environment.systemPackages = [ pkgs.git ];
-    networking.firewall.allowedTCPPorts = [ 7461 ];
+    # TEST ONLY: the module opens the agent port on tailscale0, which these VMs
+    # lack; open it on the test network instead. (checks.x86_64-linux.fleet-firewall
+    # asserts the real hosts open it on tailscale0.)
+    networking.firewall.interfaces.eth1.allowedTCPPorts = [ 7461 ];
   };
 in
 pkgs.testers.runNixOSTest {
@@ -95,7 +98,9 @@ pkgs.testers.runNixOSTest {
           ../modules/fleet/server.nix
         ];
         environment.systemPackages = [ pkgs.jq ];
-        networking.firewall.allowedTCPPorts = [ 8080 ];
+        # TEST ONLY: as for the agent port, the dashboard port is opened on tailscale0
+        # by the module; there is no tailscale0 here.
+        networking.firewall.interfaces.eth1.allowedTCPPorts = [ 8080 ];
         services.fleet-server = {
           enable = true;
           inherit repoUrl;

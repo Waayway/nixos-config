@@ -154,6 +154,18 @@
               fleet-bindings = s.fleet.bindingsCheck;
             }) perSystem)
             {
+              # Evaluation-time check: the NixOS firewall only opens 22, so the fleet
+              # modules must open the agent and dashboard ports on tailscale0.
+              x86_64-linux.fleet-firewall =
+                let
+                  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+                  ports =
+                    nixosConfigurations.nixos-manager.config.networking.firewall.interfaces.tailscale0.allowedTCPPorts;
+                in
+                assert nixpkgs.lib.assertMsg (
+                  builtins.elem 7461 ports && builtins.elem 8080 ports
+                ) "nixos-manager must open 7461 and 8080 on tailscale0 (has ${builtins.toJSON ports})";
+                pkgs.runCommand "fleet-firewall" { } "touch $out";
               # Needs an x86_64-linux builder with KVM to run.
               x86_64-linux.fleet-vm = import ./tests/fleet-vm.nix {
                 pkgs = nixpkgs.legacyPackages.x86_64-linux;

@@ -48,7 +48,12 @@ in
     deployKeyFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      description = "SSH deploy key (write access to pushUrl); a path outside the Nix store.";
+      description = ''
+        SSH deploy key (write access to pushUrl); a path outside the Nix store.
+        The server runs as the `fleet-server` user, so the key must be readable by it,
+        e.g. `sops.secrets.<name> = { owner = "fleet-server"; mode = "0400"; };` and
+        `deployKeyFile = config.sops.secrets.<name>.path;`.
+      '';
     };
     allowedUsers = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -85,6 +90,21 @@ in
 
   config = lib.mkIf cfg.enable (
     lib.optionalAttrs hostPlatform.isLinux {
+      users.users.fleet-server = {
+        isSystemUser = true;
+        group = "fleet-server";
+        # ssh (StrictHostKeyChecking=accept-new) keeps its known_hosts under $HOME.
+        home = "/var/lib/fleet-server";
+      };
+      users.groups.fleet-server = { };
+
+      # Lets the unprivileged server use `tailscale status` / `tailscale whois`.
+      services.tailscale.extraSetFlags = [ "--operator=fleet-server" ];
+
+      # The firewall (modules/networking/firewall.nix) only opens 22; the dashboard is
+      # reached over the tailnet.
+      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cfg.listenPort ];
+
       environment.etc."fleet-server/hosts.json".text = builtins.toJSON fleet.hosts;
       environment.etc."fleet-server/config.json".text = builtins.toJSON (
         {
@@ -125,6 +145,7 @@ in
           "network-online.target"
         ];
         wants = [ "network-online.target" ];
+        environment.HOME = "/var/lib/fleet-server";
         path = with pkgs; [
           git
           openssh
@@ -136,6 +157,8 @@ in
         ];
         serviceConfig = {
           ExecStart = "${cfg.package}/bin/fleet-server serve --config ${configPath}";
+          User = "fleet-server";
+          Group = "fleet-server";
           StateDirectory = "fleet-server";
           # The tailnet address may not exist yet at boot: retry until it does.
           Restart = "on-failure";

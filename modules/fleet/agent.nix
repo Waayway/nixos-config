@@ -88,6 +88,9 @@ in
         };
       }
       (lib.optionalAttrs hostPlatform.isLinux {
+        # The firewall (modules/networking/firewall.nix) only opens 22; the manager
+        # reaches the agent over the tailnet.
+        networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cfg.port ];
         systemd.services.fleet-agent = {
           description = "Fleet agent";
           wantedBy = [ "multi-user.target" ];
