@@ -8,6 +8,8 @@ For other versions see:
 
 WARNING: This config is not final. See v2 for that. but im still experimenting with some features and making it to a 1.0 version
 
+Partially developed with AI, but orchestrated by a human.
+
 ### Why NixOS
 
 #### Bazzite
