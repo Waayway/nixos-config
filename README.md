@@ -30,18 +30,15 @@ Nixos has been very stable for me with minimal problems and with a possibility t
 
 
 
-### Fleet manager
+### Lodestar (fleet manager)
 
-A small server and per-host agents that apply config changes across hosts, with a dashboard. Try it without any host:
+[Lodestar](https://github.com/Waayway/lodestar) (a separate flake, input `lodestar`) shows which commit every host runs and applies config changes across hosts, with a dashboard on `nixos-manager`. Try it without any host:
 
 ```sh
-nix run .#fleet-demo        # simulated fleet at http://127.0.0.1:8080
-nix develop .#fleet         # dev shell: cargo, node, sqlite
+nix run github:Waayway/lodestar#lodestar-demo   # simulated hosts at http://127.0.0.1:8080
 ```
 
-`fleetctl` (installed on every enrolled host) is the CLI for the same API: `fleetctl status`, `fleetctl rebuild hermes --wait` (force a rebuild of one host), `fleetctl rebuild --channel stable`. Without installing: `nix run .#fleetctl -- status`. It talks to `http://nixos-manager:8080` over the tailnet; override with `--server` or `FLEET_SERVER`.
-
-A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). The server runs on `nixos-manager`. The NixOS VM test (`checks.x86_64-linux.fleet-vm`) passes on nixos-manager, which also serves as the Linux builder; enrolling the other machines is not done yet. Details and open steps: [`docs/fleet.md`](docs/fleet.md). Notes for coding agents: [`AGENTS.md`](AGENTS.md).
+The `lodestar` CLI is installed on every enrolled host: `lodestar status`, `lodestar rebuild hermes --wait`, `lodestar rebuild --channel stable`. A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). This repo's values and open steps: [`docs/lodestar.md`](docs/lodestar.md). Notes for coding agents: [`AGENTS.md`](AGENTS.md).
 
 ### Installing a new Mac (e.g. atlas)
 

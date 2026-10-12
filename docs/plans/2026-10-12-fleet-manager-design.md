@@ -1,3 +1,5 @@
+> Historical: the fleet manager's code now lives in [github.com/Waayway/lodestar](https://github.com/Waayway/lodestar) (see `docs/lodestar.md`).
+
 # Fleet manager: dashboard + push agent (design)
 
 Date: 2026-10-12. Status: approved, revised after review (see "Review changes").

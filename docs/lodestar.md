@@ -1,0 +1,99 @@
+# Lodestar (fleet manager)
+
+[Lodestar](https://github.com/Waayway/lodestar) shows which commit of this repo
+every machine runs and applies a channel's newest commit to a host on request:
+a dashboard and API on `nixos-manager`, an agent on every enrolled host, over
+Tailscale. It used to live in this repo (`pkgs/fleet`, `modules/fleet`); it is
+now its own flake. Usage, the CLI, options, the security model and development
+(Rust, the demo, the VM test) are in the
+[lodestar README](https://github.com/Waayway/lodestar#readme) and its
+`docs/operations.md`. This page only covers how this repo uses it.
+
+## Where things live
+
+- `flake.nix`: input `lodestar` (`github:Waayway/lodestar`, nixpkgs follows
+  ours). Update with `nix flake update lodestar`.
+- `lib/mkSystem.nix` / `lib/mkDarwin.nix`: import
+  `inputs.lodestar.nixosModules.default` (agent + server) /
+  `inputs.lodestar.darwinModules.default` (agent) on every host, next to
+  sops-nix. They also build the `fleet` specialArg
+  (`{ member; channel; }`) from the host file.
+- `modules/lodestar/agent.nix`: on every host with `fleet = true`, enables
+  `services.lodestar-agent` with `user` = the host's user, `channel` = the
+  host's channel, `managerHost = "nixos-manager"`,
+  `repoUrl = "https://github.com/Waayway/nixos-config"`.
+- `modules/lodestar/server.nix` (NixOS only, active where
+  `services.lodestar-server.enable`): `hosts` from
+  `lodestar.lib.hostsFrom` over all our NixOS and darwin configurations,
+  `repoUrl`, `pushUrl = "git@github.com:Waayway/nixos-config"`,
+  `allowedUsers = [ "Waayway@github" ]`,
+  `allowedTags = [ "tag:nixos" "tag:personal" "tag:fleet" ]`; promote keeps the
+  module default (`unstable` → `stable`).
+- `hosts/servers/nixos-manager.nix`: `fleet = true`, `services.lodestar-server`
+  `enable` and `listenAddress = "100.92.102.84"` (its Tailscale IP).
+
+## Branches and channels
+
+- `unstable`: new work; workstations follow it. `stable`: servers follow it;
+  GitHub default branch. Move `stable` forward with **Promote** in the
+  dashboard or `lodestar promote --yes` (needs the deploy key, open item 1).
+- A host's channel: `channel = "stable" | "unstable";` in its host file,
+  default by folder (`hosts/servers/` → `stable`, `hosts/workstations/` →
+  `unstable`).
+
+## Enrolling a host
+
+1. In its host file: `fleet = true;` (and `channel = ...` to override).
+2. Make sure `~/.flake` is a clean checkout of its channel branch with `origin`
+   = `https://github.com/Waayway/nixos-config`.
+3. Switch it once by hand. It shows up in the dashboard once the server can
+   reach it on tcp:7461 over Tailscale (and after nixos-manager has been
+   switched to a revision that lists it: the host list is computed at build
+   time).
+
+## Using it
+
+Dashboard: http://nixos-manager:8080. The `lodestar` CLI is installed on every
+enrolled host with `LODESTAR_SERVER=http://nixos-manager:8080`:
+
+```sh
+lodestar status
+lodestar rebuild hermes --wait
+lodestar rebuild --channel stable --wait
+nix run github:Waayway/lodestar -- status   # without installing
+```
+
+## nixos-manager
+
+- Services: `lodestar-server.service` (user `lodestar-server`, state in
+  `/var/lib/lodestar-server`: `lodestar.db`, `mirror.git`) and
+  `lodestar-agent.service` (root, state in `/var/lib/lodestar-agent`). Config:
+  `/etc/lodestar-server/{config,hosts}.json`, `/etc/lodestar-agent/config.json`.
+- Both ports (8080, 7461) are opened on `tailscale0` only.
+- Its `~/.flake` is a clean checkout of `stable` that the agent manages; don't
+  build or edit there (see AGENTS.md, "Linux builder").
+
+## Tailscale policy
+
+The tailnet uses an explicit grants policy (no allow-all) with these rules:
+`nixos-manager` → agents on tcp:7461; your devices (`Waayway@github`,
+`tag:personal`, `tag:nixos`, `tag:fleet`) → dashboard on tcp:8080; SSH to
+`nixos-manager` for remote builds. Laptops you use yourself stay untagged: a
+tag replaces the device's user identity.
+
+## Open items
+
+1. Write deploy key for promote: create `secrets/nixos-manager.yaml` with a
+   GitHub deploy key (write access), declare it with
+   `sops.secrets.<name> = { owner = "lodestar-server"; mode = "0400"; };` and
+   set `services.lodestar-server.deployKeyFile` (in
+   `hosts/servers/nixos-manager.nix`). Add a GitHub ruleset on `stable` (no
+   force pushes, linear history).
+2. Advertise `tag:fleet` on enrolled Linux hosts (Lodestar has no option for
+   it yet; use `services.tailscale.extraUpFlags`) and fix nixos-manager's
+   Tailscale tags (it still carries `tag:server`).
+3. Enrol atlas, apollo, hermes and hephaestus (`fleet = true`). The darwin
+   agent has not run on a real Mac yet.
+4. Build and boot the proxmox template once, then migrate the VMs (see
+   `docs/plans/2026-10-12-fleet-manager-design.md`, "Migration of the
+   homelab").

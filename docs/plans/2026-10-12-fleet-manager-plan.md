@@ -1,3 +1,5 @@
+> Historical: the fleet manager's code now lives in [github.com/Waayway/lodestar](https://github.com/Waayway/lodestar) (see `docs/lodestar.md`).
+
 # Fleet Manager Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

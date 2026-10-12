@@ -12,7 +12,7 @@ at `~/.flake` on each machine. Read this before changing anything.
 | apollo | personal MacBook Pro M1 Pro | aarch64-darwin | thijsvw | workstations |
 | hermes | Framework 13 (AMD) | x86_64-linux | waayway | workstations |
 | hephaestus | desktop (AMD) | x86_64-linux | waayway | workstations |
-| nixos-manager | Proxmox VM 170, fleet server + Linux builder | x86_64-linux | manager | servers |
+| nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
 10.0.10.0/24, gateway 10.0.10.1). Other VMs there still run Rocky/Debian and are
@@ -22,21 +22,19 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 
 ## Layout
 
-- `flake.nix`: discovers hosts, builds `nixosConfigurations`,
-  `darwinConfigurations`, packages (fleet, proxmox template), apps, checks,
-  dev shells.
+- `flake.nix`: inputs only; outputs come from `systems.nix` (hosts →
+  `nixosConfigurations`, `darwinConfigurations`, deploy-rs nodes) and
+  `programs.nix` (packages: the proxmox template).
 - `hosts/<category>/<name>.nix`: one file per machine. Categories are folders
   (`servers`, `workstations`); a host is `foo.nix` or `foo/default.nix`.
 - `lib/`: `discoverHosts.nix`, `mkSystem.nix` (NixOS), `mkDarwin.nix`,
-  `mkHome.nix` (home-manager), `fleetHosts.nix`, `mkAppCategory.nix`,
+  `mkHome.nix` (home-manager), `mkAppCategory.nix`,
   `mkDeployNode.nix` (deploy-rs), `umport.nix` (recursive importer).
 - `modules/<category>/`: all configuration. `*_home.nix` files are
   home-manager modules; everything else is a system module.
-- `pkgs/fleet/`: the fleet manager (Rust + Preact). See `docs/fleet.md`.
 - `secrets/`: sops-nix files; recipients in `.sops.yaml`.
 - `template/proxmox.nix`: base image for new Proxmox VMs.
-- `tests/`: NixOS VM tests.
-- `docs/`: `fleet.md`, `plans/` (designs and implementation plans, one pair per
+- `docs/`: `lodestar.md`, `plans/` (designs and implementation plans, one pair per
   feature: `<date>-<topic>-design.md` and `<date>-<topic>-plan.md`),
   `Flake Docs/` (Obsidian notes on structure and module style).
 
@@ -80,7 +78,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 - **No git worktrees.** Work in the checkout.
 - **The user often has uncommitted work in the tree.** Never stash, reset or
   commit it. Commit only your own paths: `git commit -m "…" -- <paths>`.
-- Commit messages: conventional style (`fix(scope): …`, `feat(fleet): …`),
+- Commit messages: conventional style (`fix(scope): …`, `feat(lodestar): …`),
   ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Ask before pushing unless the user said to push.
 
@@ -94,7 +92,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   git -c credential.helper= -c 'credential.helper=!f(){ echo username=Waayway; echo "password=$(gh auth token -u Waayway)"; }; f' push origin HEAD:unstable
   ```
 - Servers get changes by promoting `unstable` to `stable` (dashboard or
-  `fleetctl promote --yes`) and applying through the fleet (`docs/fleet.md`).
+  `lodestar promote --yes`) and applying through Lodestar (`docs/lodestar.md`).
 
 ## Verifying changes
 
@@ -124,22 +122,26 @@ nix eval .#nixosConfigurations.nixos-manager.config.services.greetd.enable
 `ssh -J pve manager@10.0.10.170` (key `~/.ssh/proxmox_vms_rsa`; also
 `nixos-manager` on the tailnet). Flakes on, `manager` is a trusted Nix user, KVM
 available (VM tests run), passwordless sudo. Its `~/.flake` is a clean checkout
-of `stable` that the fleet agent manages: don't build or edit there. To build
+of `stable` that the Lodestar agent manages: don't build or edit there. To build
 another revision, ship it as a git bundle to a scratch clone:
 
 ```sh
 git bundle create /tmp/b.bundle <branch>
 scp -o ProxyJump=pve /tmp/b.bundle manager@10.0.10.170:/tmp/b.bundle
-ssh -J pve manager@10.0.10.170 'rm -rf ~/build && git clone -q -b <branch> /tmp/b.bundle ~/build && cd ~/build && nix build --no-link -L .#checks.x86_64-linux.fleet-vm'
+ssh -J pve manager@10.0.10.170 'rm -rf ~/build && git clone -q -b <branch> /tmp/b.bundle ~/build && cd ~/build && nix build --no-link -L .#nixosConfigurations.hermes.config.system.build.toplevel'
 ```
 
 Rust builds are slow there (4 cores): minutes, not seconds.
 
-## Fleet manager
+## Lodestar (fleet manager)
 
-See `docs/fleet.md` (parts, enrolling a host, `fleetctl`, the demo, tests,
-open items). Rust and Node only exist in the dev shell
-(`nix develop .#fleet`); the `cargo` on PATH is an unconfigured rustup.
+The fleet manager is its own flake, `github:Waayway/lodestar` (input
+`lodestar`; local clone `~/lodestar`). This repo only holds its values:
+`modules/lodestar/` (agent on `fleet = true` hosts, server defaults) and the
+nixos-manager host file. See `docs/lodestar.md` (where values live, enrolling a
+host, open items). Rust/frontend work, its dev shell, demo and VM test happen in
+the lodestar repo, not here; after a lodestar change, `nix flake update
+lodestar` here.
 
 ## Gotchas
 
