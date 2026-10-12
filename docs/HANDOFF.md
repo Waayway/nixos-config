@@ -143,3 +143,74 @@ nix eval .#darwinConfigurations.apollo.system.drvPath
 nix eval .#nixosConfigurations.hermes.config.system.build.toplevel.drvPath
 ```
 New files must be `git add`ed before flakes can see them.
+
+## Fleet manager (branch `fleet-manager`, 2026-10-12)
+
+A dashboard and agent that roll out config changes across the hosts. Design:
+`docs/superpowers/specs/2026-10-12-fleet-manager-design.md`; plan:
+`docs/superpowers/plans/2026-10-12-fleet-manager.md`.
+
+### What exists
+
+- `pkgs/fleet/`: cargo workspace (`fleet-proto`, `fleet-agent`, `fleet-server`
+  with `migration`) and `web/` (Preact + shadcn, Vite). The server embeds the
+  built dashboard (`fleet-web` package).
+- Modules in `modules/fleet/`: `agent.nix` (`services.fleet-agent`, systemd or
+  launchd), `server.nix` (`services.fleet-server`, Linux only), `audit-hook.nix`
+  (logs every activation, also manual rebuilds).
+- Host attributes: `fleet = true;` enrols a host, `channel = "stable" | "unstable";`
+  picks its branch. Defaults: servers `stable`, workstations `unstable`.
+  `nixos-manager` has `fleet = true` and runs the server.
+
+### Run it locally
+
+```sh
+nix develop .#fleet                          # cargo, rustc, node 22, sqlite, git
+nix run .#fleet-demo                         # simulated fleet, dashboard at http://127.0.0.1:8080
+nix run .#fleet-demo -- --listen 127.0.0.1:18080 --speed 4
+```
+Frontend work: run the demo on another port, then from `pkgs/fleet/web`:
+```sh
+FLEET_API=http://127.0.0.1:18080 npm run dev   # Vite proxies /api to the demo
+```
+Tests:
+```sh
+cd pkgs/fleet && cargo test --workspace
+cd pkgs/fleet/web && npx vitest run
+nix build .#checks.aarch64-darwin.fleet-bindings   # generated TS types are up to date
+```
+
+### Adding a host to the fleet
+
+Set `fleet = true;` in its host file (and `channel = ...` to override the
+default), then switch it once by hand. After that it appears in the dashboard
+once the server can reach it over Tailscale on port 7461. Hosts also need
+`tag:fleet` in Tailscale (see below).
+
+### Not verified
+
+- `checks.x86_64-linux.fleet-vm` (server, two agents and a git remote) only
+  **evaluates**; it has **not been run**. This Mac has no Linux builder, so the
+  Linux packages and the test have never been built either.
+- The agent's root-to-user privilege drop has never run as root on a real host.
+
+### Still needs the user
+
+1. **Branch rename on GitHub:** `main` to `unstable` (also the default branch),
+   create `stable`, add a ruleset on `stable`. Then rename the branch in each
+   checkout and update the push command and branch name in this file.
+2. **nixos-manager bootstrap:** start VM 170; clone the repo to
+   `/home/manager/.flake` on `stable`; add the host's age key to `.sops.yaml`;
+   create `secrets/nixos-manager.yaml` with a write deploy key and a Tailscale
+   auth key; confirm `listenAddress` (currently `100.92.102.84`, last known
+   tailnet IP) and point `deployKeyFile` at the sops secret path; first switch.
+3. **Tailscale ACL:** `tag:fleet` on enrolled hosts; `tag:manager` to
+   `tag:fleet:7461`; dashboard access for `Waayway@github`, `tag:nixos` and
+   `tag:personal`.
+4. **Enrolment:** `fleet = true` on atlas, apollo, hermes and hephaestus, then
+   a first real apply on hermes and on atlas.
+5. **A Linux builder** (`nix.linux-builder` on atlas, or a remote builder on
+   pve) to run the VM test and build the Linux packages.
+6. Fix `template/proxmox.nix`; it imports the non-existent `modules/base/*`
+   and `modules/servers/*`.
+7. VM migration (spec, "Migration of the homelab").

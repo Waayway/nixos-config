@@ -28,6 +28,17 @@ Nixos has been very stable for me with minimal problems and with a possibility t
 
 
 
+### Fleet manager
+
+A small server and per-host agents that apply config changes across hosts, with a dashboard. Try it without any host:
+
+```sh
+nix run .#fleet-demo        # simulated fleet at http://127.0.0.1:8080
+nix develop .#fleet         # dev shell: cargo, node, sqlite
+```
+
+A host joins with `fleet = true;` in its host file (optionally `channel = "stable" | "unstable";`; servers default to stable, workstations to unstable). The server runs on `nixos-manager`. The NixOS VM test (`checks.x86_64-linux.fleet-vm`) has only been evaluated, not run, and the real rollout is not done yet. Details and open steps: `docs/HANDOFF.md`.
+
 ### Installing a new Mac (e.g. atlas)
 
 Checklist, in order. Replace `atlas` with the host name.
