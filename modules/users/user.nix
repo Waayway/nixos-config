@@ -32,6 +32,10 @@ in
         "video"
       ];
       openssh.authorizedKeys.keys = lib.optional hostPlatform.isServer proxmoxKey;
+      # Servers keep the user's systemd instance running without a login
+      # session. Otherwise a switch (e.g. a Lodestar apply) can hit it while it
+      # stops after the last SSH session closed, and user activation fails.
+      linger = hostPlatform.isServer;
     };
     # Root: password disabled, key-only via the break-glass key.
     # Private key lives in 1Password — NOT on the macbook. Recovery use only.
