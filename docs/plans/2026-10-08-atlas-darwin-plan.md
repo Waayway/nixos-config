@@ -8,7 +8,7 @@
 
 **Tech Stack:** Nix flakes, nix-darwin 26.05, home-manager 26.05, nix-homebrew.
 
-**Spec:** `docs/superpowers/specs/2026-10-08-atlas-darwin-design.md`
+**Spec:** `docs/plans/2026-10-08-atlas-darwin-design.md`
 
 ## Global Constraints
 

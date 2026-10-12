@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (edition 2024, nixpkgs toolchain), tokio, axum (with `ws`), serde/serde_json, SeaORM + sea-orm-migration (sqlite), ts-rs, rust-embed, uuid, tempfile (tests). Frontend: Preact + preact/compat, @preact/preset-vite, Vite, Tailwind v4 (@tailwindcss/vite), shadcn/ui, TypeScript, vitest. Nix: crane, buildNpmPackage, nixosTest.
 
-**Spec:** `docs/superpowers/specs/2026-10-12-fleet-manager-design.md`. Read it before any task; it is the source of truth for behaviour. This plan fixes names, files, interfaces and tests.
+**Spec:** `docs/plans/2026-10-12-fleet-manager-design.md`. Read it before any task; it is the source of truth for behaviour. This plan fixes names, files, interfaces and tests.
 
 ## Global Constraints
 
@@ -20,7 +20,7 @@
 - Daemon PATH: `/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/usr/sbin:/sbin`.
 - Running revision is read only from `/run/current-system/sw/bin/{nixos,darwin}-version --configuration-revision`.
 - Dashboard access: login `Waayway@github`, or node tags `tag:nixos`, `tag:personal`, `tag:fleet`; else `403` (HTTP and WS upgrade).
-- Repo conventions (`docs/HANDOFF.md`):
+- Repo conventions (`AGENTS.md / docs/fleet.md`):
   - host files stay thin
   - platform guards use `lib.optionalAttrs hostPlatform.isLinux/isDarwin`, not `mkIf`
   - never merge attrsets that may share a top-level key with `//`; use `lib.mkMerge`
@@ -776,7 +776,7 @@ Steps:
 
 ### Task 17: Docs
 
-**Files:** Modify `docs/HANDOFF.md`, `README.md` (short "Fleet manager" section).
+**Files:** Modify `AGENTS.md / docs/fleet.md`, `README.md` (short "Fleet manager" section).
 
 - [ ] **Step 1: Write it.** Document:
   - how to run it locally (dev config, `nix develop .#fleet`, `npm run dev`)

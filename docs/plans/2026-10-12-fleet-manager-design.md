@@ -368,7 +368,7 @@ on `local-lvm` (about 100 GB free).
      `stable` from it, add the ruleset on `stable`.
    - Per checkout: `git branch -m main unstable && git fetch origin &&
      git branch -u origin/unstable && git remote set-head origin -a`.
-   - Update `docs/HANDOFF.md` (push command, branch name) and `README.md`.
+   - Update `AGENTS.md / docs/fleet.md` (push command, branch name) and `README.md`.
    - Laptops must be on `unstable`, servers on `stable`, before enrolment
      (the agent skips otherwise). `flake.lock` is unaffected: no input
      references this repo.
