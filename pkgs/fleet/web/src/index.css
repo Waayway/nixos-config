@@ -1,0 +1,132 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+
+/* Dark mode follows prefers-color-scheme (Tailwind's default `dark:` variant). */
+
+/*
+ * Neutrals lean slightly blue-green (hue 230) so the UI reads as a console rather than paper.
+ * State colours are the only saturated colours on the page: ok, running, skipped, failed, off.
+ */
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.985 0.003 230);
+  --foreground: oklch(0.22 0.015 240);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.27 0.02 240);
+  --primary-foreground: oklch(0.98 0.004 230);
+  --secondary: oklch(0.95 0.006 230);
+  --secondary-foreground: oklch(0.27 0.02 240);
+  --muted: oklch(0.955 0.005 230);
+  --muted-foreground: oklch(0.52 0.015 240);
+  --accent: oklch(0.94 0.008 230);
+  --accent-foreground: oklch(0.27 0.02 240);
+  --destructive: oklch(0.56 0.2 25);
+  --border: oklch(0.905 0.008 230);
+  --input: oklch(0.905 0.008 230);
+  --ring: oklch(0.6 0.03 230);
+
+  --ok: oklch(0.58 0.13 155);
+  --running: oklch(0.58 0.15 245);
+  --skipped: oklch(0.6 0.13 70);
+  --failed: oklch(0.56 0.2 25);
+  --off: oklch(0.68 0.01 240);
+  --warn: oklch(0.57 0.15 45);
+
+  --demo: oklch(0.93 0.05 85);
+  --demo-foreground: oklch(0.38 0.07 70);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.165 0.01 240);
+    --foreground: oklch(0.93 0.006 230);
+    --card: oklch(0.2 0.012 240);
+    --card-foreground: var(--foreground);
+    --popover: oklch(0.21 0.012 240);
+    --popover-foreground: var(--foreground);
+    --primary: oklch(0.92 0.008 230);
+    --primary-foreground: oklch(0.2 0.012 240);
+    --secondary: oklch(0.26 0.012 240);
+    --secondary-foreground: oklch(0.93 0.006 230);
+    --muted: oklch(0.24 0.012 240);
+    --muted-foreground: oklch(0.68 0.012 235);
+    --accent: oklch(0.27 0.014 240);
+    --accent-foreground: oklch(0.93 0.006 230);
+    --destructive: oklch(0.64 0.19 25);
+    --border: oklch(0.29 0.012 240);
+    --input: oklch(0.31 0.012 240);
+    --ring: oklch(0.55 0.03 230);
+
+    --ok: oklch(0.72 0.14 155);
+    --running: oklch(0.7 0.14 245);
+    --skipped: oklch(0.79 0.13 75);
+    --failed: oklch(0.66 0.19 25);
+    --off: oklch(0.55 0.012 240);
+    --warn: oklch(0.76 0.14 55);
+
+    --demo: oklch(0.3 0.05 80);
+    --demo-foreground: oklch(0.88 0.07 85);
+  }
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ok: var(--ok);
+  --color-running: var(--running);
+  --color-skipped: var(--skipped);
+  --color-failed: var(--failed);
+  --color-off: var(--off);
+  --color-warn: var(--warn);
+  --color-demo: var(--demo);
+  --color-demo-foreground: var(--demo-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+  .font-mono {
+    font-feature-settings: "zero" 1;
+  }
+}
