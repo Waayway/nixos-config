@@ -69,6 +69,7 @@
           nixpkgs
           inputs
           version
+          fleetHosts
           ;
       };
 
@@ -78,12 +79,15 @@
           nixpkgs
           inputs
           version
+          fleetHosts
           ;
       };
 
       mkDeployNode = import ./lib/mkDeployNode.nix { inherit inputs; };
 
       hosts = (import ./lib/discoverHosts.nix { lib = nixpkgs.lib; }) ./hosts;
+
+      fleetHosts = (import ./lib/fleetHosts.nix { lib = nixpkgs.lib; }) hosts;
 
       nixosHosts = nixpkgs.lib.filterAttrs (_: h: !(isDarwinHost h)) hosts;
       darwinHosts = nixpkgs.lib.filterAttrs (_: h: (isDarwinHost h)) hosts;
@@ -97,7 +101,7 @@
       ) deployHosts;
     in
     {
-      inherit nixosConfigurations darwinConfigurations;
+      inherit nixosConfigurations darwinConfigurations fleetHosts;
       deploy.nodes = deployNodes;
 
       packages.x86_64-linux.proxmox-template = inputs.nixos-generators.nixosGenerate {

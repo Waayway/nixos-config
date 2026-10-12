@@ -24,7 +24,8 @@ let
       entries = lib.filterAttrs (isHostEntry dir) (builtins.readDir dir);
     in
     lib.mapAttrs' (
-      name: type: lib.nameValuePair (hostNameOf name type) (import (dir + "/${name}"))
+      name: type:
+      lib.nameValuePair (hostNameOf name type) ((import (dir + "/${name}")) // { inherit category; })
     ) entries;
 
   # Host names are flat, so the same name in two categories would otherwise be

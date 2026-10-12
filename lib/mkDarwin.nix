@@ -3,6 +3,7 @@
   overlays,
   inputs,
   version,
+  fleetHosts,
 }:
 name: hostAttrs:
 let
@@ -27,7 +28,15 @@ let
 
   baseConfig = ../modules/system.nix;
 
+  fleet = {
+    member = machineOptions.fleet or false;
+    channel =
+      machineOptions.channel or (if machineOptions.category == "servers" then "stable" else "unstable");
+    hosts = fleetHosts;
+  };
+
   extraArgs = {
+    inherit fleet;
     inherit version;
     currentUser = user;
     currentSystem = system;
@@ -80,6 +89,7 @@ systemFunc {
       nixpkgs.overlays = overlays;
       nixpkgs.config.allowUnfree = true;
       nixpkgs.hostPlatform = system;
+      system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or "unknown";
       system.stateVersion = 6;
       system.primaryUser = user.name;
     }
