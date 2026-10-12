@@ -1,5 +1,9 @@
 pub mod access;
+pub mod agent_client;
 pub mod config;
 pub mod db;
 pub mod mirror;
+pub mod poller;
+pub mod resend;
+pub mod state;
 pub mod tailscale;

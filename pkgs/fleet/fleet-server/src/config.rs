@@ -24,7 +24,11 @@ pub enum AccessConfig {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum OnlineSource {
     Tailscale,
-    Static { addresses: HashMap<String, String> },
+    /// Host name -> IP. An address may carry a port (`127.0.0.1:54321`, tests/dev only)
+    /// to reach an agent that is not on `agent_port`.
+    Static {
+        addresses: HashMap<String, String>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

@@ -9,8 +9,8 @@ use fleet_migration::{Migrator, MigratorTrait};
 use fleet_proto::{AgentStatus, ApplyRecord, AuditEvent};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, Database, DatabaseConnection, EntityTrait, QueryOrder,
-    QuerySelect,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Database, DatabaseConnection, EntityTrait,
+    QueryFilter, QueryOrder, QuerySelect,
 };
 use serde::Serialize;
 
@@ -78,6 +78,30 @@ pub async fn update_apply_from_record(
     am.exit_code = Set(rec.exit_code);
     am.started_at = Set(rec.started_at);
     am.finished_at = Set(rec.finished_at);
+    am.update(db).await?;
+    Ok(())
+}
+
+pub async fn get_apply(
+    db: &DatabaseConnection,
+    apply_id: &str,
+) -> anyhow::Result<Option<applies::Model>> {
+    Ok(applies::Entity::find_by_id(apply_id.to_string())
+        .one(db)
+        .await?)
+}
+
+/// Stores the server's copy of an apply's full log. Errors if the apply is unknown.
+pub async fn set_apply_log(
+    db: &DatabaseConnection,
+    apply_id: &str,
+    log: &str,
+) -> anyhow::Result<()> {
+    let existing = get_apply(db, apply_id)
+        .await?
+        .with_context(|| format!("unknown apply {apply_id}"))?;
+    let mut am: applies::ActiveModel = existing.into();
+    am.log = Set(Some(log.to_string()));
     am.update(db).await?;
     Ok(())
 }
@@ -183,17 +207,34 @@ pub async fn recent_audit(db: &DatabaseConnection, limit: u64) -> anyhow::Result
         .limit(limit)
         .all(db)
         .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| AuditEvent {
-            id: r.id,
-            time: r.time,
-            host: r.host,
-            kind: r.kind,
-            actor: r.actor,
-            details: r.details,
-        })
-        .collect())
+    Ok(rows.into_iter().map(audit_from_row).collect())
+}
+
+fn audit_from_row(r: audit_events::Model) -> AuditEvent {
+    AuditEvent {
+        id: r.id,
+        time: r.time,
+        host: r.host,
+        kind: r.kind,
+        actor: r.actor,
+        details: r.details,
+    }
+}
+
+/// Newest audit event of `kind` for `host`.
+pub async fn last_audit(
+    db: &DatabaseConnection,
+    host: &str,
+    kind: &str,
+) -> anyhow::Result<Option<AuditEvent>> {
+    let row = audit_events::Entity::find()
+        .filter(audit_events::Column::Host.eq(host))
+        .filter(audit_events::Column::Kind.eq(kind))
+        .order_by_desc(audit_events::Column::Time)
+        .order_by_desc(audit_events::Column::Id)
+        .one(db)
+        .await?;
+    Ok(row.map(audit_from_row))
 }
 
 pub async fn activations_next(db: &DatabaseConnection, host: &str) -> anyhow::Result<i64> {

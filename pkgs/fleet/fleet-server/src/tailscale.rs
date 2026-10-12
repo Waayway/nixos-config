@@ -248,6 +248,14 @@ impl OnlineProvider for TailscaleCli {
     }
 }
 
+/// A static address is an IP, or (tests/dev only) `ip:port` when the agent listens on a
+/// non-default port; see `poller::agent_base`.
+pub fn parse_static_addr(s: &str) -> Option<IpAddr> {
+    s.parse::<IpAddr>()
+        .ok()
+        .or_else(|| s.parse::<std::net::SocketAddr>().ok().map(|a| a.ip()))
+}
+
 /// Dev/test source: every configured host is always online.
 pub struct StaticOnline {
     peers: HashMap<String, PeerInfo>,
@@ -258,9 +266,8 @@ impl StaticOnline {
         let mut peers = HashMap::new();
         for (name, addr) in addresses {
             let host = name.to_lowercase();
-            let addr: IpAddr = addr
-                .parse()
-                .with_context(|| format!("static address for {name}"))?;
+            let addr = parse_static_addr(addr)
+                .with_context(|| format!("static address for {name}: {addr:?}"))?;
             peers.insert(
                 host.clone(),
                 PeerInfo {
