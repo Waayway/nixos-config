@@ -228,9 +228,12 @@ fn read_log_offset() {
     write_record(&f, "r", ApplyState::Ok, 1);
     std::fs::write(applies_dir(&f.cfg).join("r.log"), "hello world").unwrap();
     let c = read_log(&f.cfg, "r", 6).unwrap();
-    assert_eq!((c.data.as_str(), c.offset, c.eof), ("world", 6, true));
+    assert_eq!(
+        (c.data.as_str(), c.offset, c.next, c.eof),
+        ("world", 6, 11, true)
+    );
     let c = read_log(&f.cfg, "r", 100).unwrap();
-    assert_eq!((c.data.as_str(), c.eof), ("", true));
+    assert_eq!((c.data.as_str(), c.next, c.eof), ("", 100, true));
     assert!(read_log(&f.cfg, "missing", 0).is_none());
     assert!(read_log(&f.cfg, "../r", 0).is_none());
 }
@@ -260,11 +263,26 @@ fn read_log_does_not_split_multibyte_char_while_running() {
     // "a" then the first byte of "é" (c3 a9).
     std::fs::write(dir.join("mb.log"), [b'a', 0xc3]).unwrap();
     let c = read_log(&f.cfg, "mb", 0).unwrap();
-    assert_eq!((c.data.as_str(), c.eof), ("a", false));
+    assert_eq!((c.data.as_str(), c.next, c.eof), ("a", 1, false));
     std::fs::write(dir.join("mb.log"), [b'a', 0xc3, 0xa9]).unwrap();
-    let next = c.offset + c.data.len() as u64;
-    let c = read_log(&f.cfg, "mb", next).unwrap();
-    assert_eq!(c.data, "é");
+    let c = read_log(&f.cfg, "mb", c.next).unwrap();
+    assert_eq!((c.data.as_str(), c.next), ("é", 3));
+}
+
+#[test]
+fn read_log_next_counts_raw_bytes_past_invalid_utf8() {
+    let f = fixture();
+    write_record(&f, "bad", ApplyState::Ok, 1);
+    // An invalid byte mid-chunk becomes U+FFFD (3 bytes of text for 1 byte of log).
+    std::fs::write(applies_dir(&f.cfg).join("bad.log"), b"a\xffb\nend\n").unwrap();
+    let c = read_log(&f.cfg, "bad", 0).unwrap();
+    assert_eq!(
+        (c.data.as_str(), c.next, c.eof),
+        ("a\u{fffd}b\nend\n", 8, true)
+    );
+    assert_ne!(c.data.len() as u64, c.next);
+    let c = read_log(&f.cfg, "bad", 4).unwrap();
+    assert_eq!((c.data.as_str(), c.offset, c.next), ("end\n", 4, 8));
 }
 
 #[test]

@@ -226,12 +226,14 @@ async fn record_apply(
 /// Reads a finished apply's log from the start to eof.
 async fn read_full_log(state: &AppState, base: &str, apply_id: &str) -> anyhow::Result<String> {
     let mut log = String::new();
+    let mut offset = 0;
     loop {
-        let chunk = state.client.log(base, apply_id, log.len() as u64).await?;
+        let chunk = state.client.log(base, apply_id, offset).await?;
         log.push_str(&chunk.data);
-        if chunk.eof || chunk.data.is_empty() {
+        if chunk.eof || chunk.next <= offset {
             return Ok(log);
         }
+        offset = chunk.next;
     }
 }
 
@@ -287,14 +289,19 @@ pub async fn follow_log(state: &AppState, host: &FleetHost, apply_id: &str) {
         return;
     };
     let mut log = String::new();
+    // The agent's byte offset: `chunk.next`, not `log.len()` (replaced invalid UTF-8 changes
+    // the length of the text).
+    let mut offset = 0;
     let mut errors = 0;
     loop {
-        match state.client.log(&base, apply_id, log.len() as u64).await {
+        match state.client.log(&base, apply_id, offset).await {
             Ok(chunk) => {
                 errors = 0;
                 log.push_str(&chunk.data);
                 let eof = chunk.eof;
-                if !chunk.data.is_empty() || eof {
+                let progressed = chunk.next > offset;
+                offset = offset.max(chunk.next);
+                if progressed || eof {
                     state.broadcast(WsMessage::ApplyLog(chunk));
                 }
                 if eof {

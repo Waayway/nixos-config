@@ -1,4 +1,5 @@
-// Apply logs as the dashboard holds them. Offsets in `LogChunk` count UTF-8 bytes of the log.
+// Apply logs as the dashboard holds them. Offsets in `LogChunk` (`offset`, `next`) count bytes
+// of the log.
 // A server-side log follower can restart and resend from offset 0, and the full log fetched
 // when the sheet opens can end in the middle of the follower's next chunk. So a chunk is
 // merged by bytes: what the held log already has is dropped, only bytes past its end are
@@ -25,14 +26,15 @@ export function fromText(text: string): HeldLog {
 export function mergeChunk(held: HeldLog | undefined, c: LogChunk): Merge {
   const bytes = held?.bytes ?? 0;
   if (c.offset > bytes) return { kind: "gap" };
-  const data = encoder.encode(c.data);
+  // `next` is the agent's byte count; `data` can be longer when invalid UTF-8 was replaced.
+  if (c.next <= bytes) return { kind: "duplicate" };
   const skip = bytes - c.offset;
-  if (skip >= data.length) return { kind: "duplicate" };
-  // Both offsets count bytes of the same log, so `skip` falls on a character boundary.
-  const tail = skip === 0 ? c.data : decoder.decode(data.subarray(skip));
+  // Both offsets count bytes of the same log, so `skip` falls on a character boundary (exact
+  // unless the overlapped part held replaced bytes).
+  const tail = skip === 0 ? c.data : decoder.decode(encoder.encode(c.data).subarray(skip));
   return {
     kind: "appended",
-    log: { text: (held?.text ?? "") + tail, bytes: bytes + data.length - skip },
+    log: { text: (held?.text ?? "") + tail, bytes: c.next },
   };
 }
 

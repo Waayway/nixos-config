@@ -35,10 +35,12 @@ struct Fake {
     log: String,
     /// `/apply/log` answers 500 this many times first.
     log_failures: u32,
-    /// When non-empty: successive (log so far, finished) states, one per `/apply/log` call
-    /// (the last one repeats). Overrides `log`.
-    log_script: Vec<(String, bool)>,
+    /// When non-empty: successive (log bytes so far, finished) states, one per `/apply/log`
+    /// call (the last one repeats). Overrides `log`.
+    log_script: Vec<(Vec<u8>, bool)>,
     log_hits: u32,
+    /// The offsets `/apply/log` was asked for.
+    log_offsets: Vec<u64>,
 }
 
 type Shared = Arc<Mutex<Fake>>;
@@ -89,25 +91,25 @@ async fn fake_agent(fake: Shared) -> SocketAddr {
     ) -> Result<Json<LogChunk>, StatusCode> {
         let mut f = f.lock().unwrap();
         f.log_hits += 1;
+        f.log_offsets.push(q.offset);
         if f.log_failures > 0 {
             f.log_failures -= 1;
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
         let (full, eof) = if f.log_script.is_empty() {
-            (f.log.clone(), true)
+            (f.log.clone().into_bytes(), true)
         } else if f.log_script.len() == 1 {
             f.log_script[0].clone()
         } else {
             f.log_script.remove(0)
         };
-        let data = full
-            .get(q.offset as usize..)
-            .unwrap_or_default()
-            .to_string();
+        // Like the real agent: raw bytes from `offset`, invalid UTF-8 replaced.
+        let raw = full.get(q.offset as usize..).unwrap_or_default();
         Ok(Json(LogChunk {
             apply_id: q.apply_id,
             offset: q.offset,
-            data,
+            data: String::from_utf8_lossy(raw).into_owned(),
+            next: q.offset + raw.len() as u64,
             eof,
         }))
     }
@@ -528,4 +530,71 @@ async fn agent_recovery_logged_once() {
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert!(lines[0].starts_with("H1: agent unreachable: "), "{lines:?}");
     assert_eq!(lines[1], "H1: agent reachable again");
+}
+
+#[tokio::test]
+async fn follow_log_continues_at_next_after_invalid_utf8() {
+    let fake = Shared::default();
+    {
+        let mut f = fake.lock().unwrap();
+        f.status = Some(agent_status(
+            OLD,
+            Some(record("a1", NEW, ApplyState::Running)),
+        ));
+        // An invalid byte mid-chunk: the text gets U+FFFD (3 bytes) for 1 raw byte.
+        f.log_script = vec![
+            (b"a\xffb\n".to_vec(), false),
+            (b"a\xffb\nmore\n".to_vec(), true),
+        ];
+    }
+    let addr = fake_agent(fake.clone()).await;
+    let e = env(addr, None).await;
+    db::insert_apply(
+        &e.state.db,
+        "H1",
+        "alice",
+        1,
+        &record("a1", NEW, ApplyState::Running),
+    )
+    .await
+    .unwrap();
+    let mut rx = e.state.tx.subscribe();
+
+    poll_once(&e.state).await;
+
+    let mut chunks = Vec::new();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        loop {
+            if let WsMessage::ApplyLog(c) = rx.recv().await.unwrap() {
+                let eof = c.eof;
+                chunks.push(c);
+                if eof {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .expect("log reached eof");
+    let got: Vec<(u64, &str, u64, bool)> = chunks
+        .iter()
+        .map(|c| (c.offset, c.data.as_str(), c.next, c.eof))
+        .collect();
+    assert_eq!(
+        got,
+        vec![(0, "a\u{fffd}b\n", 4, false), (4, "more\n", 9, true)]
+    );
+    let stored = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let row = db::get_apply(&e.state.db, "a1").await.unwrap().unwrap();
+            if let Some(log) = row.log {
+                return log;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("log stored");
+    assert_eq!(stored, "a\u{fffd}b\nmore\n");
+    assert_eq!(fake.lock().unwrap().log_offsets, vec![0, 4]);
 }

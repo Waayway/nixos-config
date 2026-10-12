@@ -186,7 +186,8 @@ pub fn latest_record(cfg: &AgentConfig) -> Option<ApplyRecord> {
 
 /// Log bytes from `offset` on. `eof` is true once the apply has finished and
 /// the chunk reaches the end of the log. `offset` echoes the request; the next
-/// request continues at `offset + data.len()`.
+/// request continues at `next` (the raw bytes consumed, which differs from
+/// `data.len()` when invalid UTF-8 was replaced).
 pub fn read_log(cfg: &AgentConfig, id: &str, offset: u64) -> Option<LogChunk> {
     let rec = read_record(cfg, id)?;
     let mut buf = Vec::new();
@@ -200,19 +201,21 @@ pub fn read_log(cfg: &AgentConfig, id: &str, offset: u64) -> Option<LogChunk> {
         at_end = offset + buf.len() as u64 >= len;
     }
     let eof = at_end && rec.state != ApplyState::Running;
-    let data = match std::str::from_utf8(&buf) {
-        Ok(s) => s.to_string(),
+    let (data, consumed) = match std::str::from_utf8(&buf) {
+        Ok(s) => (s.to_string(), buf.len()),
         // A multibyte char cut off by the end of a still-growing log: leave it
-        // for the next read so `data.len()` stays the number of bytes consumed.
+        // for the next read.
         Err(e) if !eof && e.error_len().is_none() => {
-            String::from_utf8_lossy(&buf[..e.valid_up_to()]).into_owned()
+            let valid = e.valid_up_to();
+            (String::from_utf8_lossy(&buf[..valid]).into_owned(), valid)
         }
-        Err(_) => String::from_utf8_lossy(&buf).into_owned(),
+        Err(_) => (String::from_utf8_lossy(&buf).into_owned(), buf.len()),
     };
     Some(LogChunk {
         apply_id: id.to_string(),
         offset,
         data,
+        next: offset + consumed as u64,
         eof,
     })
 }

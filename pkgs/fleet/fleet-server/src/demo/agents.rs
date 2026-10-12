@@ -409,6 +409,7 @@ async fn get_log(State(agent): State<Arc<SimAgent>>, Query(q): Query<LogQuery>) 
     Json(LogChunk {
         apply_id: q.apply_id,
         offset: q.offset,
+        next: q.offset + data.len() as u64,
         data,
         eof: at_end && a.rec.state != ApplyState::Running,
     })

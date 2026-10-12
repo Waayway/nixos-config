@@ -116,6 +116,7 @@ async fn fake_agent(fake: Shared) -> SocketAddr {
             apply_id: q.apply_id,
             offset: q.offset,
             data: "live log\n".into(),
+            next: q.offset + 9,
             eof: false,
         })
     }

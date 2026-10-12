@@ -4,7 +4,15 @@ import type { ApplyRecord } from "@/bindings/ApplyRecord";
 import type { HostView } from "@/bindings/HostView";
 import type { WsMessage } from "@/bindings/WsMessage";
 
-const chunk = (offset: number, data: string, eof = false) => ({ apply_id: "a", offset, data, eof });
+const enc = new TextEncoder();
+/** A chunk of valid UTF-8: `next` is `offset` plus the bytes of `data`. */
+const chunk = (offset: number, data: string, eof = false) => ({
+  apply_id: "a",
+  offset,
+  data,
+  next: offset + enc.encode(data).length,
+  eof,
+});
 
 describe("mergeChunk", () => {
   it("starts a log from offset 0", () => {
@@ -29,6 +37,20 @@ describe("mergeChunk", () => {
       kind: "appended",
       log: { text: "ab→cdé\n", bytes: 10 },
     });
+  });
+  it("continues at the agent's `next` after invalid UTF-8 in a chunk", () => {
+    // Log bytes "a\xffb\n": 4 bytes, sent as "a\uFFFDb\n" (6 bytes of text).
+    const first = { apply_id: "a", offset: 0, data: "a\uFFFDb\n", next: 4, eof: false };
+    const m = mergeChunk(undefined, first);
+    expect(m).toEqual({ kind: "appended", log: { text: "a\uFFFDb\n", bytes: 4 } });
+    if (m.kind !== "appended") throw new Error("unreachable");
+    // The next chunk starts at byte 4: no gap, appended in full.
+    expect(mergeChunk(m.log, chunk(4, "more\n", true))).toEqual({
+      kind: "appended",
+      log: { text: "a\uFFFDb\nmore\n", bytes: 9 },
+    });
+    // A resend of the first chunk is a duplicate.
+    expect(mergeChunk(m.log, first)).toEqual({ kind: "duplicate" });
   });
   it("reports a gap when a chunk starts past the end", () => {
     expect(mergeChunk(fromText("hello\n"), chunk(20, "later\n"))).toEqual({ kind: "gap" });
