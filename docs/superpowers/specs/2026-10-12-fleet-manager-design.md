@@ -411,6 +411,22 @@ rename.)
   the VM's store), so it isn't attempted.
 - Real switches by hand on hermes (NixOS) and atlas (darwin/launchd).
 
+## Demo mode
+
+Added after the user asked for it: demo mode is part of fleet itself.
+
+- `fleet-server demo` (or `nix run .#fleet-demo`) runs the real server, poller,
+  database, git mirror and dashboard against a simulated fleet: a throwaway git
+  repo with `unstable`/`stable`, and in-process simulated agents that implement
+  the real agent API.
+- The simulated hosts cover every state the dashboard must show: successful
+  applies with a streaming log, a dirty checkout that is skipped, a failed build,
+  an unreachable agent, and a laptop that is off and comes online (showing the
+  automatic re-send). A new commit lands on `unstable` every few minutes and
+  promote really moves `stable` in the throwaway repo.
+- The snapshot carries `demo: true` and the dashboard shows a "Demo" banner.
+  Access control is off; it listens on loopback unless `--listen` says otherwise.
+
 ## Review changes (2026-10-12)
 
 An independent review found these problems in the first version; all are

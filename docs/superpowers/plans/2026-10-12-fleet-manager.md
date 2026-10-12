@@ -624,6 +624,54 @@ Audit kinds:
 - [ ] **Step 4: Run, and expect PASS.** Also run `cargo clippy --workspace -- -D warnings`.
 - [ ] **Step 5: Commit.**
 
+### Task 13b: Demo mode
+
+Added at the user's request: demo mode is part of fleet, so the real server and dashboard can be run and shown without any enrolled machine.
+
+**Files:**
+- Create: `fleet-server/src/demo/{mod.rs,repo.rs,agents.rs,online.rs}`
+- Modify: `fleet-server/src/main.rs` (subcommands), `fleet-proto/src/lib.rs` (`Snapshot.demo: bool` + regenerated bindings), `fleet-server/src/state.rs` (`AppState.demo` flag → snapshot), `flake.nix` (`apps.<sys>.fleet-demo`)
+- Test: `fleet-server/tests/demo.rs`
+
+**Interfaces:**
+- Consumes: `AppState`, `poller::spawn`, `api::router` (Task 13), `OnlineProvider` (Task 11), `Mirror` (Task 10), fleet-proto agent types.
+- Produces:
+  - CLI `fleet-server demo [--listen 127.0.0.1:8080] [--speed <f64, default 1.0>]`; `fleet-server --config <path>` keeps working (make it `fleet-server serve --config` and keep the bare `--config` form as an alias).
+  - `pub async fn demo::start(listen: SocketAddr, speed: f64) -> anyhow::Result<DemoHandle>` (returns once the server is listening; `DemoHandle { addr, state: AppState, _tmp: TempDir }`, dropping it stops everything). `--listen` with a non-loopback IP prints a warning (access control is off in demo mode) but is allowed.
+  - `Snapshot.demo: bool` (`#[serde(default)]`), true only in demo mode.
+
+Behaviour (all timings divided by `speed`):
+- `repo.rs`: a temp dir with a bare repo `fleet.git` and a work clone. Seeds 12 commits on `unstable` with realistic subjects from this repo's history (e.g. `fix(vscodium): run the settings.json edit as the user`, `feat(fleet): agent service modules and activation audit hook`), and `stable` at the 8th. Every 180 s a background task commits a new realistic subject to `unstable` and pushes it. The server config uses the bare repo path as both `repo_url` and `push_url` (no deploy key), so promote works for real.
+- `agents.rs`: one in-process simulated agent per demo host, each an axum router on `127.0.0.1:0` implementing the exact agent API (`GET /status`, `POST /apply`, `GET /apply/log`, `GET /activations`) with the agent's status codes (202 / 200 duplicate id / 409 busy / 400 bad input). An apply streams realistic log lines (fetch, checks, `nix build …`, `building '/nix/store/…-nixos-system-<host>…drv'`, switch/activate) over ~10 s, then:
+  - `ok`: running revision becomes the commit, an activation line with trigger `apply:<id>` is appended
+  - per-host scripted outcomes below
+- Demo hosts (FleetHost list, `os` from system):
+  | host | system | channel | starts at | scripted behaviour |
+  |---|---|---|---|---|
+  | atlas | aarch64-darwin | unstable | 3 behind | checkout dirty → every apply `skipped: dirty` |
+  | apollo | aarch64-darwin | unstable | 5 behind | offline for the first 120 s, then online (shows re-send of a pending apply) |
+  | hermes | x86_64-linux | unstable | 2 behind | applies succeed |
+  | hephaestus | x86_64-linux | unstable | 1 behind | Tailscale online but agent unreachable (router returns no listener) |
+  | nixos-manager | x86_64-linux | stable | up to date | applies succeed |
+  | vpn | x86_64-linux | stable | 1 behind | applies succeed |
+  | media | x86_64-linux | stable | 1 behind | first apply fails (exit 1, `error: builder for '…' failed`), later ones succeed |
+  Each host starts with one `manual` activation (with `sudo_user`) a few hours in the past.
+- `online.rs`: `DemoOnline` implementing `OnlineProvider`: peers from the table (addr = the simulated agent's `127.0.0.1:<port>`, using the Static `ip:port` convention from Task 12), online flags per the table and timeline; `whois` → None. Access is `AccessConfig::Disabled`.
+- The poller runs with `poll_secs = 5 / speed` (min 1) and `mirror_fetch_secs = 30 / speed` so the demo feels live; SQLite lives in the temp dir.
+- `nix run .#fleet-demo` = `fleet-server demo`.
+
+- [ ] **Step 1: Failing tests** (`tests/demo.rs`, all with `speed = 20.0`):
+  - `demo_starts_and_serves_snapshot`: `GET /api/snapshot` → 7 hosts, `demo == true`, channels unstable+stable with heads, atlas `checkout.dirty == true`.
+  - `demo_apply_hermes_reaches_ok`: POST apply hermes → 202; within 10 s the snapshot shows hermes `running == unstable head` and last_apply `ok`.
+  - `demo_apply_atlas_skips_dirty`: → last_apply `skipped`, `skip_reason == dirty`.
+  - `demo_media_first_apply_fails`: → `failed` with an exit code.
+  - `demo_apollo_resend_after_online`: apply apollo while offline (`agent_status == "unreachable"`), then after it comes online the poller re-sends and it reaches `ok`.
+  - `demo_promote_moves_stable`: POST promote with the promote candidate → 200, snapshot stable head == that commit.
+- [ ] **Step 2: Run, and expect FAIL.**
+- [ ] **Step 3: Implement.** Regenerate the TS bindings (`TS_RS_EXPORT_DIR=../web/src/bindings cargo test -p fleet-proto`), commit them.
+- [ ] **Step 4: Verify.** `cargo test -p fleet-server`, workspace clippy `-D warnings`, `nix build .#fleet-server`, `nix build .#checks.aarch64-darwin.fleet-bindings`, and `nix run .#fleet-demo` then `curl -s 127.0.0.1:8080/api/snapshot | head -c 300` shows `"demo":true`.
+- [ ] **Step 5: Commit.**
+
 ### Task 14: Frontend (Preact + shadcn)
 
 **Files:**
@@ -661,7 +709,7 @@ UI, as listed in the spec's Dashboard bullet:
 - [ ] **Step 3: Implement the app.**
 - [ ] **Step 4: Verify.**
   - `npx vitest run` and `npx tsc --noEmit` pass, and `npm run build` produces `web/dist/index.html`.
-  - Run the server with a dev config: `AccessConfig::Disabled`, `StaticOnline` pointing at a locally running `fleet-agent serve` with `listen = 127.0.0.1:7461` and `rebuild_command = ["sh","-c","sleep 3; echo ok"]` against a temp clone.
+  - Run `fleet-server demo` (Task 13b) and point the Vite dev server at it. The dashboard shows a "Demo" banner when `snapshot.demo` is true.
   - Open `http://127.0.0.1:8080` in the browser pane and check: the host row renders, Apply shows running → ok with a live log, and the dirty-skip reason shows. Screenshot it.
 - [ ] **Step 5: Commit**, including `package-lock.json`.
 
