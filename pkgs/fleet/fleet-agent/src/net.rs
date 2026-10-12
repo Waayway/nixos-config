@@ -29,6 +29,18 @@ pub fn tailscale_addrs() -> Vec<IpAddr> {
         .unwrap_or_default()
 }
 
+/// The manager's addresses as seen by this agent. When the manager name
+/// resolves to loopback, the manager is this machine (NixOS maps the own
+/// hostname to 127.0.0.2 in /etc/hosts), and the server reaches the agent
+/// from this machine's own Tailscale addresses, so those count too.
+pub fn manager_addrs(resolved: Vec<IpAddr>, own_tailscale: &[IpAddr]) -> Vec<IpAddr> {
+    let mut ips: Vec<IpAddr> = resolved.into_iter().map(|ip| ip.to_canonical()).collect();
+    if ips.iter().any(|ip| ip.is_loopback()) {
+        ips.extend(own_tailscale.iter().map(|ip| ip.to_canonical()));
+    }
+    ips
+}
+
 /// Allows only the addresses the manager host currently resolves to.
 pub struct SourceGuard {
     host: String,
@@ -54,7 +66,7 @@ impl SourceGuard {
             Some((true, ips)) => ips,
             stale => match tokio::net::lookup_host((self.host.as_str(), 0)).await {
                 Ok(addrs) => {
-                    let ips: Vec<IpAddr> = addrs.map(|a| a.ip().to_canonical()).collect();
+                    let ips = manager_addrs(addrs.map(|a| a.ip()).collect(), &tailscale_addrs());
                     *self.cache.lock().unwrap() = Some((Instant::now(), ips.clone()));
                     ips
                 }
@@ -63,5 +75,24 @@ impl SourceGuard {
             },
         };
         ips.contains(&ip)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manager_addrs_adds_own_tailscale_addrs_when_manager_is_this_host() {
+        let own: Vec<IpAddr> = vec!["100.92.102.84".parse().unwrap()];
+        let got = manager_addrs(vec!["127.0.0.2".parse().unwrap()], &own);
+        assert!(got.contains(&"100.92.102.84".parse().unwrap()));
+    }
+
+    #[test]
+    fn manager_addrs_unchanged_for_a_remote_manager() {
+        let own: Vec<IpAddr> = vec!["100.95.164.9".parse().unwrap()];
+        let remote: IpAddr = "100.92.102.84".parse().unwrap();
+        assert_eq!(manager_addrs(vec![remote], &own), vec![remote]);
     }
 }
