@@ -4,4 +4,4 @@ import type { ApplyRecord } from "./ApplyRecord";
 import type { CheckoutStatus } from "./CheckoutStatus";
 import type { OnlineState } from "./OnlineState";
 
-export type HostView = { name: string, os: string, channel: string, online: OnlineState, last_seen: bigint | null, running: string | null, running_dirty: boolean, behind: number | null, checkout: CheckoutStatus | null, last_apply: ApplyRecord | null, desired_apply_id: string | null, last_activation: ActivationEvent | null, };
+export type HostView = { name: string, os: string, channel: string, online: OnlineState, last_seen: number | null, running: string | null, running_dirty: boolean, behind: number | null, checkout: CheckoutStatus | null, last_apply: ApplyRecord | null, desired_apply_id: string | null, last_activation: ActivationEvent | null, };

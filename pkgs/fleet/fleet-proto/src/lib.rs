@@ -37,7 +37,9 @@ pub struct ApplyRecord {
     pub skip_reason: Option<SkipReason>,
     pub message: Option<String>,
     pub exit_code: Option<i32>,
+    #[ts(type = "number | null")]
     pub started_at: Option<i64>,
+    #[ts(type = "number | null")]
     pub finished_at: Option<i64>,
 }
 
@@ -50,6 +52,7 @@ pub struct CheckoutStatus {
     pub dirty: bool,
     pub untracked: u32,
     pub ahead: Option<u32>,
+    #[ts(type = "number | null")]
     pub last_fetch_at: Option<i64>,
 }
 
@@ -79,6 +82,7 @@ pub struct ApplyRequest {
 pub struct ActivationEvent {
     #[ts(type = "number")]
     pub line: u64,
+    #[ts(type = "number")]
     pub time: i64,
     pub store_path: String,
     pub revision: String,
@@ -127,6 +131,7 @@ pub struct HostView {
     pub os: String,
     pub channel: String,
     pub online: OnlineState,
+    #[ts(type = "number | null")]
     pub last_seen: Option<i64>,
     pub running: Option<String>,
     pub running_dirty: bool,
@@ -160,7 +165,9 @@ pub struct Snapshot {
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
 pub struct AuditEvent {
+    #[ts(type = "number")]
     pub id: i64,
+    #[ts(type = "number")]
     pub time: i64,
     pub host: Option<String>,
     pub kind: String,

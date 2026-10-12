@@ -2,4 +2,4 @@
 import type { ApplyState } from "./ApplyState";
 import type { SkipReason } from "./SkipReason";
 
-export type ApplyRecord = { apply_id: string, commit: string, state: ApplyState, skip_reason: SkipReason | null, message: string | null, exit_code: number | null, started_at: bigint | null, finished_at: bigint | null, };
+export type ApplyRecord = { apply_id: string, commit: string, state: ApplyState, skip_reason: SkipReason | null, message: string | null, exit_code: number | null, started_at: number | null, finished_at: number | null, };
