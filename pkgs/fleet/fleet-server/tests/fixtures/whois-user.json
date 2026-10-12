@@ -1,0 +1,14 @@
+{
+  "Node": {
+    "ID": 2,
+    "Name": "laptop.tail1234.ts.net.",
+    "ComputedName": "laptop",
+    "Addresses": ["100.64.0.2/32"]
+  },
+  "UserProfile": {
+    "ID": 42,
+    "LoginName": "Waayway@github",
+    "DisplayName": "Thijs van Waaij"
+  },
+  "CapMap": {}
+}

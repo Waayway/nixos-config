@@ -1,0 +1,15 @@
+{
+  "Node": {
+    "ID": 3,
+    "Name": "nixos-box.tail1234.ts.net.",
+    "ComputedName": "nixos-box",
+    "Tags": ["tag:nixos"],
+    "Addresses": ["100.64.0.5/32"]
+  },
+  "UserProfile": {
+    "ID": 99,
+    "LoginName": "tagged-devices",
+    "DisplayName": "Tagged Devices"
+  },
+  "CapMap": {}
+}

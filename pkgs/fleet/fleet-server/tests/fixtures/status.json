@@ -1,0 +1,48 @@
+{
+  "Version": "1.78.1",
+  "BackendState": "Running",
+  "Self": {
+    "ID": "n1",
+    "PublicKey": "nodekey:self",
+    "HostName": "nixos-manager",
+    "DNSName": "nixos-manager.tail1234.ts.net.",
+    "OS": "linux",
+    "TailscaleIPs": ["100.64.0.1", "fd7a:115c:a1e0::1"],
+    "Tags": ["tag:fleet"],
+    "Online": true,
+    "LastSeen": "0001-01-01T00:00:00Z"
+  },
+  "Peer": {
+    "nodekey:aaa": {
+      "ID": "n2",
+      "PublicKey": "nodekey:aaa",
+      "HostName": "Laptop",
+      "DNSName": "laptop.tail1234.ts.net.",
+      "OS": "macOS",
+      "TailscaleIPs": ["fd7a:115c:a1e0::2", "100.64.0.2"],
+      "Tags": ["tag:personal"],
+      "Online": true,
+      "LastSeen": "2026-10-12T08:00:00Z"
+    },
+    "nodekey:bbb": {
+      "ID": "n3",
+      "PublicKey": "nodekey:bbb",
+      "HostName": "desktop",
+      "DNSName": "desktop.tail1234.ts.net.",
+      "OS": "linux",
+      "TailscaleIPs": ["100.64.0.3"],
+      "Online": false,
+      "LastSeen": "2026-10-11T20:30:00Z"
+    },
+    "nodekey:ccc": {
+      "ID": "n4",
+      "PublicKey": "nodekey:ccc",
+      "HostName": "ghost",
+      "DNSName": "ghost.tail1234.ts.net.",
+      "OS": "linux",
+      "TailscaleIPs": ["fd7a:115c:a1e0::4"],
+      "Online": false,
+      "LastSeen": "0001-01-01T00:00:00Z"
+    }
+  }
+}

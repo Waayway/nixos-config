@@ -605,6 +605,9 @@ name = "fleet-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
  "fleet-migration",
  "fleet-proto",
  "sea-orm",
@@ -612,6 +615,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tower",
 ]
 
 [[package]]
