@@ -1,6 +1,8 @@
+use std::io::Read;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
 use nix::unistd::{Gid, Uid, User, setgid, setuid};
@@ -133,14 +135,20 @@ impl Git {
 
     /// Runs `git -C <flake_path> <args>`. Non-zero exit is not an error here.
     pub fn run(&self, args: &[&str]) -> anyhow::Result<Output> {
+        self.git_command(args)?
+            .output()
+            .with_context(|| format!("running git {}", args.join(" ")))
+    }
+
+    /// `git -C <flake_path> <args>` as the configured user, never prompting.
+    fn git_command(&self, args: &[&str]) -> anyhow::Result<Command> {
         let mut cmd = self.user_command("git")?;
         cmd.arg("-C")
             .arg(&self.flake_path)
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C");
-        cmd.output()
-            .with_context(|| format!("running git {}", args.join(" ")))
+        Ok(cmd)
     }
 
     fn succeeds(&self, args: &[&str]) -> bool {
@@ -156,12 +164,7 @@ impl Git {
     }
 
     pub fn fetch(&self, repo_url: &str) -> anyhow::Result<()> {
-        let out = self.run(&[
-            "fetch",
-            "--quiet",
-            repo_url,
-            "+refs/heads/*:refs/remotes/origin/*",
-        ])?;
+        let out = self.run(&Self::fetch_args(repo_url))?;
         if !out.status.success() {
             bail!(
                 "git fetch failed: {}",
@@ -169,6 +172,51 @@ impl Git {
             );
         }
         Ok(())
+    }
+
+    /// `fetch`, but killed (with everything it started) after `timeout`.
+    pub fn fetch_within(&self, repo_url: &str, timeout: Duration) -> anyhow::Result<()> {
+        let mut cmd = self.git_command(&Self::fetch_args(repo_url))?;
+        // Its own process group, so a kill also reaches git-remote-* and ssh.
+        cmd.process_group(0)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        let mut child = cmd.spawn().context("running git fetch")?;
+        let mut stderr = child.stderr.take().context("git fetch stderr")?;
+        let reader = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stderr.read_to_end(&mut buf);
+            buf
+        });
+        let deadline = Instant::now() + timeout;
+        let status = loop {
+            if let Some(status) = child.try_wait().context("waiting for git fetch")? {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                // SAFETY: signals the process group the child leads.
+                unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+                let _ = child.kill();
+                let _ = child.wait();
+                bail!("git fetch timed out after {} s", timeout.as_secs());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        };
+        let err = reader.join().unwrap_or_default();
+        if !status.success() {
+            bail!("git fetch failed: {}", String::from_utf8_lossy(&err).trim());
+        }
+        Ok(())
+    }
+
+    fn fetch_args(repo_url: &str) -> [&str; 4] {
+        [
+            "fetch",
+            "--quiet",
+            repo_url,
+            "+refs/heads/*:refs/remotes/origin/*",
+        ]
     }
 
     /// None on detached HEAD.

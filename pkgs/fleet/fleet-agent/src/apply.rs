@@ -33,6 +33,18 @@ pub fn try_lock_apply(cfg: &AgentConfig) -> Option<File> {
     (unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0).then_some(f)
 }
 
+/// `try_lock_apply`, retried for up to a second: the daemon briefly takes the lock to check
+/// whether a `Running` record's wrapper is still alive (`read_record`).
+fn lock_apply_briefly(cfg: &AgentConfig) -> Option<File> {
+    for _ in 0..20 {
+        if let Some(f) = try_lock_apply(cfg) {
+            return Some(f);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    try_lock_apply(cfg)
+}
+
 /// Records a successful fetch in `<state_dir>/last_fetch` (unix seconds).
 pub fn record_fetch(cfg: &AgentConfig) {
     let _ = fs::create_dir_all(&cfg.state_dir);
@@ -87,8 +99,30 @@ fn pid_alive(pid: i32) -> bool {
     std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
 }
 
-/// The stored record, with a `Running` record whose wrapper died reported as
-/// failed ("interrupted").
+fn in_progress_marker(cfg: &AgentConfig) -> PathBuf {
+    cfg.state_dir.join("apply-in-progress.json")
+}
+
+/// Removes a leftover `apply-in-progress.json` (a wrapper that crashed or a reboot mid-apply),
+/// so the audit hook does not label later manual switches as that apply. Only when no wrapper
+/// holds the apply lock. The daemon calls this at start.
+pub fn clear_stale_marker(cfg: &AgentConfig) {
+    let marker = in_progress_marker(cfg);
+    if !marker.exists() {
+        return;
+    }
+    // The lock binding lives until the end of the block.
+    if let Some(_lock) = try_lock_apply(cfg)
+        && fs::remove_file(&marker).is_ok()
+    {
+        eprintln!("fleet-agent: removed stale apply-in-progress.json");
+    }
+}
+
+/// The stored record. A `Running` record whose wrapper is gone is reported (and, when no
+/// wrapper holds the apply lock, stored) as failed ("interrupted"). The wrapper is gone when
+/// its pid is dead, or when the apply lock is free: a running wrapper always holds it, which
+/// also catches a pid reused by an unrelated process.
 pub fn read_record(cfg: &AgentConfig, id: &str) -> Option<ApplyRecord> {
     if !is_valid_apply_id(id) {
         return None;
@@ -96,13 +130,26 @@ pub fn read_record(cfg: &AgentConfig, id: &str) -> Option<ApplyRecord> {
     let raw = fs::read(file(cfg, id, "json")).ok()?;
     let mut rec: ApplyRecord = serde_json::from_slice(&raw).ok()?;
     if rec.state == ApplyState::Running {
-        let alive = fs::read_to_string(file(cfg, id, "pid"))
+        let pid_alive = fs::read_to_string(file(cfg, id, "pid"))
             .ok()
             .and_then(|s| s.trim().parse::<i32>().ok())
             .is_some_and(pid_alive);
-        if !alive {
+        // Held only for this check (and the clean-up below), never across a wait.
+        let lock = try_lock_apply(cfg);
+        if !pid_alive || lock.is_some() {
             rec.state = ApplyState::Failed;
             rec.message = Some("interrupted".into());
+        }
+        if rec.state == ApplyState::Failed && lock.is_some() {
+            // No wrapper can be running: make the outcome permanent and drop the marker.
+            if rec.finished_at.is_none() {
+                rec.finished_at = Some(now());
+            }
+            if let Err(e) = write_record(cfg, &rec) {
+                eprintln!("fleet-agent: {e:#}");
+            }
+            let _ = fs::remove_file(file(cfg, id, "pid"));
+            let _ = fs::remove_file(in_progress_marker(cfg));
         }
     }
     Some(rec)
@@ -334,7 +381,7 @@ pub fn run_apply(cfg: &AgentConfig, id: &str, commit: &str) -> ApplyRecord {
         return rec;
     }
     // Held until the function returns; keeps a second wrapper out.
-    let Some(_lock) = try_lock_apply(cfg) else {
+    let Some(_lock) = lock_apply_briefly(cfg) else {
         eprintln!("fleet-agent: another apply is running; not starting {id}");
         rec.message = Some("another apply is running".into());
         return rec;
@@ -344,7 +391,7 @@ pub fn run_apply(cfg: &AgentConfig, id: &str, commit: &str) -> ApplyRecord {
         rec.finished_at = Some(now());
         return rec;
     }
-    let in_progress = cfg.state_dir.join("apply-in-progress.json");
+    let in_progress = in_progress_marker(cfg);
 
     let outcome = if !is_commit_hash(commit) {
         Outcome::Failed(None, "invalid commit".into())
@@ -398,11 +445,8 @@ fn start(cfg: &AgentConfig, rec: &mut ApplyRecord) -> anyhow::Result<()> {
         "commit": rec.commit,
         "started": rec.started_at,
     });
-    write_atomic(
-        &cfg.state_dir.join("apply-in-progress.json"),
-        marker.to_string().as_bytes(),
-    )
-    .context("writing apply-in-progress.json")?;
+    write_atomic(&in_progress_marker(cfg), marker.to_string().as_bytes())
+        .context("writing apply-in-progress.json")?;
     rec.state = ApplyState::Running;
     write_record(cfg, rec)?;
     Ok(())

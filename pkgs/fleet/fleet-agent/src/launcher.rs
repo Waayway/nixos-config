@@ -13,7 +13,15 @@ use crate::config::{AgentConfig, Launcher};
 /// The daemon PATH (global constraints); transient units do not inherit it.
 pub const DAEMON_PATH: &str =
     "/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-const DAEMON_HOME: &str = "/root";
+
+/// Root's home directory for the wrapper: `/var/root` on macOS, `/root` elsewhere.
+pub fn daemon_home(cfg: &AgentConfig) -> &'static str {
+    if cfg.os == "darwin" {
+        "/var/root"
+    } else {
+        "/root"
+    }
+}
 
 fn exe_path(cfg: &AgentConfig) -> anyhow::Result<PathBuf> {
     match &cfg.agent_exe {
@@ -53,7 +61,7 @@ pub fn launch_command(
                 "--collect".into(),
                 "--property=Type=exec".into(),
                 format!("--setenv=PATH={DAEMON_PATH}"),
-                format!("--setenv=HOME={DAEMON_HOME}"),
+                format!("--setenv=HOME={}", daemon_home(cfg)),
                 exe.to_string_lossy().into_owned(),
             ];
             args.extend(wrapper);
@@ -79,7 +87,7 @@ pub fn launch(cfg: &AgentConfig, config_path: &Path, id: &str, commit: &str) -> 
         }
         Launcher::Detach => {
             cmd.env("PATH", DAEMON_PATH)
-                .env("HOME", DAEMON_HOME)
+                .env("HOME", daemon_home(cfg))
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null());
@@ -95,7 +103,7 @@ pub fn launch(cfg: &AgentConfig, config_path: &Path, id: &str, commit: &str) -> 
             reap(cmd.spawn().context("spawning apply wrapper")?);
         }
         Launcher::Inline => {
-            cmd.env("PATH", DAEMON_PATH).env("HOME", DAEMON_HOME);
+            cmd.env("PATH", DAEMON_PATH).env("HOME", daemon_home(cfg));
             reap(cmd.spawn().context("spawning apply wrapper")?);
         }
     }

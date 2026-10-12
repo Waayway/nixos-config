@@ -1,6 +1,9 @@
 mod common;
 use common::*;
-use fleet_agent::apply::{applies_dir, latest_record, prune, read_log, read_record, run_apply};
+use fleet_agent::apply::{
+    applies_dir, clear_stale_marker, latest_record, prune, read_log, read_record, run_apply,
+    try_lock_apply,
+};
 use fleet_agent::git::Git;
 use fleet_proto::{ApplyRecord, ApplyState, SkipReason};
 
@@ -112,6 +115,8 @@ fn interrupted_running_record_reports_failed() {
 #[test]
 fn running_record_with_live_pid_stays_running() {
     let f = fixture();
+    // A running wrapper holds the apply lock.
+    let _lock = try_lock_apply(&f.cfg).unwrap();
     write_record(&f, "live", ApplyState::Running, 100);
     std::fs::write(
         applies_dir(&f.cfg).join("live.pid"),
@@ -119,6 +124,67 @@ fn running_record_with_live_pid_stays_running() {
     )
     .unwrap();
     assert_eq!(latest_record(&f.cfg).unwrap().state, ApplyState::Running);
+}
+
+#[test]
+fn running_record_with_reused_pid_and_no_lock_is_interrupted() {
+    let f = fixture();
+    let marker = f.cfg.state_dir.join("apply-in-progress.json");
+    std::fs::create_dir_all(&f.cfg.state_dir).unwrap();
+    std::fs::write(&marker, "{}").unwrap();
+    write_record(&f, "reused", ApplyState::Running, 100);
+    // A live but unrelated process (this test) has the recorded pid; no wrapper holds the lock.
+    let pid_file = applies_dir(&f.cfg).join("reused.pid");
+    std::fs::write(&pid_file, std::process::id().to_string()).unwrap();
+    let rec = latest_record(&f.cfg).unwrap();
+    assert_eq!(rec.state, ApplyState::Failed);
+    assert_eq!(rec.message.as_deref(), Some("interrupted"));
+    assert!(rec.finished_at.is_some());
+    // Made permanent: the stored record says so, the pid file and the marker are gone.
+    let raw = std::fs::read(applies_dir(&f.cfg).join("reused.json")).unwrap();
+    let stored: ApplyRecord = serde_json::from_slice(&raw).unwrap();
+    assert_eq!(stored.state, ApplyState::Failed);
+    assert!(!pid_file.exists());
+    assert!(!marker.exists());
+    // And it can be pruned like any finished apply.
+    for i in 0..3 {
+        write_record(&f, &format!("n{i}"), ApplyState::Ok, 200 + i);
+    }
+    prune(&f.cfg, 3);
+    assert!(read_record(&f.cfg, "reused").is_none());
+}
+
+#[test]
+fn dead_pid_while_another_wrapper_holds_the_lock_keeps_the_marker() {
+    let f = fixture();
+    let marker = f.cfg.state_dir.join("apply-in-progress.json");
+    std::fs::create_dir_all(&f.cfg.state_dir).unwrap();
+    std::fs::write(&marker, "{}").unwrap();
+    let _lock = try_lock_apply(&f.cfg).unwrap();
+    write_record(&f, "dead", ApplyState::Running, 100);
+    let mut child = std::process::Command::new("true").spawn().unwrap();
+    let pid = child.id();
+    child.wait().unwrap();
+    std::fs::write(applies_dir(&f.cfg).join("dead.pid"), pid.to_string()).unwrap();
+    let rec = read_record(&f.cfg, "dead").unwrap();
+    assert_eq!(rec.state, ApplyState::Failed);
+    // The marker may belong to the wrapper holding the lock.
+    assert!(marker.exists());
+}
+
+#[test]
+fn stale_marker_cleared_only_when_unlocked() {
+    let f = fixture();
+    let marker = f.cfg.state_dir.join("apply-in-progress.json");
+    std::fs::create_dir_all(&f.cfg.state_dir).unwrap();
+    std::fs::write(&marker, "{}").unwrap();
+    let lock = try_lock_apply(&f.cfg).unwrap();
+    clear_stale_marker(&f.cfg);
+    assert!(marker.exists(), "a wrapper holds the lock");
+    drop(lock);
+    clear_stale_marker(&f.cfg);
+    assert!(!marker.exists());
+    clear_stale_marker(&f.cfg); // no marker: nothing to do
 }
 
 #[test]
@@ -172,6 +238,7 @@ fn read_log_offset() {
 #[test]
 fn read_log_not_eof_while_running() {
     let f = fixture();
+    let _lock = try_lock_apply(&f.cfg).unwrap();
     write_record(&f, "run", ApplyState::Running, 1);
     std::fs::write(
         applies_dir(&f.cfg).join("run.pid"),
@@ -186,6 +253,7 @@ fn read_log_not_eof_while_running() {
 #[test]
 fn read_log_does_not_split_multibyte_char_while_running() {
     let f = fixture();
+    let _lock = try_lock_apply(&f.cfg).unwrap();
     write_record(&f, "mb", ApplyState::Running, 1);
     let dir = applies_dir(&f.cfg);
     std::fs::write(dir.join("mb.pid"), std::process::id().to_string()).unwrap();
@@ -250,4 +318,14 @@ fn launch_command_detach_uses_agent_exe() {
     let (prog, args) = launch_command(&f.cfg, std::path::Path::new("/c.json"), "id1", &c).unwrap();
     assert_eq!(prog.to_str(), Some("/bin/fa"));
     assert_eq!(args, ["apply", "--config", "/c.json", "--", "id1", &c]);
+}
+
+#[test]
+fn daemon_home_is_roots_home_per_os() {
+    use fleet_agent::launcher::daemon_home;
+    let mut f = fixture();
+    f.cfg.os = "darwin".into();
+    assert_eq!(daemon_home(&f.cfg), "/var/root");
+    f.cfg.os = "linux".into();
+    assert_eq!(daemon_home(&f.cfg), "/root");
 }

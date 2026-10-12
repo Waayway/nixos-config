@@ -17,7 +17,8 @@ use serde::Deserialize;
 use tokio::sync::{Mutex, OwnedMutexGuard};
 
 use crate::apply::{
-    is_valid_apply_id, latest_record, read_log, read_record, record_fetch, try_lock_apply,
+    clear_stale_marker, is_valid_apply_id, latest_record, read_log, read_record, record_fetch,
+    try_lock_apply,
 };
 use crate::config::AgentConfig;
 use crate::git::Git;
@@ -26,6 +27,8 @@ use crate::{activations, launcher, status};
 
 const BODY_LIMIT: usize = 4096;
 const FETCH_INTERVAL: Duration = Duration::from_secs(600);
+/// The background fetch holds the apply lock, so it must not hang.
+const FETCH_TIMEOUT: Duration = Duration::from_secs(120);
 const PENDING_TTL: Duration = Duration::from_secs(30);
 const ADDR_RECHECK: Duration = Duration::from_secs(60);
 
@@ -199,7 +202,7 @@ async fn background_fetch(st: AppState) {
             let Some(_flock) = try_lock_apply(&st.cfg) else {
                 return;
             };
-            match st.git.fetch(&st.cfg.repo_url) {
+            match st.git.fetch_within(&st.cfg.repo_url, FETCH_TIMEOUT) {
                 Ok(()) => record_fetch(&st.cfg),
                 Err(e) => eprintln!("fleet-agent: background fetch failed: {e:#}"),
             }
@@ -211,6 +214,8 @@ async fn background_fetch(st: AppState) {
 /// Runs the daemon: binds `listen`, or every Tailscale address (retrying with
 /// backoff and re-checking the addresses every 60 s), and serves forever.
 pub async fn serve(cfg: AgentConfig, config_path: PathBuf) -> anyhow::Result<()> {
+    clear_stale_marker(&cfg);
+    log_manager_addrs(&cfg.manager_host).await;
     let state = AppState::new(
         cfg.clone(),
         config_path,
@@ -229,8 +234,13 @@ pub async fn serve(cfg: AgentConfig, config_path: PathBuf) -> anyhow::Result<()>
     let mut bound: HashSet<IpAddr> = HashSet::new();
     let mut backoff = Duration::from_secs(1);
     loop {
-        let mut pending = tailscale_addrs().is_empty();
-        for ip in tailscale_addrs() {
+        let addrs = tailscale_addrs();
+        let mut pending = addrs.is_empty();
+        if pending {
+            eprintln!("fleet-agent: no Tailscale address yet; retrying");
+        }
+        let before = bound.len();
+        for ip in addrs {
             if bound.contains(&ip) {
                 continue;
             }
@@ -249,6 +259,14 @@ pub async fn serve(cfg: AgentConfig, config_path: PathBuf) -> anyhow::Result<()>
                 }
             }
         }
+        if bound.len() != before {
+            let mut all: Vec<String> = bound
+                .iter()
+                .map(|ip| SocketAddr::new(*ip, cfg.port).to_string())
+                .collect();
+            all.sort();
+            eprintln!("fleet-agent: bound addresses: {}", all.join(", "));
+        }
         if pending {
             tokio::time::sleep(backoff).await;
             backoff = (backoff * 2).min(ADDR_RECHECK);
@@ -256,5 +274,25 @@ pub async fn serve(cfg: AgentConfig, config_path: PathBuf) -> anyhow::Result<()>
             backoff = Duration::from_secs(1);
             tokio::time::sleep(ADDR_RECHECK).await;
         }
+    }
+}
+
+/// Logs what the manager host resolves to: the only sources the agent accepts.
+async fn log_manager_addrs(host: &str) {
+    match tokio::net::lookup_host((host, 0)).await {
+        Ok(addrs) => {
+            let mut ips: Vec<String> = addrs.map(|a| a.ip().to_canonical().to_string()).collect();
+            ips.sort();
+            ips.dedup();
+            eprintln!(
+                "fleet-agent: manager {host} resolves to: {}",
+                if ips.is_empty() {
+                    "(nothing)".to_string()
+                } else {
+                    ips.join(", ")
+                }
+            );
+        }
+        Err(e) => eprintln!("fleet-agent: manager {host} does not resolve yet: {e}"),
     }
 }

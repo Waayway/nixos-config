@@ -15,6 +15,39 @@ fn fetch_then_commit_exists() {
 }
 
 #[test]
+fn fetch_within_works_and_times_out() {
+    use std::time::{Duration, Instant};
+    let f = fixture();
+    let c = push_remote_commit(&f, "b.txt");
+    let g = Git::new(&f.cfg).unwrap();
+    g.fetch_within(&f.cfg.repo_url, Duration::from_secs(30))
+        .unwrap();
+    assert!(g.commit_exists(&c));
+    assert!(
+        g.fetch_within("/nonexistent/repo", Duration::from_secs(30))
+            .is_err()
+    );
+
+    // A git:// server that accepts and never answers.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("git://{}/repo", listener.local_addr().unwrap());
+    let hold = std::thread::spawn(move || {
+        let conn = listener.accept();
+        std::thread::sleep(Duration::from_secs(5));
+        drop(conn);
+    });
+    let start = Instant::now();
+    let err = g.fetch_within(&url, Duration::from_secs(1)).unwrap_err();
+    assert!(format!("{err:#}").contains("timed out"), "{err:#}");
+    assert!(
+        start.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        start.elapsed()
+    );
+    hold.join().unwrap();
+}
+
+#[test]
 fn dirty_tracked_only() {
     let f = fixture();
     let g = Git::new(&f.cfg).unwrap();
