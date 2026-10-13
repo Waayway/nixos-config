@@ -28,6 +28,9 @@ in
   # DHCP too, so dhcpcd and networkd never manage the same interface.
   networking.useNetworkd = true;
   networking.useDHCP = lib.mkForce true;
+  # One link with an address is enough; waiting for every link held sshd back
+  # about two minutes on first boot.
+  systemd.network.wait-online.anyInterface = true;
 
   services.qemuGuest.enable = true;
 
