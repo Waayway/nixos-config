@@ -69,6 +69,17 @@ in
 
   system.stateVersion = "26.05";
 
+  # Host keys come from NixOS (sshd-keygen) on first boot. cloud-init's own
+  # ssh module raced it and regenerated the keys whenever Proxmox handed out a
+  # new instance-id (any `qm set` on the VM).
+  services.cloud-init.settings = {
+    ssh_deletekeys = false;
+    ssh_genkeytypes = [ ];
+  };
+
+  # Proxmox's default vCPU lacks SSE4.1: the 1Password SDK inside opnix then
+  # runs its WebAssembly core interpreted, 88 s per fetch instead of 4 s.
+  proxmox.qemuExtraConf.cpu = "host";
   proxmox.qemuConf.name = "nixos-template";
   proxmox.qemuConf.cores = 2;
   proxmox.qemuConf.memory = 2048;
