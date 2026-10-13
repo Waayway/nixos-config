@@ -27,7 +27,7 @@ Status: approved in conversation 2026-10-13.
 1. **Next to the service**, inside the module's own `mkIf`, so the link exists exactly
    when the service does. `host` stays `null` (the declaring machine).
    - `modules/backup/backrest.nix`: `backrest`, group *Backups*,
-     `http://${cfg.listenAddress}:${toString cfg.port}`, icon `restic`.
+     `http://${cfg.listenAddress}:${toString cfg.port}`, no icon (Simple Icons has no restic mark; the card shows "B").
    - `modules/lodestar/server.nix`: `lodestar`, group *Infrastructure*,
      `http://${listenAddress}:${toString listenPort}`; `check.enable = false` (it is the
      page you are looking at).
