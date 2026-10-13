@@ -4,19 +4,28 @@ Design: `2026-10-12-homelab-backup-design.md`. Inventory: `docs/homelab.md`.
 Steps marked **(user)** need Hetzner Robot, the Proxmox console, the TrueNAS UI
 or 1Password; everything else can be done from the repo and over SSH.
 
-Backups come first and don't depend on the migration: the backup host
-(nixos-manager) is already NixOS, and the data stays on ZFS whichever VM uses it.
+Secrets first (opnix replaces sops-nix), then backups. Backups don't depend on
+the migration: the backup host (nixos-manager) is already NixOS, and the data
+stays on ZFS whichever VM uses it.
 
 ## Phase 0: answers and accounts
 
 1. **(user)** Answer the open questions in the design (Storage Box size,
-   TrueNAS Apps, NFS export of `store/shares`, VM 110, Immich/downloads, alert
-   channel).
-2. **(user)** Hetzner Robot, Storage Box:
+   TrueNAS Apps, NFS export of `store/shares`, VM 110, Immich/downloads,
+   1Password plan, alert channel).
+2. **(user)** 1Password:
+   - vault **Homelab**;
+   - a **service account** with read-only access to Homelab only; store its
+     token as an item in your private vault (it's the bootstrap secret);
+   - item `tailscale-authkey`: a new tagged, reusable Tailscale auth key (the
+     one in `secrets/common.yaml` stays in git history, so it gets revoked in
+     phase 1).
+3. **(user)** Hetzner Robot, Storage Box:
    - enable SSH support (port 23);
    - create sub-account `-sub1` for the backup host;
-   - enable automatic snapshots (for example daily, keep 7, plus weekly, keep 4).
-3. **(user)** TrueNAS:
+   - enable automatic snapshots (for example daily, keep 7, plus weekly, keep 4);
+   - main account login into 1Password (private vault, not Homelab).
+4. **(user)** TrueNAS:
    - dataset `store/internal/db-dumps` (owner: the UID the dump job runs as);
    - `snapdir=visible` on `store/internal`, `store/shares`, `archive/internal`,
      `archive/shares` (Datasets → Edit → Advanced → Snapshot directory);
@@ -25,45 +34,78 @@ Backups come first and don't depend on the migration: the backup host
      `store/proxmox-vms`;
    - NFS exports read-only for 10.0.10.170 on the four datasets (`store/shares`
      gets a new NFS share next to its SMB share);
-   - a read-only API key for the dataset-list check;
+   - a read-only API key → item `truenas-api` in Homelab;
    - add the `proxmox_vms_rsa` public key to `truenas_admin` so the remaining
      inventory (Apps, pool layout, scrub/SMART) can be done over SSH.
-4. **(user)** VM 110: look at the container from the Proxmox console, note it
+5. **(user)** VM 110: look at the container from the Proxmox console, note it
    in `docs/homelab.md`.
 
-## Phase 1: backup module
+## Phase 1: opnix replaces sops-nix
 
-Files: `modules/backup/borg.nix`, `modules/backup/notify.nix`.
+Files: `flake.nix`, `lib/mkSystem.nix`, `lib/mkDarwin.nix`,
+`modules/secrets/opnix.nix` (new), `modules/secrets/sops.nix` (removed),
+`modules/networking/tailscale.nix`, `.sops.yaml` and `secrets/` (removed),
+`AGENTS.md`, `README.md`.
 
-1. `modules/backup/borg.nix` as in the design: options `enable`, `repoBase`,
-   `repos.<name>.{datasets,paths,sqlite,startAt,keep}`; per repo a
-   `services.borgbackup.jobs` entry, NFS `fileSystems` (ro, automount), the
-   snapshot bind-mount `preHook`, the dataset check against the TrueNAS API,
-   `postHook` stamp, prune/compact, weekly and monthly `borg check` units,
-   `OnFailure`. Off by default.
-2. `modules/backup/notify.nix`: `notify@.service` posting to the alert channel
-   (token from sops), plus the stamp-age timer.
-3. Format with the repo's nixfmt; evaluate all five hosts (the module is
-   imported everywhere and must stay inert when disabled).
+1. **Spike on nixos-manager** (scratch clone, not committed): add the input
+   `opnix.url = "github:brizzbuzz/opnix"` (with `inputs.nixpkgs.follows`), the
+   NixOS module, one test secret. **(user)** `sudo opnix token set` on the VM.
+   Check:
+   - the file appears with the right owner/mode, and `secretPaths` points at it;
+   - with the token removed or 1Password unreachable (block it in nftables), a
+     switch still activates and the existing file stays;
+   - a reboot with 1Password unreachable boots normally;
+   - nix-darwin evaluates with the darwin module imported and `enable = false`.
+   If any of these fail, stop and re-plan.
+2. `flake.nix`: add `opnix`; `lib/mkSystem.nix` imports
+   `inputs.opnix.nixosModules.default`, `lib/mkDarwin.nix`
+   `inputs.opnix.darwinModules.default`.
+3. `modules/secrets/opnix.nix`: `services.onepassword-secrets = { enable =
+   hostPlatform.isServer; tokenFile = "/etc/opnix-token"; }` (Linux only, via
+   `lib.optionalAttrs hostPlatform.isLinux`); servers only, workstations need no
+   server secrets.
+4. `modules/networking/tailscale.nix`: replace `sops.secrets.tailscale_authkey`
+   with an opnix secret `reference = "op://Homelab/tailscale-authkey/credential"`
+   and `authKeyFile = config.services.onepassword-secrets.secretPaths.tailscaleAuthKey`.
+5. Remove sops-nix: the input, both `sops` module imports in `lib/`,
+   `modules/secrets/sops.nix`, `.sops.yaml`, `secrets/`. `nix flake lock`
+   drops it from `flake.lock`.
+6. Docs: `AGENTS.md` (layout entry for `secrets/`, the sops gotcha becomes an
+   opnix gotcha: token at `/etc/opnix-token`, vault Homelab, item names are a
+   contract), `README.md` (the "Adding sops secrets" section becomes "Adding a
+   server secret": create the item in Homelab, reference it in the module),
+   lodestar's `deployKeyFile` description (example with opnix; in the
+   lodestar repo).
+7. Evaluate all five hosts, `nix flake check --no-build --keep-going`, build
+   nixos-manager on itself. Commit, push to `unstable`, promote, apply via
+   Lodestar. Check `tailscale status` on nixos-manager afterwards.
+8. **(user)** Revoke the old Tailscale auth key (still readable in git history).
 
-## Phase 2: enable on nixos-manager
+## Phase 2: backup module and the backup host
 
-Files: `hosts/servers/nixos-manager.nix`, `secrets/nixos-manager.yaml`,
-`.sops.yaml`.
+Files: `modules/backup/restic.nix`, `modules/backup/notify.nix`,
+`modules/backup/backrest.nix`, `hosts/servers/nixos-manager.nix`.
 
-1. Generate the Storage Box key: `ssh-keygen -t ed25519 -N "" -f
-   <scratch>/storagebox-backup`. **(user)** add the public key to `-sub1`
-   (`ssh-copy-id -p 23 -s uXXXX-sub1@uXXXX.your-storagebox.de`).
-2. `.sops.yaml`: rule for `secrets/nixos-manager.yaml` with nixos-manager's age
-   key (`ssh-keyscan -t ed25519 10.0.10.170 | ssh-to-age`) plus the workstation
-   keys. Check that this Mac can decrypt the file.
-3. `secrets/nixos-manager.yaml`: `borg-passphrase` (`openssl rand -base64 48`),
-   `storagebox-ssh-key`, `truenas-api-key`, notify token.
+1. `modules/backup/restic.nix` as in the design: options `enable`,
+   `repos.<name>.{datasets,paths,sqlite,timerConfig,pruneOpts}`; per repo a
+   `services.restic.backups` entry, the `storagebox` SSH alias and known host,
+   NFS `fileSystems` (ro, automount), the snapshot bind-mount and SQLite dump
+   in `backupPrepareCommand`, the dataset check against the TrueNAS API,
+   `backupCleanupCommand` stamp, `runCheck` with `--read-data-subset=2%`,
+   `OnFailure`. Secrets via opnix (`restic-<repo>`, `storagebox-backup`,
+   `truenas-api`). Off by default.
+2. `modules/backup/notify.nix`: `notify@.service` posting the failed unit name
+   and the last journal lines to ntfy (item `ntfy`), plus the stamp-age timer.
+3. Generate the Storage Box key: `ssh-keygen -t ed25519 -N "" -f
+   <scratch>/storagebox-backup`. **(user)** private key into item
+   `storagebox-backup` in Homelab, public key onto `-sub1`
+   (`ssh-copy-id -p 23 -s uXXXX-sub1@uXXXX.your-storagebox.de`); delete the
+   scratch copy. **(user)** items `restic-store` and `restic-archive` with
+   generated passwords (1Password's generator, 40+ characters).
 4. Host file:
    ```nix
-   backup.borg = {
+   backup.restic = {
      enable = true;
-     repoBase = "ssh://uXXXX-sub1@uXXXX.your-storagebox.de:23/./";
      repos.store = {
        datasets = {
          store-internal = "10.0.10.130:/mnt/store/internal";
@@ -71,20 +113,25 @@ Files: `hosts/servers/nixos-manager.nix`, `secrets/nixos-manager.yaml`,
          archive-internal = "10.0.10.130:/mnt/archive/internal";
        };
        sqlite.lodestar = "/var/lib/lodestar-server/lodestar.db";
-       startAt = "*-*-* 02:30";
+       timerConfig.OnCalendar = "*-*-* 02:30";
      };
      repos.archive = {
        datasets.archive-shares = "10.0.10.130:/mnt/archive/shares";
-       startAt = "Sun 03:00";
-       keep = { weekly = 4; monthly = 6; };
+       timerConfig.OnCalendar = "Sun 03:00";
+       pruneOpts = [ "--keep-weekly 4" "--keep-monthly 6" ];
      };
    };
    ```
 5. Grow nixos-manager's disk (**(user)** `qm resize 170 virtio0 +32G`, then
    grow the partition and filesystem), and fix the server gating so Flatpak and
-   interception-tools leave it.
-6. Evaluate all hosts, build on nixos-manager (scratch clone, see `AGENTS.md`),
-   commit, push to `unstable`, promote to `stable`, apply via Lodestar.
+   interception-tools leave it; delete `/var/lib/fleet-server`.
+6. Format with the repo's nixfmt, evaluate all five hosts, build on
+   nixos-manager, commit, push to `unstable`, promote, apply via Lodestar.
+7. `modules/backup/backrest.nix`: a systemd service for `pkgs.backrest` (no
+   NixOS module exists), listening on the tailnet IP only, state in
+   `/var/lib/backrest`, repo passwords from opnix. Add both repos in its UI as
+   existing repositories with no plans (scheduling stays in Nix). Then point
+   `backrest-browser` at it.
 
 ## Phase 3: database dumps on the Rocky VMs (until they migrate)
 
@@ -101,16 +148,17 @@ Files: `hosts/servers/nixos-manager.nix`, `secrets/nixos-manager.yaml`,
 
 ## Phase 4: first runs and restore test
 
-1. `store` repo first: `sudo systemctl start borgbackup-job-store` (the
-   initial 600 GiB takes hours; watch `journalctl -fu borgbackup-job-store`).
-   `borg init` happens on first use.
-2. `borg key export --paper` for the repo → **(user)** 1Password together with
-   the passphrase.
-3. Restore test: extract one Nextcloud file and the latest Nextcloud dump into
-   `/tmp`; `gunzip -t` the dump, compare the file's checksum with the live copy.
+1. `store` repo first: `sudo systemctl start restic-backups-store` (the initial
+   600 GiB takes hours; watch `journalctl -fu restic-backups-store`). The repo
+   is created on first use (`initialize = true`).
+2. Restore test: restore one Nextcloud file and the latest Nextcloud dump to
+   `/tmp/restore`; `gunzip -t` the dump, compare the file's checksum with the
+   live copy. Also try it from Backrest.
+3. Restore from nothing: on this Mac, with only 1Password, `restic -r
+   sftp:uXXXX-sub1@uXXXX.your-storagebox.de:23/restic/store snapshots`. This
+   proves recovery doesn't depend on any server.
 4. `archive` repo: start by hand; the initial 3.26 TiB takes days on a home
-   uplink. borg resumes from its last checkpoint if interrupted
-   (`--checkpoint-interval`, default 30 min).
+   uplink. If it's interrupted, the next run skips what's already uploaded.
 5. Trigger a failure on purpose (wrong repo path) and check that the
    notification arrives; revert.
 6. Write the restore runbook in `docs/homelab.md`.
@@ -177,7 +225,7 @@ Order: vpn (or retire) → archipelago → media → Main. Per VM:
    `enable`). Secrets in `secrets/<name>.yaml`.
 2. Evaluate all hosts, build on nixos-manager.
 3. **(user)** Clone template 9000 to a new VM on `local-lvm` (not `store-lvm`),
-   first boot, add its age key to `.sops.yaml`, switch to the config.
+   first boot, **(user)** `sudo opnix token set`, switch to the config.
 4. Stop the service on the old VM, move its state (databases via a fresh
    dump), start on the new one, check it.
 5. Switch Traefik routes / DNS to the new VM. Old VM stays stopped two weeks,
@@ -188,7 +236,7 @@ Per-VM specifics:
 
 - **archipelago:** image built with `dockerTools.buildLayeredImage` from a
   pinned Archipelago source (flake input), `virtualisation.oci-containers` for
-  web + multiworld, native nginx, `SECRET_KEY` from sops, ports 50000–50010/tcp,
+  web + multiworld, native nginx, `SECRET_KEY` from opnix (item `archipelago-secret`, rotated), ports 50000–50010/tcp,
   `onboot`. No backup.
 - **media:** `services.jellyfin` with `hardware.graphics` + `amdgpu`, config
   stays on `/store/jellyfin`, library read-only from `archive/shares`. Immich if
@@ -230,7 +278,7 @@ on `store`.
      backup, replication, updates, fencing.
    - TrueNAS: Alert Services → same channel (pool degraded, SMART, scrub errors,
      disk space).
-   - borg: `notify@.service` from phase 1.
+   - restic: `notify@.service` from phase 2.
    - `services.gatus` on nixos-manager: checks the public URLs (Nextcloud,
      Jellyfin, ap, Immich) and the internal services, alerts to ntfy.
    - Later: node-exporter + Prometheus/Grafana if trends are wanted; Traefik
@@ -256,7 +304,7 @@ nix flake check --no-build --keep-going
 On nixos-manager:
 
 ```sh
-systemctl list-timers 'borgbackup-*'
-sudo borg-job-store list
-sudo borg-job-store info --last 1
+systemctl list-timers 'restic-backups-*'
+sudo restic-store snapshots
+sudo restic-store stats latest
 ```
