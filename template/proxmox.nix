@@ -16,9 +16,31 @@
 #   - DHCP via systemd-networkd on whatever interface comes up
 #   - flakes, a bootstrap user `nixos` with the proxmox-vms key, root via
 #     the break-glass key only
+#   - optionally the opnix token (below), so the first switch to a server
+#     config can fetch its secrets from 1Password right away
 let
   proxmoxKey = builtins.readFile ../modules/users/proxmox-vms_rsa.pub;
   breakGlassKey = builtins.readFile ../modules/users/break-glass-root_ed25519.pub;
+
+  # The opnix service-account token is never in this (public) repo. A build
+  # opts in with an impure build that names a file holding it, e.g. on
+  # nixos-manager, which already has the token (as the repo's owner; root
+  # trips git's "dubious ownership"):
+  #   sudo install -m 0400 -o "$USER" /etc/opnix-token /tmp/opnix-token
+  #   OPNIX_TOKEN_FILE=/tmp/opnix-token nix build --impure .#proxmox-template
+  #   rm /tmp/opnix-token
+  # Pure evaluation (flake check, other machines) sees "" and leaves it out.
+  # The token then sits in the build host's Nix store, the image and every
+  # clone.
+  opnixTokenFile = builtins.getEnv "OPNIX_TOKEN_FILE";
+  opnixToken =
+    if opnixTokenFile == "" then
+      null
+    else
+      builtins.path {
+        path = opnixTokenFile;
+        name = "opnix-token";
+      };
 in
 {
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
@@ -66,6 +88,15 @@ in
   users.users.root.openssh.authorizedKeys.keys = [ breakGlassKey ];
 
   environment.systemPackages = [ pkgs.git ];
+
+  # A plain file, not environment.etc: NixOS removes its own /etc entries on
+  # the first switch to a config that doesn't declare them, and opnix
+  # (modules/secrets/opnix.nix) expects the token to stay. Never overwrites.
+  system.activationScripts.opnixToken = lib.mkIf (opnixToken != null) ''
+    if [ ! -s /etc/opnix-token ]; then
+      install -m 0600 -o root -g root ${opnixToken} /etc/opnix-token
+    fi
+  '';
 
   system.stateVersion = "26.05";
 
