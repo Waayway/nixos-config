@@ -74,6 +74,8 @@ Files: `flake.nix`, `lib/mkSystem.nix`, `lib/mkDarwin.nix`,
    `/var/lib/opnix`, not in `/run`, so they survive reboots.
 
    Verdict: usable. Step 3 below adds the settings that address the findings.
+**Steps 2–6 done in `1018a35` (2026-10-13);** lodestar docs in lodestar `4a73b04`.
+
 2. `flake.nix`: add `opnix`; `lib/mkSystem.nix` imports
    `inputs.opnix.nixosModules.default`, `lib/mkDarwin.nix`
    `inputs.opnix.darwinModules.default`.
