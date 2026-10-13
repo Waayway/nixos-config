@@ -47,5 +47,11 @@ lib.optionalAttrs hostPlatform.isLinux {
         healthchecks = "failures";
       };
     };
+
+    # Web UI over both repos, on the tailnet IP Lodestar also listens on.
+    backup.backrest = {
+      enable = true;
+      inherit (config.services.lodestar-server) listenAddress;
+    };
   };
 }

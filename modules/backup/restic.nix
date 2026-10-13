@@ -39,8 +39,7 @@ let
 
   # opnix wants camelCase secret names: store -> resticStore.
   passwordSecret =
-    name:
-    "restic" + lib.toUpper (builtins.substring 0 1 name) + builtins.substring 1 (-1) name;
+    name: "restic" + lib.toUpper (builtins.substring 0 1 name) + builtins.substring 1 (-1) name;
 
   repoEnv = name: {
     RESTIC_REPOSITORY = repoUrl name;

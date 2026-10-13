@@ -17,6 +17,9 @@ shift 9
 umask 077
 IFS= read -r RESTIC_PASSWORD
 export RESTIC_PASSWORD RESTIC_REPOSITORY=$repo RESTIC_CACHE_DIR=/root/.cache/restic-nix
+# No terminal here: without this restic reports nothing until it's done. One
+# status line a minute goes to the journal and the Healthchecks log.
+export RESTIC_PROGRESS_FPS=0.016
 
 view=/run/restic-view
 work=$(mktemp -d /run/restic-nix.XXXXXX)
