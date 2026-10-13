@@ -91,7 +91,7 @@ Checklist, in order. Replace `atlas` with the host name.
     ```
 13. **Sign in by hand:** 1Password, Microsoft 365, OneDrive, Google Drive, Tailscale. For git over HTTPS: `gh auth login`.
 14. **Finder sidebar:** favorites from `darwin.finderSidebar` are only added once their folders exist. After Google Drive has synced and your repos are cloned, switch once more.
-15. **Secrets:** copy the host's age key to `~/.config/sops/age/keys.txt` (or create one, see below) before the host uses sops secrets.
+15. **Secrets:** nothing to do. Macs and laptops use no repo-managed secrets; servers get theirs from 1Password (see "Server secrets" below).
 16. **Handoff** is turned off by the config, but it works both ways: also turn it off on your other Macs/iPhone (System Settings → General → AirDrop & Handoff), or apps from them keep showing up as "Open on …" in ⌘-Tab.
 17. **Manual installs** (no cask): MacUtil.
 
@@ -104,23 +104,22 @@ Checklist, in order. Replace `atlas` with the host name.
 
 Host files stay thin: identity, which modules/categories are enabled, and a few per-host values. Apps are grouped in cross-platform categories under `modules/apps/` (`workstation.apps.<category>.enable`); a host can switch single apps off with `workstation.apps.<category>.<app>.enable = false`. macOS settings shared by every Mac live in `modules/darwin/` (`defaults.nix`, `spotlight.nix`, `system.nix`). On every Mac a random picture from `wallpapers/` becomes the desktop on each switch (`darwin.wallpaper` to pin one); macOS asks once to allow controlling System Events.
 
-#### Adding sops secrets to a Mac
+#### Server secrets
 
-Darwin hosts don't declare secrets yet. To onboard one:
+Servers fetch their secrets from the 1Password vault **Homelab** with [opnix](https://github.com/brizzbuzz/opnix) (`modules/secrets/opnix.nix`); nothing secret is in this repo, not even encrypted.
 
-1. Generate the age key (`age-keygen` ships in the `age` package, but isn't its main program, so use `nix shell`):
-   ```sh
-   mkdir -p ~/.config/sops/age
-   nix shell nixpkgs#age -c age-keygen -o ~/.config/sops/age/keys.txt
-   ```
-   It prints `Public key: age1…`. To show it again later:
-   ```sh
-   nix shell nixpkgs#age -c age-keygen -y ~/.config/sops/age/keys.txt
-   ```
-2. Add that public key to `.sops.yaml`: a new `&host_<name>` entry under `keys:` and a reference in each `creation_rules` group the host should read.
-3. On a machine that can already decrypt, re-encrypt for the new key, then commit and pull on the Mac:
-   ```sh
-   export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt  # sops on macOS defaults to ~/Library/Application Support/sops/age/
-   nix shell nixpkgs#sops -c sops updatekeys secrets/*.yaml
-   ```
-   Empty placeholder files (no `sops:` block) are skipped; only files with content need re-encrypting.
+- **New server:** after the first switch, put the service account token on it once (the token is the item "opnix-homelab service account" in the Personal vault):
+  ```sh
+  sudo opnix token set
+  sudo systemctl restart opnix-secrets
+  ```
+- **New secret:** create the item in Homelab, then declare it in the module that uses it:
+  ```nix
+  services.onepassword-secrets.secrets.myToken = {
+    reference = "op://Homelab/my-token/credential";
+    owner = "myservice";
+    services = [ "myservice" ];   # restarted when the value changes
+  };
+  # use: config.services.onepassword-secrets.secretPaths.myToken
+  ```
+- **Rotating:** change the value in 1Password; servers pick it up within 6 hours (polling), on the next switch, or right away with `sudo systemctl restart opnix-secrets`.

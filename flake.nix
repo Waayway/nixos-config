@@ -38,8 +38,9 @@
       flake = false;
     };
 
-    sops-nix = {
-      url = "github:Mic92/sops-nix";
+    # Server secrets from the 1Password vault Homelab (modules/secrets/opnix.nix).
+    opnix = {
+      url = "github:brizzbuzz/opnix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

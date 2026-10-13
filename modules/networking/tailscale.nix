@@ -18,18 +18,20 @@ lib.optionalAttrs hostPlatform.isLinux (
         };
       }
 
-      # Servers join unattended with the tagged auth key from sops. A tag
-      # replaces the device's user identity, so workstations (laptops,
-      # desktop) stay untagged and are logged in once by hand
-      # (`sudo tailscale up --ssh`); they then belong to Waayway@github.
+      # Servers join unattended with the tagged auth key from 1Password
+      # (modules/secrets/opnix.nix). A tag replaces the device's user identity,
+      # so workstations (laptops, desktop) stay untagged and are logged in once
+      # by hand (`sudo tailscale up --ssh`); they then belong to Waayway@github.
       (lib.mkIf hostPlatform.isServer {
-        sops.secrets.tailscale_authkey = {
+        services.onepassword-secrets.secrets.tailscaleAuthKey = {
+          reference = "op://Homelab/tailscale-authkey/credential";
           mode = "0400";
           owner = "root";
+          services = [ "tailscaled-autoconnect" ];
         };
 
         services.tailscale = {
-          authKeyFile = config.sops.secrets.tailscale_authkey.path;
+          authKeyFile = config.services.onepassword-secrets.secretPaths.tailscaleAuthKey;
           authKeyParameters = {
             ephemeral = false;
             preauthorized = true;

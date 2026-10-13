@@ -109,7 +109,7 @@ systemFunc rec {
 
     machineConfig
 
-    inputs.sops-nix.nixosModules.sops
+    inputs.opnix.nixosModules.default
     inputs.lodestar.nixosModules.default
     homeManager
   ];

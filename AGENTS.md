@@ -32,7 +32,8 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   `mkDeployNode.nix` (deploy-rs), `umport.nix` (recursive importer).
 - `modules/<category>/`: all configuration. `*_home.nix` files are
   home-manager modules; everything else is a system module.
-- `secrets/`: sops-nix files; recipients in `.sops.yaml`.
+- `modules/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
+  (opnix); no secrets live in the repo.
 - `template/proxmox.nix`: base image for new Proxmox VMs.
 - `docs/`: `lodestar.md`, `plans/` (designs and implementation plans, one pair per
   feature: `<date>-<topic>-design.md` and `<date>-<topic>-plan.md`), `modules.md` (module style).
@@ -156,13 +157,19 @@ lodestar` here.
 - **Switching a VM over SSH:** prefer `nixos-rebuild boot` + reboot when the
   network config changes; the previous generation stays in GRUB, and `pve`'s
   console is the fallback.
-- **sops:** host age keys are derived from the SSH host key
-  (`/etc/ssh/ssh_host_ed25519_key`; convert with `ssh-to-age`). Only
-  workstations also have a user key file (`~/.config/sops/age/keys.txt`); a
-  configured but missing key file fails the whole activation. On macOS, sops
-  looks in `~/Library/Application Support/sops/age/`, so set
-  `SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt`. Generate keys with
-  `nix shell nixpkgs#age -c age-keygen`.
+- **Secrets (opnix):** servers fetch secrets from the 1Password vault
+  **Homelab** with the read-only service account `opnix-homelab`; its token is
+  the one bootstrap secret per server, placed once with `sudo opnix token set`
+  (`/etc/opnix-token`; the token is in Thijs's Personal vault). A module
+  declares `services.onepassword-secrets.secrets.<name>.reference =
+  "op://Homelab/<item>/<field>"` and reads
+  `config.services.onepassword-secrets.secretPaths.<name>`; item names are the
+  contract between repo and vault. Workstations have no opnix. Without a token
+  or without network, opnix keeps the files it already has; a switch that
+  can't reach 1Password ends with exit 4 (`opnix-secrets` failed) although the
+  generation is active. VMs need `cpu: host` (the SDK's WebAssembly core is
+  20× slower without SSE4.1). Create items with the CLI:
+  `op --account KVKXJLIAFVBK5GYLWVS37CJCTE item create --vault Homelab …`.
 - **nix-darwin activation order:** system settings → Homebrew →
   post-activation → home-manager. If Homebrew fails, home-manager never runs.
   ThermalForge compiles from source and needs the full Xcode app. Writing

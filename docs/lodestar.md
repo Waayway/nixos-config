@@ -16,7 +16,7 @@ now its own flake. Usage, the CLI, options, the security model and development
 - `lib/mkSystem.nix` / `lib/mkDarwin.nix`: import
   `inputs.lodestar.nixosModules.default` (agent + server) /
   `inputs.lodestar.darwinModules.default` (agent) on every host, next to
-  sops-nix. They also build the `fleet` specialArg
+  opnix. They also build the `fleet` specialArg
   (`{ member; channel; }`) from the host file.
 - `modules/lodestar/agent.nix`: on every host with `fleet = true`, enables
   `services.lodestar-agent` with `user` = the host's user, `channel` = the
@@ -83,10 +83,13 @@ tag replaces the device's user identity.
 
 ## Open items
 
-1. Write deploy key for promote: create `secrets/nixos-manager.yaml` with a
-   GitHub deploy key (write access), declare it with
-   `sops.secrets.<name> = { owner = "lodestar-server"; mode = "0400"; };` and
-   set `services.lodestar-server.deployKeyFile` (in
+1. Write deploy key for promote: put a GitHub deploy key (write access) in
+   the 1Password vault Homelab (item `lodestar-deploy-key`), declare it with
+   `services.onepassword-secrets.secrets.lodestarDeployKey = { reference =
+   "op://Homelab/lodestar-deploy-key/private key"; owner = "lodestar-server";
+   mode = "0400"; services = [ "lodestar-server" ]; };` and set
+   `services.lodestar-server.deployKeyFile =
+   config.services.onepassword-secrets.secretPaths.lodestarDeployKey` (in
    `hosts/servers/nixos-manager.nix`). Add a GitHub ruleset on `stable` (no
    force pushes, linear history).
 2. Advertise `tag:fleet` on enrolled Linux hosts (Lodestar has no option for
@@ -94,6 +97,10 @@ tag replaces the device's user identity.
    Tailscale tags (it still carries `tag:server`).
 3. Enrol atlas, apollo, hermes and hephaestus (`fleet = true`). The darwin
    agent has not run on a real Mac yet.
-4. Build and boot the proxmox template once, then migrate the VMs (see
-   `docs/plans/2026-10-12-fleet-manager-design.md`, "Migration of the
-   homelab").
+4. Migrate the VMs (template 9000 is built from `template/proxmox.nix` and
+   boot-tested since 2026-10-13; see
+   `docs/plans/2026-10-12-homelab-backup-plan.md`, phase 6).
+5. An apply where 1Password is unreachable ends with exit 4 because only
+   `opnix-secrets` failed; the new generation is active and the old secret
+   files stay. Show that as "applied, secrets not refreshed" instead of a
+   failed apply.

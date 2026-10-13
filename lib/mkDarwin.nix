@@ -98,7 +98,7 @@ systemFunc {
 
     machineConfig
 
-    inputs.sops-nix.darwinModules.sops
+    inputs.opnix.darwinModules.default
     inputs.lodestar.darwinModules.default
     homeManager
   ];
