@@ -74,7 +74,15 @@ Files: `flake.nix`, `lib/mkSystem.nix`, `lib/mkDarwin.nix`,
    `/var/lib/opnix`, not in `/run`, so they survive reboots.
 
    Verdict: usable. Step 3 below adds the settings that address the findings.
-**Steps 2–6 done in `1018a35` (2026-10-13);** lodestar docs in lodestar `4a73b04`.
+**Steps 2–7 done (2026-10-13).** Code in `1018a35`, lodestar docs in lodestar
+`4a73b04`. The Tailscale key was moved from sops to Homelab
+(`tailscale-authkey`); the token was put on nixos-manager straight from
+1Password; `594eaa6` promoted to `stable` and applied through Lodestar: opnix
+fetched the key in about a second, the poll timer runs, nothing failed.
+Template 9000 is built with the token baked in (`template/proxmox.nix`,
+`OPNIX_TOKEN_FILE`), so new VMs have `/etc/opnix-token` from first boot.
+Open: step 8 (rotate the Tailscale key; Homelab still holds the one that is
+in git history).
 
 2. `flake.nix`: add `opnix`; `lib/mkSystem.nix` imports
    `inputs.opnix.nixosModules.default`, `lib/mkDarwin.nix`
