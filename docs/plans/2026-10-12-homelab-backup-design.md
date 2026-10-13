@@ -67,17 +67,28 @@ Total about 3.9 TiB. New datasets on either pool are caught by a check
      NixOS module so it's code; Backrest only reads the repos.
    - Borg was the alternative: server-side `borg serve` on the Storage Box, but
      no Backrest, one repo per host and a version pin on the server.
-3. **One backup host, reading the pools over NFS from ZFS snapshots.** TrueNAS
-   stays an appliance: it takes the snapshots, a NixOS host does the backup.
-   The backup host is **nixos-manager**: it's already NixOS, and as the fleet
-   controller it can already change every host, so giving it read access to
-   the data adds little risk. Can move to its own VM later without changing the
-   module.
+3. **Driven from one host, restic runs on TrueNAS (revised 2026-10-13).**
+   The first idea was nixos-manager reading the pools over NFS. TrueNAS 26
+   doesn't serve `.zfs/snapshot` over NFS without an Enterprise licence
+   (`expose_snapshots`), so instead nixos-manager starts restic **on TrueNAS**
+   over SSH: a static restic pinned by `flake.lock` (`pkgsStatic.restic`),
+   copied there when its hash changes. The repo password goes over stdin and the
+   Storage Box key through the forwarded SSH agent, so no secret is stored on
+   TrueNAS. Data flows straight from TrueNAS's disks to the Storage Box.
+   Everything (schedule, retention, restic version, secret references) stays in
+   this repo; TrueNAS only provides `bash`, `ssh`, `unshare` and `sqlite3`.
 4. **Back up from snapshots, not live files.** A TrueNAS periodic snapshot task
    takes a recursive `backup-%Y-%m-%d_%H-%M` snapshot of both pools at 02:00.
-   The datasets get `snapdir=visible`, so the backup host sees
-   `<mount>/.zfs/snapshot/backup-…/`. Each dataset is consistent at one moment,
-   and writes during the run don't matter.
+   The remote script bind-mounts the newest one of each dataset at
+   `/run/restic-view/<dataset>` in a private mount namespace: consistent at one
+   moment, and the same paths every run, so restic skips unchanged files. A
+   snapshot older than 26 h fails the run.
+4a. **TrueNAS as code.** Its snapshot tasks, dataset properties, cron jobs and
+   NFS shares are declared in `modules/truenas/` and applied by
+   `truenas-reconcile` (`midclt` over SSH as the TrueNAS user `automation`;
+   on switch and daily). Resources it owns carry a `[nix] <name>` marker; only
+   those are ever deleted. nixos-manager is effectively root on TrueNAS, as it
+   already is on every host it deploys.
 5. **Databases are dumped onto ZFS before the snapshot.** The dumps travel with
    the rest of the data, and the backup host never needs database access:
    - Nextcloud (Main): `mariadb-dump --single-transaction` at 01:30 to
@@ -98,39 +109,38 @@ Total about 3.9 TiB. New datasets on either pool are caught by a check
    The large, slow-changing media share doesn't hold up the nightly run, and
    its multi-day initial upload doesn't block the important data. Each repo has
    its own password item in 1Password.
-7. **One Storage Box sub-account for the backup host**, key-only SSH, both repos
-   under it. The SSH key comes from 1Password through opnix. The main Storage
-   Box account stays in 1Password and is never on a server.
+7. **One Storage Box sub-account (`u592252-sub2`, 10 TB box)**, key-only SSH,
+   both repos under `restic/`. The key (Homelab/storagebox-backup) is the only
+   one in its `authorized_keys`. The main Storage Box account stays in 1Password.
 8. **Ransomware/mistake protection: Storage Box snapshots.** The backup host's
    key can delete its repos. Automatic Storage Box snapshots (set in Hetzner
    Robot, outside any server's reach) keep older states of the whole box.
    restic's append-only mode needs rest-server, which the Storage Box doesn't
    run.
-9. **The Proxmox host and TrueNAS stay non-NixOS**, configured by hand once
-   (snapshot task, `snapdir`, NFS exports, config export).
+9. **The Proxmox host and TrueNAS stay non-NixOS.** TrueNAS's settings come
+   from Nix (decision 4a); its install, pools, datasets and the `automation`
+   user are manual, like the opnix token on servers.
 
 ## Architecture
 
 ```
  ┌───────────────────────────── pve ─────────────────────────────────┐
+ │  main ──01:30 mariadb-dump──► truenas store/internal/db-dumps/…    │
  │                                                                    │
- │  main ──01:30 mariadb-dump──┐        media ──(postgres dump)──┐    │
- │                             ▼                                 ▼    │
- │  truenas  store/internal/db-dumps/…                                │
- │    02:00 recursive snapshot  store@backup-…, archive@backup-…      │
- │    NFS (ro, only to 10.0.10.170): store/internal, store/shares,    │
- │                                   archive/internal, archive/shares │
- │                             │                                      │
- │  nixos-manager ◄────────────┘        opnix ◄── 1Password "Homelab" │
- │    02:30 bind-mount newest .zfs/snapshot/backup-* → /run/backup/…  │
- │          restic backup (encrypted, zstd) → repo "store"            │
- │    Sun 03:00 same for archive/shares → repo "archive"              │
- │    Backrest (tailnet only, read/restore) ← backrest-browser        │
- └──────────────────────────────┬─────────────────────────────────────┘
-                                │ SFTP over SSH :23, key-only
-                                ▼
-              Hetzner Storage Box  uXXXX-sub1: restic/store, restic/archive
-              (+ automatic box snapshots, managed in Robot)
+ │  truenas   02:00 recursive snapshots store@backup-…, archive@backup-… │
+ │     ▲                                                              │
+ │     │ SSH as automation: copy pinned restic if needed, then        │
+ │     │ `sudo restic backup` of /run/restic-view/<dataset>           │
+ │     │ (snapshot bind mounts, private namespace); password on stdin,│
+ │     │ Storage Box key via agent forwarding                         │
+ │  nixos-manager  02:30 restic-store.service (Sun 03:00 restic-archive)│
+ │     opnix ◄── 1Password Homelab   truenas-reconcile (on switch, daily)│
+ │     local part: Lodestar DB; forget/prune and check from here      │
+ └──────────────────────┬─────────────────────────────┬───────────────┘
+                        │ SFTP over SSH :23           │ HTTPS
+                        ▼                             ▼
+      Hetzner Storage Box u592252-sub2:          healthchecks.io
+      restic/store, restic/archive               (/start, /<exit code>)
 ```
 
 ### Secrets: `modules/secrets/opnix.nix`
@@ -170,63 +180,24 @@ Items in the Homelab vault (names are the contract with the repo):
 Workstations keep no opnix token; they need no server secrets. Darwin hosts
 import the module with `enable = false`.
 
-### Which datasets
+### Modules
 
-The backup host mounts each dataset read-only (`fileSystems` with
-`fsType = "nfs"`, `options = [ "ro" "noauto" "x-systemd.automount" ]`). The
-list lives in the host file, so a new dataset is one line plus an NFS export on
-TrueNAS. A check in `backupPrepareCommand` lists the pools' datasets over the
-TrueNAS API and fails loudly when one isn't in the list (except
-`store/proxmox-vms`). That keeps "everything on the pools" true without
-silently missing a new share.
+- `modules/truenas/truenas.nix`: options `truenas.{enable, host, user, hostKey,
+  snapshotTasks, datasets, cronJobs, nfsShares}` and the `truenas-reconcile`
+  service; `reconcile.sh` does the work (`apply` / `check`).
+  `modules/truenas/homelab.nix` holds this homelab's TrueNAS state.
+- `modules/backup/restic.nix`: options `backup.restic.{enable, storageBox,
+  healthchecksReference, repos.<name>.{truenas, local.{paths,sqlite},
+  snapshotPrefix, maxSnapshotAgeHours, timerConfig, pruneOpts, checkOpts,
+  healthchecks}}`; per repo `restic-<name>.service` + timer and a
+  `restic-<name>` command for manual use. `restic-truenas.sh` is the part sent
+  to TrueNAS. `modules/backup/homelab.nix` declares the two repos.
+- Secrets via opnix: `truenasAutomationKey`, `storageBoxKey`, `resticStore`,
+  `resticArchive`, `healthchecksUrl`.
 
-### NixOS module: `modules/backup/restic.nix`
-
-Feature module per `docs/modules.md`:
-
-```nix
-options.backup.restic = {
-  enable = lib.mkEnableOption "encrypted restic backups to the Storage Box";
-  repos = lib.mkOption {
-    type = lib.types.attrsOf (lib.types.submodule {
-      options = {
-        datasets = …;      # name → NFS source (host:/mnt/pool/dataset)
-        paths = …;         # extra local paths
-        sqlite = …;        # name → db path, dumped before the run
-        timerConfig = …;   # OnCalendar etc.
-        pruneOpts = …;
-      };
-    });
-  };
-};
-```
-
-Per repo the module:
-
-- declares `services.restic.backups.<repo>` with
-  `repository = "sftp:storagebox:restic/<repo>"`,
-  `passwordFile = secretPaths.restic-<repo>`, `initialize = true`,
-  `createWrapper = true`, `extraBackupArgs = [ "--compression" "auto"
-  "--exclude-caches" ]`, `timerConfig` with `Persistent = true` and a
-  randomized delay;
-- an SSH alias `storagebox` for root (`programs.ssh.extraConfig`: host,
-  port 23, sub-account user, `IdentityFile` = the opnix path) and the box's
-  host key in `programs.ssh.knownHosts`;
-- `backupPrepareCommand`: for each dataset, find the newest `backup-*` snapshot
-  under the NFS mount and bind-mount it to `/run/backup/<repo>/<dataset>`
-  (constant paths let restic find the parent snapshot and skip unchanged
-  files), fail if it's older than 26 hours; dump the SQLite databases; run the
-  dataset check;
-- `backupCleanupCommand`: unmount the bind mounts, write
-  `/var/lib/backup/<repo>.last-success` when the run succeeded;
-- `pruneOpts` per repo, `runCheck = true` with `checkOpts = [
-  "--read-data-subset=2%" ]` (a different 2% each run covers the whole repo
-  over time);
-- `OnFailure=` on the backup units → `notify@.service`.
-
-If restic re-reads every file each night (inode numbers on snapshot mounts can
-differ), add `--ignore-inode` to `extraBackupArgs`; dedup means nothing is
-uploaded twice either way, it only costs read time.
+Not covered by the snapshot path and declared as live paths instead: TrueNAS's
+config database (`/data/freenas-v1.db`, copied with `sqlite3 .backup`) and
+`/data/pwenc_secret`.
 
 ### Encryption summary
 
@@ -237,15 +208,14 @@ uploaded twice either way, it only costs read time.
 | Restic passwords, SSH key, API keys, app secrets | 1Password vault Homelab → opnix → root-only files at runtime |
 | Recovery | the 1Password account (repo passwords + Storage Box login) |
 | On-site data (TrueNAS) | unencrypted today. ZFS native encryption needs new datasets and a copy (`zfs send` into an encrypted dataset); optional, later |
-| LAN (NFS) | plaintext; exports limited per client IP, backup exports read-only |
+| LAN (NFS) | plaintext; to be limited per client IP (plan phase 5); backups don't use NFS |
 
 ### Monitoring
 
-A `notify@.service` template triggered by `OnFailure=` posts the unit name and
-the last journal lines to ntfy. A daily timer fails (and so notifies) when a
-`last-success` stamp is older than 36 h (`store`) or 8 days (`archive`).
-Backrest shows snapshot history; later the Lodestar dashboard can show the
-backup age per repo.
+Healthchecks.io, one check (Homelab/healthchecks.io). The daily `store` run
+pings `/start` and then `/<exit code>` with the last 60 kB of its log
+(`ExecStopPost`); `archive` only pings on failure. Missing or failed runs alert
+through the integrations configured there. A failed ping never fails a backup.
 
 ### Restore
 
@@ -290,13 +260,9 @@ NixOS hosts keep no unique state outside ZFS.
 
 ## Open questions
 
-1. **Storage Box size.** 3.9 TiB now: BX21 (5 TB) is tight once versions and box
-   snapshots accumulate; BX31 (10 TB) leaves room.
-2. **TrueNAS Apps** on `archive` (the pool has the Apps icon): which apps run,
-   and does their state (the hidden `ix-apps` dataset) need a backup?
-3. **`store/shares`** is SMB-only: fine to add a read-only NFS export to
-   10.0.10.170 for the backup?
-4. **VM 110 (vpn):** what does the container do? Needs the Proxmox console.
-5. **Immich and the download stack:** revive them on the new `media` host, or drop?
-6. **1Password plan:** service accounts must be available on it.
-7. **Alert channel:** ntfy (self-hosted or ntfy.sh) or email? The design assumes ntfy.
+Resolved 2026-10-13: Storage Box is 10 TB; no TrueNAS Apps exist; `store/shares`
+needs no NFS export (restic reads it on TrueNAS); 1Password service accounts
+work; alerts go to Healthchecks.io.
+
+1. **VM 110 (vpn):** what does the container do? Needs the Proxmox console.
+2. **Immich and the download stack:** revive them on the new `media` host, or drop?

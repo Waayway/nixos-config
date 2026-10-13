@@ -10,33 +10,27 @@ stays on ZFS whichever VM uses it.
 
 ## Phase 0: answers and accounts
 
-1. **(user)** Answer the open questions in the design (Storage Box size,
-   TrueNAS Apps, NFS export of `store/shares`, VM 110, Immich/downloads,
-   1Password plan, alert channel).
-2. **(user)** 1Password:
-   - vault **Homelab**;
-   - a **service account** with read-only access to Homelab only; store its
-     token as an item in your private vault (it's the bootstrap secret);
-   - item `tailscale-authkey`: a new tagged, reusable Tailscale auth key (the
-     one in `secrets/common.yaml` stays in git history, so it gets revoked in
-     phase 1).
-3. **(user)** Hetzner Robot, Storage Box:
-   - enable SSH support (port 23);
-   - create sub-account `-sub1` for the backup host;
-   - enable automatic snapshots (for example daily, keep 7, plus weekly, keep 4);
-   - main account login into 1Password (private vault, not Homelab).
-4. **(user)** TrueNAS:
-   - dataset `store/internal/db-dumps` (owner: the UID the dump job runs as);
-   - `snapdir=visible` on `store/internal`, `store/shares`, `archive/internal`,
-     `archive/shares` (Datasets → Edit → Advanced → Snapshot directory);
-   - periodic snapshot tasks, recursive on `store` and on `archive`, daily at
-     02:00, naming `backup-%Y-%m-%d_%H-%M`, keep 3 days. Exclude
-     `store/proxmox-vms`;
-   - NFS exports read-only for 10.0.10.170 on the four datasets (`store/shares`
-     gets a new NFS share next to its SMB share);
-   - a read-only API key → item `truenas-api` in Homelab;
-   - add the `proxmox_vms_rsa` public key to `truenas_admin` so the remaining
-     inventory (Apps, pool layout, scrub/SMART) can be done over SSH.
+**Done 2026-10-13**, except item 5 (VM 110):
+
+1. Answers: Storage Box 10 TB; no TrueNAS Apps; alerts via Healthchecks.io
+   (Homelab/healthchecks.io, one check URL); 1Password service accounts work.
+   Open: VM 110, Immich/downloads.
+2. 1Password: vault Homelab, service account `opnix-homelab` (token in the
+   Personal vault), items `tailscale-authkey`, `truenas-automation` and
+   `storagebox-backup` (SSH keys generated in 1Password), `restic-store`,
+   `restic-archive`, `truenas-api`, `healthchecks.io`, `Hetzner Personal
+   storage` (sub-account login).
+3. Storage Box: sub-account `u592252-sub2`, SSH on port 23, only the
+   `storagebox-backup` key in `authorized_keys`; the empty, unused
+   `restic-personal` repo and its old key were removed. **Still to check:
+   automatic Storage Box snapshots in Robot.**
+4. TrueNAS: user `automation` (key-only, passwordless sudo); snapshot tasks,
+   `snapdir=visible`, SMART cron jobs (now in `modules/truenas/homelab.nix`);
+   `db-dumps/` folder in `store/internal` (`nextcloud/` owned by 65534, as
+   Main's root is squashed); read-only user `backup-readonly` with its API key
+   in Homelab/truenas-api (JSON-RPC over `wss://…/api/current`; TrueNAS 26 has
+   no REST API). Four read-only "restic backup" NFS exports (#4–#7) were made
+   for the first design and are no longer needed: remove them.
 5. **(user)** VM 110: look at the container from the Proxmox console, note it
    in `docs/homelab.md`.
 
@@ -128,55 +122,31 @@ in git history).
 
 ## Phase 2: backup module and the backup host
 
-Files: `modules/backup/restic.nix`, `modules/backup/notify.nix`,
-`modules/backup/backrest.nix`, `hosts/servers/nixos-manager.nix`.
+**Built 2026-10-13** (`c673926`), as revised in the design (restic runs on
+TrueNAS, TrueNAS as code). Files: `modules/truenas/{truenas,homelab}.nix`,
+`modules/truenas/reconcile.sh`, `modules/backup/{restic,homelab}.nix`,
+`modules/backup/restic-truenas.sh`, `hosts/servers/nixos-manager.nix`
+(`truenas.enable`, `backup.restic.enable`).
 
-1. `modules/backup/restic.nix` as in the design: options `enable`,
-   `repos.<name>.{datasets,paths,sqlite,timerConfig,pruneOpts}`; per repo a
-   `services.restic.backups` entry, the `storagebox` SSH alias and known host,
-   NFS `fileSystems` (ro, automount), the snapshot bind-mount and SQLite dump
-   in `backupPrepareCommand`, the dataset check against the TrueNAS API,
-   `backupCleanupCommand` stamp, `runCheck` with `--read-data-subset=2%`,
-   `OnFailure`. Secrets via opnix (`restic-<repo>`, `storagebox-backup`,
-   `truenas-api`). Off by default.
-2. `modules/backup/notify.nix`: `notify@.service` posting the failed unit name
-   and the last journal lines to ntfy (item `ntfy`), plus the stamp-age timer.
-3. Generate the Storage Box key: `ssh-keygen -t ed25519 -N "" -f
-   <scratch>/storagebox-backup`. **(user)** private key into item
-   `storagebox-backup` in Homelab, public key onto `-sub1`
-   (`ssh-copy-id -p 23 -s uXXXX-sub1@uXXXX.your-storagebox.de`); delete the
-   scratch copy. **(user)** items `restic-store` and `restic-archive` with
-   generated passwords (1Password's generator, 40+ characters).
-4. Host file:
-   ```nix
-   backup.restic = {
-     enable = true;
-     repos.store = {
-       datasets = {
-         store-internal = "10.0.10.130:/mnt/store/internal";
-         store-shares = "10.0.10.130:/mnt/store/shares";
-         archive-internal = "10.0.10.130:/mnt/archive/internal";
-       };
-       sqlite.lodestar = "/var/lib/lodestar-server/lodestar.db";
-       timerConfig.OnCalendar = "*-*-* 02:30";
-     };
-     repos.archive = {
-       datasets.archive-shares = "10.0.10.130:/mnt/archive/shares";
-       timerConfig.OnCalendar = "Sun 03:00";
-       pruneOpts = [ "--keep-weekly 4" "--keep-monthly 6" ];
-     };
-   };
-   ```
-5. Grow nixos-manager's disk (**(user)** `qm resize 170 virtio0 +32G`, then
-   grow the partition and filesystem), and fix the server gating so Flatpak and
-   interception-tools leave it; delete `/var/lib/fleet-server`.
-6. Format with the repo's nixfmt, evaluate all five hosts, build on
-   nixos-manager, commit, push to `unstable`, promote, apply via Lodestar.
-7. `modules/backup/backrest.nix`: a systemd service for `pkgs.backrest` (no
-   NixOS module exists), listening on the tailnet IP only, state in
-   `/var/lib/backrest`, repo passwords from opnix. Add both repos in its UI as
-   existing repositories with no plans (scheduling stays in Nix). Then point
-   `backrest-browser` at it.
+Verified before deploying: `truenas-reconcile check` reports 0 changes against
+the hand-made state; a deliberate drift (`snapdir`) was detected and fixed by
+`apply`. The first `store` run (started by hand with the built unit's script)
+created the repo, backed up the Lodestar DB, copied the static restic to TrueNAS
+and started the snapshot backup at about 168 Mbit/s.
+
+Left:
+
+1. Let the first `store` backup finish (≈ 8 h for 600 GiB); check
+   `restic-store snapshots` and the TrueNAS side's exit code.
+2. Push, promote, apply on nixos-manager (Lodestar); then the timers run:
+   `restic-store` daily 02:30, `restic-archive` Sunday 03:00.
+3. Remove the NFS exports #4–#7 (phase 0.4).
+4. Set the Healthchecks check's schedule: cron `30 2 * * *`, grace 6 h.
+5. Backrest (later): `pkgs.backrest` as a tailnet-only service on
+   nixos-manager, repos added read-only; `backrest-browser` in front.
+6. nixos-manager cleanup (Flatpak/interception-tools on servers,
+   `/var/lib/fleet-server`); its disk doesn't need to grow, since the restic
+   cache for the TrueNAS part lives on TrueNAS.
 
 ## Phase 3: database dumps on the Rocky VMs (until they migrate)
 
@@ -187,20 +157,21 @@ Files: `modules/backup/restic.nix`, `modules/backup/notify.nix`,
    older than 3 days. Temporary: replaced by `services.mysqlBackup` when Main
    moves to NixOS.
 2. media: only if Immich is revived before media migrates (same, `pg_dumpall`).
-3. **(user)** TrueNAS: schedule the config export into
-   `store/internal/db-dumps/truenas-config/` (cron task calling the
-   `config.save` API, or monthly by hand).
+3. TrueNAS config: done differently. The `store` repo includes
+   `/data/freenas-v1.db` (sqlite `.backup`) and `/data/pwenc_secret` live.
 
 ## Phase 4: first runs and restore test
 
-1. `store` repo first: `sudo systemctl start restic-backups-store` (the initial
-   600 GiB takes hours; watch `journalctl -fu restic-backups-store`). The repo
-   is created on first use (`initialize = true`).
+1. `store` repo first: `sudo systemctl start restic-store` (the initial
+   600 GiB takes hours; watch `journalctl -fu restic-store`). The repo
+   is created on first use.
 2. Restore test: restore one Nextcloud file and the latest Nextcloud dump to
    `/tmp/restore`; `gunzip -t` the dump, compare the file's checksum with the
    live copy. Also try it from Backrest.
-3. Restore from nothing: on this Mac, with only 1Password, `restic -r
-   sftp:uXXXX-sub1@uXXXX.your-storagebox.de:23/restic/store snapshots`. This
+3. Restore from nothing: on this Mac, with only 1Password: repo
+   `sftp:u592252-sub2@u592252-sub2.your-storagebox.de:restic/store`, password
+   Homelab/restic-store, key Homelab/storagebox-backup, port 23
+   (`-o sftp.command="ssh -p 23 … -s sftp"`), then `snapshots`. This
    proves recovery doesn't depend on any server.
 4. `archive` repo: start by hand; the initial 3.26 TiB takes days on a home
    uplink. If it's interrupted, the next run skips what's already uploaded.
@@ -349,7 +320,7 @@ nix flake check --no-build --keep-going
 On nixos-manager:
 
 ```sh
-systemctl list-timers 'restic-backups-*'
+systemctl list-timers 'restic-*'
 sudo restic-store snapshots
 sudo restic-store stats latest
 ```

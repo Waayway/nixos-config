@@ -19,7 +19,7 @@ VM moves to NixOS or a service changes. Migration and backup plans:
   | 201 archipelago | `archipelago` |
   | 170 nixos-manager | `manager` |
   | 110 vpn | none reachable: port 22 closed from the LAN |
-  | 130 truenas | the key isn't accepted for any user. Use the web UI (https://10.0.10.130) |
+  | 130 truenas | `automation` (key: 1Password Homelab/truenas-automation, passwordless sudo; use `sudo midclt call …`) |
 
 - Guest-exec is disabled in the qemu agent on the Rocky VMs (`qm guest exec`
   fails); `qm guest cmd <id> get-osinfo|network-get-interfaces|get-fsinfo` work.
@@ -125,25 +125,42 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
 
 - TrueNAS 26.0.0-BETA.2 (beta on the storage everything depends on). Two SATA
   controllers passed through; boot disk on `local-lvm`.
-- Pools and datasets (TrueNAS UI, 2026-10-12), all **unencrypted**:
+- Managed as code since 2026-10-13: `modules/truenas/` declares snapshot tasks,
+  dataset properties, cron jobs and NFS shares; `truenas-reconcile` on
+  nixos-manager applies them (on switch, daily 05:00; `sudo truenas-reconcile
+  check` for a dry run). Pools, datasets and users stay manual.
+- Pools (both healthy, last scrubs 0 errors; scrub weekly, Sunday 00:00):
+
+  | Pool | Layout | Size / allocated |
+  |---|---|---|
+  | `store` | RAIDZ1, 4 × KIOXIA EXCERIA SATA SSD 960 GB (consumer) | 3.83 TB / 1.84 TB |
+  | `archive` | RAIDZ1, 3 × Seagate IronWolf ST4000VN006 4 TB | 11.99 TB / 7.16 TB |
+
+- Datasets, all **unencrypted**, compression on:
 
   | Dataset | Used | Shared as | Contents |
   |---|---|---|---|
-  | `archive` (pool) | 3.26 TiB, 2.07 TiB free | (pool also hosts TrueNAS Apps) | |
   | `archive/internal` | 96 KiB | NFS | empty |
-  | `archive/shares` | 3.26 TiB | SMB + NFS | incl. `jellyfin` (3.3 TB media library) |
-  | `store` (pool) | 1.26 TiB, 1.27 TiB free | | |
-  | `store/internal` | 299.6 GiB | NFS | `nextcloud` 248 GB, `immich` 52 GB, `jellyfin` config 152 MB, `garage` empty |
+  | `archive/shares` | 3.26 TiB | SMB `archive` + NFS (`jellyfin` subfolder) | incl. `jellyfin` (3.3 TB media library) |
+  | `store/internal` | 299.6 GiB | NFS | `nextcloud` 248 GB, `immich` 52 GB, `jellyfin` config 152 MB, `garage` empty, `db-dumps/` |
   | `store/proxmox-vms` (zvol) | 74.6 GiB | iSCSI | VM disks behind `store-lvm` (not backed up) |
-  | `store/shares` | 300.2 GiB | SMB | SMB shares (contents not inspected) |
+  | `store/shares` | 300.2 GiB | SMB `store` | SMB shares |
 
-  The children of `store` add up to about 675 GiB of the 1.26 TiB used; the rest
-  is probably the zvol's reservation (500 GB volsize) or snapshots.
-- NFS exports `/mnt/store/internal`, `/mnt/archive/internal`,
-  `/mnt/archive/shares/jellyfin` to `*` (any host on the LAN), `sec=sys`.
-- Not yet inventoried (no shell access): which TrueNAS Apps run on `archive`,
-  snapshot and replication tasks, pool layout (mirror/raidz), SMART/scrub
-  schedules, config backup.
+  The four data datasets have `snapdir=visible`. TrueNAS's hidden `.system`
+  dataset lives on `archive`; there are no TrueNAS Apps.
+- Snapshots: tasks on `store` (recursive, without `proxmox-vms`) and `archive`
+  (recursive), daily 02:00, `backup-%Y-%m-%d_%H-%M`, kept 3 days. Read by the
+  restic backups; also the quick local restore.
+- SMART: TrueNAS 26 has no SMART schedules; cron jobs run `smartctl` short
+  (Saturday 03:00) and long (1st of the month 04:00) on all `ata-*` disks.
+- NFS exports: `/mnt/store/internal`, `/mnt/archive/internal`,
+  `/mnt/archive/shares/jellyfin` to `*` (any host on the LAN), read-write,
+  root squashed. Snapshots are **not** readable over NFS (`expose_snapshots`
+  needs an Enterprise licence), which is why restic runs on TrueNAS itself.
+- Alerts: e-mail and SNMP trap. Updates: profile EARLY_ADOPTER (that's why it's
+  on a beta).
+- Users: `automation` (management, full sudo), `backup-readonly` (read-only API
+  key in Homelab/truenas-api).
 
 ### 170 nixos-manager
 
@@ -170,9 +187,13 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
 
 ## Backups today
 
-None. No vzdump jobs, no backup tools on any VM, no off-site copy. Whether
-TrueNAS takes ZFS snapshots is unknown. The Hetzner Storage Box isn't
-connected yet.
+Since 2026-10-13: restic from nixos-manager to the Hetzner Storage Box
+(`u592252-sub2`, 10 TB), encrypted client-side. Repos `restic/store` (daily
+02:30: `store/internal`, `store/shares`, `archive/internal`, TrueNAS config
+database, Lodestar DB) and `restic/archive` (Sunday 03:00: `archive/shares`).
+restic runs on TrueNAS against the 02:00 ZFS snapshots; reporting to
+Healthchecks (Homelab/healthchecks.io). Code: `modules/backup/`. Restore:
+`sudo restic-store snapshots` / `restore` on nixos-manager.
 
 ## Data that needs backing up
 
