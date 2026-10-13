@@ -194,42 +194,25 @@ the iSCSI zvol `store/proxmox-vms`, Archipelago (not needed), voice-memo
 
 Total: about 3.9 TiB, of which 3.26 TiB is `archive/shares`.
 
-## What could be better
+## What could be better, and the fix
 
-Ordered roughly by risk.
+Ordered roughly by risk. "Plan" refers to the phases and steps in
+`docs/plans/2026-10-12-homelab-backup-plan.md`.
 
-1. **No backups at all**, on-site or off-site. One disk failure in a non-redundant
-   pool, a bad TrueNAS beta update or ransomware means losing Nextcloud and photos.
-2. **Production storage on a TrueNAS beta.** Everything (NFS data and the iSCSI
-   LUN with most VM disks) depends on TrueNAS 26.0.0-BETA.2. Move to a stable
-   train.
-3. **Circular storage dependency.** Five VM disks live on an iSCSI LUN served by a
-   VM on the same host. If TrueNAS doesn't come up, those VMs can't boot; a
-   hung iSCSI session can freeze them. Once VMs are NixOS (stateless OS, data on
-   NFS), their small disks can go back to `local-lvm`.
-4. **`store-lvm` is 97% full.** Deleting VM 101 (64 GB) and moving the template
-   frees room; the orphaned disks on `local-lvm` (about 450 GB provisioned) need
-   a look and cleanup.
-5. **NFS exported to `*` with `sec=sys`.** Any LAN device can mount the
-   Nextcloud and photo data and claim any UID. Restrict each export to the
-   client IPs that need it (and read-only where possible).
-6. **Secrets in plain text** in `.env` and `config.yaml` files on the VMs, outside
-   any version control. Moving to sops-nix fixes this.
-7. **Patching is manual.** pve has 222 pending updates; the Rocky VMs have no
-   `dnf-automatic`; images use `:latest`/`:stable` tags pulled at whatever time.
-   MariaDB 10.7 has been EOL since 2023.
-8. **Firewalls are inconsistent.** The PVE firewall is off, media has no
-   firewall, Jellyfin is open on the LAN directly, firewalld allows `cockpit`
-   everywhere, Docker bypasses firewalld anyway.
-9. **Dead routes and stopped services.** Immich and BlueMap are routed but down;
-   jellyfetch and voice-memo are stopped but still on disk.
-10. **Root SSH on pve allows passwords**; all VMs share one RSA key. The VPN VM
-    and TrueNAS aren't reachable with it at all.
-11. **No monitoring or alerting.** No PVE notification target, nothing scrapes
-    Traefik metrics, no disk-full or SMART alerts reach anyone.
-12. **The `letsencrypt` HTTP-01 resolver is used everywhere** although a
-    Cloudflare DNS-01 wildcard resolver exists; DNS-01 would also allow
-    certificates for tailnet-only services.
-13. **nixos-manager** runs workstation bits (Flatpak, interception-tools) and
-    has a leftover `/var/lib/fleet-server`; root disk is 83% full.
-14. **Archipelago isn't `onboot`**, so it stays down after a host reboot.
+| # | Problem | Fix | Plan |
+|---|---|---|---|
+| 1 | **No backups at all**, on-site or off-site. A failed pool, a bad TrueNAS beta update or ransomware loses Nextcloud and photos. | Nightly encrypted borg backups of every ZFS dataset + DB dumps to the Storage Box; Storage Box snapshots; keys in 1Password; local ZFS snapshots for fast restores. | 0–4 |
+| 2 | **Production storage on TrueNAS 26.0.0-BETA.2.** | Export the config, switch the update train to stable, upgrade to 26.0 stable when it ships; no further betas. | 5.11 |
+| 3 | **Circular storage dependency**: five VM disks on an iSCSI LUN served by a VM on the same host. | New NixOS VMs go on `local-lvm` (stateless, ~32 GB each); move nixos-manager's disk now; drop the iSCSI storage and zvol once the last Rocky VM is gone. | 5.3, 6, 7.1 |
+| 4 | **`store-lvm` 97% full**, about 450 GB of orphaned disks on `local-lvm`. | Delete VM 101 and stale orphaned disks; move the template to `local-lvm`. | 5.1, 5.2 |
+| 5 | **NFS exported to `*`** with `sec=sys`; SMB permissions unchecked. | Exports per client IP, read-only where possible; review SMB users/ACLs. | 5.10 |
+| 6 | **Secrets in plain text** (`.env`, `config.yaml`). | Now: `chmod 600`, tighten the Cloudflare token to DNS-edit on `vanwaaij.com` only. Migration: everything into sops, rotate each secret as it moves. | 5.6, 6 |
+| 7 | **Manual patching**: 222 pending on pve, no automatic updates on Rocky, `:latest` images, MariaDB 10.7 EOL. | NixOS: weekly `flake.lock` bump on `unstable` → promote → Lodestar apply. Until then `dnf-automatic` (security) on the Rocky VMs and MariaDB to 10.11 LTS. pve: monthly `apt full-upgrade`, update notifications. | 5.7, 5.8, 5.12, 7.3 |
+| 8 | **Firewalls inconsistent**: PVE firewall off, none on media, Jellyfin open on the LAN, Docker bypasses firewalld. | NixOS hosts already enable `networking.firewall` with SSH-only defaults; each service module opens only its own ports, backends accept only Main's IP. PVE firewall on for the host (22, 8006 from LAN + tailnet). | 6, 7.4 |
+| 9 | **Dead routes and stopped services** (Immich, BlueMap, jellyfetch, voice-memo). | Decide Immich/downloads; remove dead routes and voice-memo. | 5.5 |
+| 10 | **SSH**: pve root allows passwords, one shared RSA key, vpn/TrueNAS unreachable. | `PermitRootLogin prohibit-password` on pve; new ed25519 key for VMs, keys managed in the repo; TrueNAS key-only admin; vpn either NixOS or gone. | 5.9, 7.2 |
+| 11 | **No monitoring or alerting.** | One ntfy channel for everything: PVE notifications, TrueNAS alerts, borg failures, Gatus uptime checks for the public URLs, disk/SMART alerts. | 7.5 |
+| 12 | **HTTP-01 everywhere** although a DNS-01 wildcard resolver exists. | Routers to the `cloudflare` resolver (one wildcard cert, no port-80 dependency, tailnet-only hosts possible). | 5.6, 6 |
+| 13 | **nixos-manager** runs workstation bits, has a leftover `/var/lib/fleet-server`, disk 83% full. | Gate Flatpak/interception-tools on `!isServer`, delete the leftover, grow the disk. | 2.5 |
+| 14 | **Archipelago isn't `onboot`.** | `qm set 201 --onboot 1`. | 5.4 |
+| 15 | **Hairpin NAT** worked around with `extra_hosts` in Nextcloud. | Split DNS: `*.vanwaaij.com` → 10.0.10.100 on the LAN resolver (router), or `networking.hosts` on the NixOS hosts. | 7.6 |

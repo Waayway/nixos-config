@@ -115,23 +115,58 @@ Files: `hosts/servers/nixos-manager.nix`, `secrets/nixos-manager.yaml`,
    notification arrives; revert.
 6. Write the restore runbook in `docs/homelab.md`.
 
-## Phase 5: cleanup and hardening
+## Phase 5: fixes on the current setup
 
-1. VM 101: check its disk read-only for anything worth keeping, then **(user)**
-   delete it → 64 GB free on `store-lvm`.
-2. Orphaned disks: list contents of `local-lvm:vm-105-disk-{0..3}`,
-   `vm-120-disk-0`, `vm-170-disk-0`; **(user)** delete what's stale; remove the
-   dangling `unused0` from VM 200.
-3. VM 105 (Jenkins): **(user)** shut down, delete after two weeks.
-4. media: delete `/opt/voice-memo` (deprecated).
-5. Traefik: remove the dead `bluemap` route (and `immich` if not revived).
-6. NFS exports per IP: `store/internal` → main, media, nixos-manager (ro);
-   `archive/shares` → media (ro), nixos-manager (ro); `archive/internal` and
-   `store/shares` → nixos-manager (ro) and whoever needs them.
-7. pve: `apt full-upgrade` in a quiet window; `PermitRootLogin prohibit-password`.
-8. **(user)** TrueNAS: move from 26.0.0-BETA.2 to the 26 stable release when it
-   ships. Going back to 25.10 is likely impossible if the pools use 26's
-   feature flags (`zpool get all | grep feature@`).
+Can run in parallel with phases 1–4; none of it waits for the migration.
+Numbers are referenced from "What could be better" in `docs/homelab.md`.
+
+1. **VM 101:** activate its LV on pve, mount the root read-only, look for
+   anything worth keeping, then **(user)** `qm destroy 101` → 64 GB free on
+   `store-lvm`.
+2. **Orphaned disks and template:** for `local-lvm:vm-105-disk-{0..3}`,
+   `vm-120-disk-0`, `vm-170-disk-0`: check `lvs` data usage and the partition
+   table; **(user)** delete what's stale. Remove the dangling `unused0` from VM
+   200 (`qm set 200 --delete unused0`). Move template 9000 to `local-lvm`
+   (`qm disk move 9000 virtio0 local-lvm --delete`).
+3. **nixos-manager off iSCSI:** `qm disk move 170 virtio0 local-lvm --delete`
+   (online), so the backup host and fleet manager don't depend on TrueNAS for
+   their own disk.
+4. **Stopped services:** `qm set 201 --onboot 1`. **(user)** VM 105: shut down,
+   delete after two weeks.
+5. **Dead things:** delete `/opt/voice-memo` on media; remove the `bluemap`
+   route from `~/traefik/dynamic/media.yml` (and `immich` and `/opt/jellyfetch`
+   if they're not revived).
+6. **Secrets and certificates on Main:** `chmod 600` on `~/traefik/.env`,
+   `~/nextcloud/.env`, `/opt/archipelago/deploy/config.yaml` (on 201).
+   **(user)** In Cloudflare, check the Traefik token is scoped to `Zone:DNS:Edit`
+   on `vanwaaij.com` only; rotate it if it's broader. Switch the routers in
+   `dynamic/*.yml` and the Nextcloud labels to `certResolver: cloudflare`;
+   check that the wildcard cert is issued before removing the HTTP-01 resolver.
+7. **Patching the Rocky VMs until they migrate:** `dnf install dnf-automatic`,
+   `upgrade_type = security`, `apply_updates = yes`, enable
+   `dnf-automatic.timer` on 100, 110, 120, 201. Pin image tags in the compose
+   files (`traefik:v3.x`, `nextcloud:32.0.x`, `jellyfin/jellyfin:10.x`) and
+   update deliberately.
+8. **MariaDB 10.7 → 10.11 LTS** on Main, after the first good backup (phase 4):
+   fresh dump, `image: mariadb:10.11`, `MARIADB_AUTO_UPGRADE=1`, start, check
+   `occ status` and the logs. Rollback = old image + restore the dump.
+9. **SSH:** pve `PermitRootLogin prohibit-password` in
+   `/etc/ssh/sshd_config.d/`, test a second session before closing the first.
+   Remove `waayway@wdesktop` from pve's keys if that desktop is gone.
+10. **Storage access (user, TrueNAS):** NFS exports per IP —
+    `store/internal` → main (rw), media (rw), nixos-manager (ro);
+    `archive/shares` → media (ro), nixos-manager (ro); `archive/internal`,
+    `store/shares` → nixos-manager (ro) plus whoever needs them. Review SMB
+    users and share ACLs on `store/shares` and `archive/shares`; disable SMB1
+    and guest access.
+11. **TrueNAS off the beta (user):** save the config (phase 3.3), set the update
+    train to stable, don't install further betas, upgrade to 26.0 stable when
+    it ships. Going back to 25.10 is likely impossible if the pools use 26's
+    feature flags (`zpool get all | grep feature@`). Also check pool layout
+    (mirror/raidz), and that scrubs (monthly) and SMART tests (weekly short,
+    monthly long) are scheduled.
+12. **pve updates:** `apt full-upgrade` in a quiet window, reboot, check every
+    VM comes back (TrueNAS first, `startup: order=1` is already set).
 
 ## Phase 6: migrate VMs to NixOS, one at a time
 
@@ -169,6 +204,43 @@ Per-VM specifics:
 Once no VM disk is left on `store-lvm`: remove the iSCSI storage from PVE and
 the `store/proxmox-vms` zvol from TrueNAS, which also frees its reservation
 on `store`.
+
+## Phase 7: after the migration
+
+1. **iSCSI gone:** once no VM disk is on `store-lvm`, **(user)** remove the
+   `store-lvm` and `store-iscsi` storages from PVE, the iSCSI share and the
+   `store/proxmox-vms` zvol from TrueNAS (frees its reservation on `store`).
+2. **SSH keys:** new ed25519 key for server access replaces
+   `proxmox_vms_rsa`; the public keys live in the repo (the users module), so
+   rotating is a commit. One login user per NixOS host as today.
+3. **Updates as code:** a weekly scheduled job (GitHub Actions or a timer on
+   nixos-manager) runs `nix flake update` on `unstable` and opens a PR or
+   commits; workstations follow `unstable`, servers get it through
+   `lodestar promote` + apply. MariaDB/Postgres major upgrades stay manual
+   (`services.mysql.package` pinned).
+4. **Firewalls:** every service module opens only its own ports
+   (`networking.firewall.allowedTCPPorts`); backends behind Traefik only accept
+   Main's IP (`networking.firewall.extraInputRules` / `interfaces`). PVE
+   firewall on at datacenter level with a host rule set: SSH and 8006 from
+   10.0.10.0/24 and the tailnet. **(user)** enable it from the console so a
+   mistake can't lock you out; VM firewalls stay off in PVE (the NixOS
+   firewall does that job).
+5. **Monitoring and alerts:** one ntfy topic (self-hosted on Main or ntfy.sh).
+   - PVE: Datacenter → Notifications → a webhook/gotify target, matchers for
+     backup, replication, updates, fencing.
+   - TrueNAS: Alert Services → same channel (pool degraded, SMART, scrub errors,
+     disk space).
+   - borg: `notify@.service` from phase 1.
+   - `services.gatus` on nixos-manager: checks the public URLs (Nextcloud,
+     Jellyfin, ap, Immich) and the internal services, alerts to ntfy.
+   - Later: node-exporter + Prometheus/Grafana if trends are wanted; Traefik
+     already exposes metrics.
+6. **Hairpin NAT:** **(user)** a local DNS override `*.vanwaaij.com` →
+   10.0.10.100 on the router (or `networking.hosts` on the NixOS hosts), then
+   drop the `extra_hosts` workaround from the Nextcloud config.
+7. **Optional, at-rest encryption on TrueNAS:** create encrypted datasets,
+   `zfs send | zfs recv` the data over, swap shares, destroy the old ones. Needs
+   free space equal to the largest dataset, so do `store` first (1.27 TiB free).
 
 ## Verification (every phase that touches Nix)
 
