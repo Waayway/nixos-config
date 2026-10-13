@@ -1,0 +1,75 @@
+{
+  config,
+  lib,
+  hostPlatform,
+  ...
+}:
+# The homelab's TrueNAS (VM 130), applied by modules/truenas/truenas.nix from the
+# host that sets `truenas.enable` (nixos-manager). Inventory: docs/homelab.md.
+let
+  smart =
+    type:
+    ''for d in /dev/disk/by-id/ata-*; do case "$d" in *-part*) ;; *) /usr/sbin/smartctl -t ${type} "$d" >/dev/null ;; esac; done'';
+in
+lib.optionalAttrs hostPlatform.isLinux {
+  config = lib.mkIf config.truenas.enable {
+    truenas = {
+      hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/L1Q4XFYuZc2E54Rru1kKd3L2wJ44vVybOzvo9M3IY";
+
+      # Read by the restic backups (modules/backup/homelab.nix) from
+      # .zfs/snapshot; kept 3 days for quick local restores too.
+      snapshotTasks =
+        lib.genAttrs
+          [
+            "store"
+            "archive"
+          ]
+          (pool: {
+            dataset = pool;
+            recursive = true;
+            exclude = lib.optional (pool == "store") "store/proxmox-vms";
+            namingSchema = "backup-%Y-%m-%d_%H-%M";
+            keep = {
+              value = 3;
+              unit = "DAY";
+            };
+            schedule = {
+              minute = "00";
+              hour = "02";
+            };
+          });
+
+      datasets =
+        lib.genAttrs
+          [
+            "store/internal"
+            "store/shares"
+            "archive/internal"
+            "archive/shares"
+          ]
+          (_: {
+            snapdir = "VISIBLE";
+          });
+
+      # TrueNAS 26 has no SMART test schedules of its own. Errors go out by mail.
+      cronJobs = {
+        smart-short = {
+          description = "SMART short self-test, all data disks";
+          command = smart "short";
+          schedule = {
+            hour = "03";
+            dow = "6";
+          };
+        };
+        smart-long = {
+          description = "SMART long self-test, all data disks";
+          command = smart "long";
+          schedule = {
+            hour = "04";
+            dom = "1";
+          };
+        };
+      };
+    };
+  };
+}

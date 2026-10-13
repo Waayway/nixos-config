@@ -4,6 +4,7 @@
     # Skip categories that don't exist (yet) so listing them is harmless.
     paths = builtins.filter builtins.pathExists [
       ./apps
+      ./backup
       ./boot
       ./console
       ./darwin
@@ -21,6 +22,7 @@
       ./security
       ./shell
       ./system
+      ./truenas
       ./users
       ./vm-specific
     ];
