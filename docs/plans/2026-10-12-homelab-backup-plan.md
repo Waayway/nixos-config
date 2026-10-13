@@ -47,23 +47,58 @@ Files: `flake.nix`, `lib/mkSystem.nix`, `lib/mkDarwin.nix`,
 `modules/networking/tailscale.nix`, `.sops.yaml` and `secrets/` (removed),
 `AGENTS.md`, `README.md`.
 
-1. **Spike on nixos-manager** (scratch clone, not committed): add the input
-   `opnix.url = "github:brizzbuzz/opnix"` (with `inputs.nixpkgs.follows`), the
-   NixOS module, one test secret. **(user)** `sudo opnix token set` on the VM.
-   Check:
-   - the file appears with the right owner/mode, and `secretPaths` points at it;
-   - with the token removed or 1Password unreachable (block it in nftables), a
-     switch still activates and the existing file stays;
-   - a reboot with 1Password unreachable boots normally;
-   - nix-darwin evaluates with the darwin module imported and `enable = false`.
-   If any of these fail, stop and re-plan.
+1. **Spike: done 2026-10-13** on a throwaway VM (199, cloned from template
+   9000) instead of nixos-manager, with opnix 0.11.0 (`0ea3a9e`, 2026-08-18)
+   on this repo's nixpkgs. Service account `opnix-homelab` (read-only on
+   Homelab; token in the Personal vault, item "opnix-homelab service
+   account"). Results:
+
+   | Test | Result |
+   |---|---|
+   | No token file | switch succeeds; `opnix-secrets` logs a warning, exits 0, keeps existing files |
+   | Fetch | file in `/var/lib/opnix/secrets/<name>` with the configured owner/mode; `secretPaths` points at it; the consumer is restarted automatically when the value changes |
+   | Value changed in 1Password | arrives on the next opnix run (switch, restart, reboot); polling is **off** by default |
+   | 1Password unreachable, switch | new generation is active, but `switch-to-configuration` **exits 4** (failed unit) after ~95 s (3 attempts); old file and running consumers untouched |
+   | 1Password unreachable, reboot | boots, but `multi-user.target` is **~100 s late** (opnix is a oneshot wanted by it); consumers start with the old file afterwards |
+   | Recovery | first run after the network is back applies everything, including pending owner/mode changes |
+   | Token removed | same as no token: exit 0, old files stay |
+   | nix-darwin | atlas and apollo evaluate with the darwin module imported, `enable = false` |
+   | CPU | Proxmox's default vCPU (no SSE4.1) makes the 1Password SDK's WebAssembly core run interpreted: **88 s per run instead of 4 s**. All VMs use `cpu: host`; the template now does too (`7ccedd4`) |
+
+   Other things learned: `opnix-secrets` has `StartLimitBurst = 2` per hour,
+   so a switch plus one manual restart already hits the limit; after each
+   successful run the path watcher (`opnix-secrets-restart`) fetches
+   everything a second time, and two concurrent runs once returned
+   "internal server error"; the error text on a network failure suggests an
+   invalid token, which is misleading. Secrets live on disk under
+   `/var/lib/opnix`, not in `/run`, so they survive reboots.
+
+   Verdict: usable. Step 3 below adds the settings that address the findings.
 2. `flake.nix`: add `opnix`; `lib/mkSystem.nix` imports
    `inputs.opnix.nixosModules.default`, `lib/mkDarwin.nix`
    `inputs.opnix.darwinModules.default`.
-3. `modules/secrets/opnix.nix`: `services.onepassword-secrets = { enable =
-   hostPlatform.isServer; tokenFile = "/etc/opnix-token"; }` (Linux only, via
-   `lib.optionalAttrs hostPlatform.isLinux`); servers only, workstations need no
-   server secrets.
+3. `modules/secrets/opnix.nix` (Linux only, via `lib.optionalAttrs
+   hostPlatform.isLinux`; servers only, workstations need no server secrets):
+   ```nix
+   services.onepassword-secrets = {
+     enable = hostPlatform.isServer;
+     tokenFile = "/etc/opnix-token";
+     # The main run already restarts changed consumers; the path watcher
+     # only adds a second fetch per run.
+     systemdIntegration.changeDetection.enable = false;
+     # Rotations reach servers without a switch.
+     systemdIntegration.polling = { enable = true; interval = "6h"; };
+   };
+   systemd.services.opnix-secrets = {
+     # Don't hold boot or a switch for minutes when 1Password is down;
+     # consumers start with the files they have.
+     serviceConfig.TimeoutStartSec = "60s";
+     unitConfig.StartLimitBurst = lib.mkForce 6;
+   };
+   ```
+   Lodestar should show an apply that ends with exit 4 and only
+   `opnix-secrets` failed as "applied, secrets not refreshed" rather than a
+   failed apply (note in `docs/lodestar.md` open items).
 4. `modules/networking/tailscale.nix`: replace `sops.secrets.tailscale_authkey`
    with an opnix secret `reference = "op://Homelab/tailscale-authkey/credential"`
    and `authKeyFile = config.services.onepassword-secrets.secretPaths.tailscaleAuthKey`.
