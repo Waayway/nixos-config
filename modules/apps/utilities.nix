@@ -11,7 +11,10 @@ import ../../lib/mkAppCategory.nix args {
           polkitPolicyOwners = [ user.name ];
         };
       };
-      darwinCasks = [ "1password" ];
+      darwinCasks = [
+        "1password"
+        "1password-cli"
+      ];
     };
     # Linux: the tailscale daemon lives in modules/networking/tailscale.nix.
     tailscale.darwinCasks = [ "tailscale-app" ];
