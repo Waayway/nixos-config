@@ -18,6 +18,9 @@
 
   type = "macbook";
 
+  # Managed by Lodestar (docs/lodestar.md); workstations follow `unstable`.
+  fleet = true;
+
   options = {
     home-manager.enable = true;
     workstation.apps = {
