@@ -27,9 +27,13 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   `programs.nix` (packages: the proxmox template).
 - `hosts/<category>/<name>.nix`: one file per machine. Categories are folders
   (`servers`, `workstations`); a host is `foo.nix` or `foo/default.nix`.
-- `lib/`: `discoverHosts.nix`, `mkSystem.nix` (NixOS), `mkDarwin.nix`,
-  `mkHome.nix` (home-manager), `mkAppCategory.nix`,
-  `mkDeployNode.nix` (deploy-rs), `umport.nix` (recursive importer).
+- `lib/`: helper functions. `lib/default.nix` imports every file there into
+  one attrset keyed by file name (`tools.mkSystem`, `tools.mkAppCategory`, …);
+  `systems.nix` uses it, and every module gets it as the `tools` specialArg
+  (use `tools.<name>`, not a relative import). Files: `discoverHosts.nix`,
+  `mkSystem.nix` (NixOS), `mkDarwin.nix`, `mkHome.nix` (home-manager),
+  `mkAppCategory.nix`, `mkDeployNode.nix` (deploy-rs), `umport.nix`
+  (recursive importer).
 - `modules/<category>/`: all configuration. `*_home.nix` files are
   home-manager modules; everything else is a system module.
 - `modules/secrets/opnix.nix`: server secrets from the 1Password vault Homelab

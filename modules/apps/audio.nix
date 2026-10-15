@@ -1,5 +1,5 @@
-args@{ pkgs, ... }:
-import ../../lib/mkAppCategory.nix args {
+args@{ pkgs, tools, ... }:
+tools.mkAppCategory args {
   name = "audio";
   # Pro audio / show-control rig. Proprietary vendor installers, darwin only.
   # Manual-only: Avantis Director, Dante Virtual Soundcard, Dante Activator/Updater.

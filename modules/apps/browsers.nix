@@ -1,5 +1,5 @@
-args@{ pkgs, ... }:
-import ../../lib/mkAppCategory.nix args {
+args@{ pkgs, tools, ... }:
+tools.mkAppCategory args {
   name = "browsers";
   apps = {
     firefox = {

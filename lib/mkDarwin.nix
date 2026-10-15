@@ -3,6 +3,7 @@
   overlays,
   inputs,
   version,
+  tools,
 }:
 name: hostAttrs:
 let
@@ -21,7 +22,7 @@ let
   isServer = type == "server";
   tags = machineOptions.tags or [ ];
 
-  colors = import ./color.nix { };
+  colors = tools.color { };
 
   machineConfig = machineOptions.config;
 
@@ -61,14 +62,15 @@ let
 
     user = user;
 
-    umport = import ./umport.nix { lib = upkgs.lib; };
-    importCurDir = import ./importCurDir.nix upkgs.lib;
+    inherit tools;
+    umport = tools.umport { lib = upkgs.lib; };
+    importCurDir = tools.importCurDir upkgs.lib;
   };
 
   systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
   homeManager =
-    (import ./mkHome.nix (
+    (tools.mkHome (
       if machineOptions.options ? home-manager && machineOptions.options.home-manager ? enable then
         machineOptions.options.home-manager.enable
       else
