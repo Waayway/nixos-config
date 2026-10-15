@@ -79,6 +79,46 @@ let
       chmod 600 "$RUNTIME_DIRECTORY/config.json"
     '';
   };
+  # Backrest only indexes a repo it backed up itself, or on request (DoRepoTask
+  # TASK_INDEX_SNAPSHOTS; there's no separate IndexSnapshots RPC). Our
+  # backups come from restic-<name>, so ask after each run and at start:
+  # `backrest-index [repo…]` (default: every repo in the running config).
+  index = pkgs.writeShellApplication {
+    name = "backrest-index";
+    runtimeInputs = [
+      pkgs.curl
+      pkgs.jq
+      pkgs.systemd
+    ];
+    text = ''
+      url=http://${cfg.listenAddress}:${toString cfg.port}
+      # Backrest needs a moment after starting.
+      for _ in $(seq 1 30); do
+        curl -fs -o /dev/null "$url/" && break
+        sleep 2
+      done
+      if [ $# -eq 0 ]; then
+        mapfile -t repos < <(jq -r '.repos[].id' /run/backrest/config.json)
+      else
+        repos=("$@")
+      fi
+      for repo in "''${repos[@]}"; do
+        # A repo created since Backrest started (archive's first run) isn't in
+        # its config yet: a restart writes the config and indexes everything.
+        if ! jq -e --arg r "$repo" 'any(.repos[]; .id == $r)' /run/backrest/config.json >/dev/null; then
+          echo "backrest: $repo not configured yet, restarting backrest"
+          systemctl try-restart --no-block backrest.service
+          continue
+        fi
+        # Password via a curl config on stdin, not on the command line.
+        printf 'user = "%s:%s"\n' ${lib.escapeShellArg cfg.user} "$(cat ${secretPaths.backrestPassword})" |
+          curl -fsS -K - -X POST -H 'Content-Type: application/json' \
+            --data "$(jq -cn --arg r "$repo" '{repoId: $r, task: "TASK_INDEX_SNAPSHOTS"}')" \
+            "$url/v1.Backrest/DoRepoTask" -o /dev/null
+        echo "backrest: indexing $repo"
+      done
+    '';
+  };
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.backup.backrest = {
@@ -118,34 +158,49 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cfg.port ];
 
-    systemd.services.backrest = {
-      description = "Backrest (restic web UI)";
-      wantedBy = [ "multi-user.target" ];
-      wants = [ "network-online.target" ];
-      after = [
-        "network-online.target"
-        "tailscaled.service"
-        "opnix-secrets.service"
-      ];
-      environment = {
-        BACKREST_PORT = "${cfg.listenAddress}:${toString cfg.port}";
-        BACKREST_CONFIG = "/run/backrest/config.json";
-        BACKREST_DATA = "/var/lib/backrest";
-        BACKREST_RESTIC_COMMAND = lib.getExe pkgs.restic;
-        XDG_CACHE_HOME = "/var/cache/backrest";
-      };
-      path = [ pkgs.openssh ];
-      serviceConfig = {
-        # Root: it reads the opnix secrets and restores files anywhere.
-        ExecStartPre = lib.getExe writeConfig;
-        ExecStart = lib.getExe pkgs.backrest;
-        RuntimeDirectory = "backrest";
-        StateDirectory = "backrest";
-        CacheDirectory = "backrest";
-        # The tailnet IP may not be up yet right after boot.
-        Restart = "on-failure";
-        RestartSec = "30s";
-      };
-    };
+    environment.systemPackages = [ index ];
+
+    # Index each repo right after its backup run.
+    systemd.services = lib.mkMerge [
+      (lib.mapAttrs' (
+        name: _:
+        lib.nameValuePair "restic-${name}" {
+          serviceConfig.ExecStartPost = [ "-${lib.getExe index} ${name}" ];
+        }
+      ) restic.repos)
+      {
+        backrest = {
+          description = "Backrest (restic web UI)";
+          wantedBy = [ "multi-user.target" ];
+          wants = [ "network-online.target" ];
+          after = [
+            "network-online.target"
+            "tailscaled.service"
+            "opnix-secrets.service"
+          ];
+          environment = {
+            BACKREST_PORT = "${cfg.listenAddress}:${toString cfg.port}";
+            BACKREST_CONFIG = "/run/backrest/config.json";
+            BACKREST_DATA = "/var/lib/backrest";
+            BACKREST_RESTIC_COMMAND = lib.getExe pkgs.restic;
+            XDG_CACHE_HOME = "/var/cache/backrest";
+          };
+          path = [ pkgs.openssh ];
+          serviceConfig = {
+            # Root: it reads the opnix secrets and restores files anywhere.
+            ExecStartPre = lib.getExe writeConfig;
+            ExecStart = lib.getExe pkgs.backrest;
+            # "-": a failed index request doesn't fail the service.
+            ExecStartPost = "-${lib.getExe index}";
+            RuntimeDirectory = "backrest";
+            StateDirectory = "backrest";
+            CacheDirectory = "backrest";
+            # The tailnet IP may not be up yet right after boot.
+            Restart = "on-failure";
+            RestartSec = "30s";
+          };
+        };
+      }
+    ];
   };
 }
