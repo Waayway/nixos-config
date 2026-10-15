@@ -142,6 +142,14 @@ lib.optionalAttrs hostPlatform.isLinux {
   };
 
   config = lib.mkIf cfg.enable {
+    # Lodestar's Services tab. Login page answers 200/401: up.
+    lodestar.links.backrest = {
+      title = "Backrest";
+      group = "Backups";
+      description = "Browse and restore restic snapshots";
+      url = "http://${cfg.listenAddress}:${toString cfg.port}";
+    };
+
     assertions = [
       {
         assertion = restic.enable;

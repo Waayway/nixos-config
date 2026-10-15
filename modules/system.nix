@@ -13,6 +13,7 @@
       ./editor
       ./gaming
       ./hardware
+      ./homelab
       ./locale
       ./lodestar
       ./networking

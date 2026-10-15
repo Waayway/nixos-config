@@ -195,6 +195,28 @@ restic runs on TrueNAS against the 02:00 ZFS snapshots; reporting to
 Healthchecks (Homelab/healthchecks.io). Code: `modules/backup/`. Restore:
 `sudo restic-store snapshots` / `restore` on nixos-manager.
 
+## Dashboard
+
+Every hosted application is on Lodestar's **Services** tab
+(`http://100.92.102.84:8080/#/services`, tailnet), with an HTTP check every 60 s
+from nixos-manager and the state of the machine it runs on.
+
+- A NixOS service declares its link next to itself, inside its module's `mkIf`:
+  `lodestar.links.<id> = { title; url; group; … };` (see
+  `modules/backup/backrest.nix`). `host` defaults to that machine.
+- Services on machines this flake doesn't manage yet are listed in
+  `modules/homelab/links.nix` with an explicit `host`. When a VM moves to NixOS,
+  its entry moves into the service's module.
+- `check.url` probes another address than the link (Main's Traefik isn't
+  reachable from the LAN, so Jellyfin and Archipelago are probed on their
+  backends); `check.insecureTls` for self-signed UIs; `check.enable = false` for
+  links that can't be probed (Nextcloud, for now).
+- Option reference: `~/lodestar/docs/operations.md` ("Service links").
+
+Main's ports 80/443 time out from the LAN (from `pve` and nixos-manager, by
+public name and by 10.0.10.100) while they answer from outside: worth a look
+when Main moves to NixOS.
+
 ## Data that needs backing up
 
 Scope (decided 2026-10-12): **everything on the ZFS pools plus database dumps.
