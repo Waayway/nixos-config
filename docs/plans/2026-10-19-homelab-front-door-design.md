@@ -249,49 +249,62 @@ All links are visible to anonymous visitors, on purpose: the repo is public and
 reachable from the internet, and the page doubles as a public overview of what the
 homelab hosts. The only extra thing it reveals is live up/down state.
 
-## C. Production, VM 100 (agreed)
+## C. Production, VM 100 (agreed; revised 2026-10-19: Docker)
+
+### Decisions
+
+- **Apps and databases run from their official Docker images**, declared in Nix with
+  `virtualisation.oci-containers` (Docker backend), translated from the upstream compose
+  files. Reason: the software stays current independently of the NixOS release, and
+  follows the makers' supported setup (Immich in particular, whose PostgreSQL needs the
+  VectorChord extension it ships). Considered: native NixOS services (versions tied to
+  nixpkgs; PostgreSQL major upgrades manual) and upstream compose files run by a unit
+  (less checked, two languages).
+- **Versions:** apps on a minor track that updates automatically (`nextcloud:32-apache`,
+  `jellyfin/jellyfin:10.11`, Immich `v2`); databases and Immich's PostgreSQL pinned
+  (`mariadb:11.4`, the exact image Immich prescribes). Majors are deliberate commits.
+- **Weekly update:** Friday night a timer on VM 100 pulls the floating tags and restarts
+  only containers whose image changed; result to Healthchecks.io (ping URL in 1Password
+  `healthchecks-prod-updates`).
+- **Notifications:** Renovate on the GitHub repo opens a pull request for every new app
+  major and every database/pinned-image update, with changelog. Merging is the upgrade;
+  Lodestar rolls it out. Renovate never merges by itself.
+- **Data:** files on TrueNAS (`/store`, `/archive`), mounted into the containers at the
+  paths the current Docker setups use, so no path rewrites; databases on VM 100's own
+  disk; nightly dumps to `/store/db-dumps/<app>` (restic picks them up).
+- Logins through Kanidm come with the identity plan.
 
 ### VM
 
 - VMID 100, `10.0.10.100`, hostname `prod`: 6 cores, 16 GB RAM, 64 GB root on
-  `local-lvm` (about 100 GB free there: fits, but getting full). All data stays on
-  TrueNAS over NFS.
-- The WX7100 passthrough moves from media (120); media must be off before 100 starts.
+  `local-lvm`. NixOS provides Docker, the TrueNAS mounts, Tailscale, firewall, the dump
+  and update timers.
+- The WX7100 passthrough moves from media (120) at the cutover; media must be off first.
 - Open: the WX7100 may be replaced by a newer GPU (AV1, HDR tone mapping, Immich ML
-  acceleration); the user is choosing one. The design only assumes one GPU passed
-  through to VM 100.
-- Old Main is renumbered 100 → 108 on `pve` while it is stopped for the Nextcloud
-  move (renaming its disks needs the VM off). Its IP inside the VM stays `.100`; it is
-  never started again after the move, so the new VM 100 can take `.100`.
+  acceleration); the design only assumes one GPU passed through to VM 100.
+- Old Main moves to IP `10.0.10.108` (user) and VMID 108 (Claude).
 
 ### Nextcloud
 
-- `services.nextcloud` on the same major version (32); moving to 33 is a separate
-  step afterwards.
-- MariaDB, current LTS, restored from a fresh dump of 10.7 (no switch to PostgreSQL:
-  an extra migration for no real gain).
-- Data stays on `/store/nextcloud/data`. Redis for caching and locking.
-  `services.collabora-online` on its own subdomain.
-- Kanidm login via `user_oidc`; existing accounts linked by username.
-- Move: maintenance mode on → dump → stop the old containers → restore → `occ
-  upgrade` check → router route to `10.0.10.100`. Rehearsed first on a clone at 230.
+- Containers: `nextcloud:32-apache` (app, and the same image as `cron`), `mariadb:11.4`,
+  `redis:7-alpine`, `collabora/code` at `office.vanwaaij.com`.
+- Data `/store/nextcloud/data` mounted at `/var/www/html/data` (as on Main; owned by
+  www-data, uid 33). Config and app code on VM 100's disk.
+- Move: a dump of Main's MariaDB 10.7 into the `mariadb:11.4` container (it upgrades
+  once on start), `occ upgrade`; first a copy for testing, the final dump at the cutover.
 
 ### Jellyfin
 
-- `services.jellyfin` with VA-API on the WX7100.
-- Config stays on `/store/jellyfin`, so libraries, users and watch progress carry
-  over. Library read-only from `archive/shares`.
-- SSO plugin in the browser; TV apps keep a password or Quick Connect.
+- `jellyfin/jellyfin:10.11` with `/dev/dri` once the GPU has moved; `/config`, `/cache`
+  and `/media` mounted as on media today (`/media` = `/archive/jellyfin`, read-only).
+- Testing on a copy of the config (`/store/jellyfin-test`); the original
+  `/store/jellyfin` at the cutover.
 
 ### Immich
 
-- `services.immich`, library on `/store/immich` (52 GB already there), database dumps
-  to `/store/db-dumps/immich`.
-- Machine learning on the CPU: the WX7100 (Polaris) is too old for current ROCm.
-  Slower first indexing, otherwise fine.
-- Start fresh (decided 2026-10-19): the library on `/store/immich` is re-imported
-  and re-indexed; the old database on media is not migrated (albums, faces and sharing
-  are rebuilt by hand).
+- Upstream's containers: server, machine-learning (CPU), valkey, PostgreSQL (pinned).
+- Starts fresh: new media location `/store/immich-v2`; the existing photos in
+  `/store/immich/library` are added as a read-only external library.
 
 ### Not moving
 
