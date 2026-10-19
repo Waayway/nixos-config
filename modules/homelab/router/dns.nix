@@ -5,6 +5,7 @@
 {
   config,
   lib,
+  pkgs,
   hostPlatform,
   ...
 }:
@@ -17,6 +18,18 @@ let
     && r.tailnet.address != null
     && (cfg.tailnetServices == null || lib.elem name cfg.tailnetServices)
   ) cfg.routes;
+
+  waitForTailnetAddress = pkgs.writeShellScript "coredns-wait-tailnet-address" ''
+    for _ in $(seq 60); do
+      addr=$(${lib.getExe config.services.tailscale.package} ip -4 2>/dev/null)
+      if [ -n "$addr" ] && ${pkgs.iproute2}/bin/ip -4 -o addr show dev tailscale0 | grep -qF " $addr/"; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "no tailnet address on tailscale0 after 60 s" >&2
+    exit 1
+  '';
 in
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf cfg.enable {
@@ -37,11 +50,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       '';
     };
 
-    # `bind tailscale0` fails until the interface exists.
+    # `bind tailscale0` takes the interface's addresses once, at start: wait until the
+    # node's 100.x address is on tailscale0 (up to 60 s, then fail and retry), and
+    # restart with tailscaled so a new login doesn't leave it on a stale address.
     systemd.services.coredns = {
-      after = [ "tailscaled.service" ];
+      after = [
+        "tailscaled.service"
+        "tailscaled-autoconnect.service"
+      ];
       wants = [ "tailscaled.service" ];
+      partOf = [ "tailscaled.service" ];
       serviceConfig = {
+        # `+`: as root, for tailscaled's socket.
+        ExecStartPre = "+${waitForTailnetAddress}";
         Restart = "on-failure";
         RestartSec = "2s";
       };
