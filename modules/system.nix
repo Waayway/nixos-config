@@ -21,6 +21,7 @@
       ./packages
       ./secrets
       ./security
+      ./services
       ./shell
       ./system
       ./truenas

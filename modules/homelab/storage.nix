@@ -28,5 +28,21 @@ lib.optionalAttrs hostPlatform.isLinux {
           "/store" = "10.0.10.130:/mnt/store/internal";
           "/archive" = "10.0.10.130:/mnt/archive/shares";
         };
+
+    # systemd-tmpfiles runs before the network is up: a rule under an NFS automount
+    # (a service's dump or media directory) would hang boot waiting for the mount.
+    # Those directories are made on TrueNAS with the right owner instead (the root
+    # of an NFS client is squashed and couldn't chown them anyway).
+    systemd.services =
+      let
+        exclude = "--exclude-prefix=/dev --exclude-prefix=/store --exclude-prefix=/archive";
+      in
+      {
+        systemd-tmpfiles-setup.serviceConfig.ExecStart = [
+          ""
+          "systemd-tmpfiles --create --remove --boot ${exclude}"
+        ];
+        systemd-tmpfiles-resetup.serviceConfig.ExecStart = lib.mkForce "systemd-tmpfiles --create --remove ${exclude}";
+      };
   };
 }

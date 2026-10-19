@@ -20,6 +20,12 @@
 
   options = {
     homelab.storage.enable = true;
+    homelab.nextcloud.enable = true;
+    homelab.jellyfin = {
+      enable = true;
+      configDir = "/store/jellyfin-test/config";
+    };
+    homelab.immich.enable = true;
   };
 
   config = { ... }: { };

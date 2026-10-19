@@ -11,25 +11,6 @@
 {
   config = lib.mkIf (config.services.lodestar-server.enable or false) {
     lodestar.links = {
-      nextcloud = {
-        title = "Nextcloud";
-        group = "Apps";
-        description = "Files, contacts and documents";
-        icon = "nextcloud";
-        url = "https://nextcloud.vanwaaij.com";
-        host = "main";
-        # Only reachable through Main's Traefik, which the LAN can't reach.
-        check.enable = false;
-      };
-      jellyfin = {
-        title = "Jellyfin";
-        group = "Media";
-        description = "Media server";
-        icon = "jellyfin";
-        url = "https://jellyfin.vanwaaij.com";
-        host = "media";
-        check.url = "http://10.0.10.120:8096";
-      };
       archipelago = {
         title = "Archipelago";
         group = "Games";
