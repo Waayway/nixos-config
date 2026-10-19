@@ -1,6 +1,7 @@
 # Split DNS for the tailnet: CoreDNS answers vanwaaij.com on tailscale0 with the
 # Tailscale Service IP of each published route, and forwards everything else
-# (the public records) upstream. The tailnet's nameserver setting points here.
+# (the public records, and any other zone, for clients that use it as their only
+# nameserver) upstream. The tailnet's nameserver setting points here.
 # NixOS only.
 {
   config,
@@ -44,6 +45,12 @@ lib.optionalAttrs hostPlatform.isLinux {
         )}
             fallthrough
           }
+          forward . 1.1.1.1 9.9.9.9
+          cache 30
+        }
+
+        .:53 {
+          bind tailscale0
           forward . 1.1.1.1 9.9.9.9
           cache 30
         }
