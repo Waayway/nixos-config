@@ -274,9 +274,9 @@ homelab hosts. The only extra thing it reveals is live up/down state.
   to `/store/db-dumps/immich`.
 - Machine learning on the CPU: the WX7100 (Polaris) is too old for current ROCm.
   Slower first indexing, otherwise fine.
-- Open: restore the old database (262 MB on media's local disk; albums, faces and
-  sharing come back, but it needs a stepwise upgrade from an old Immich version) or
-  start fresh (re-import and re-index the library; albums, faces and sharing lost).
+- Start fresh (decided 2026-10-19): the library on `/store/immich` is re-imported
+  and re-indexed; the old database on media is not migrated (albums, faces and sharing
+  are rebuilt by hand).
 
 ### Not moving
 
