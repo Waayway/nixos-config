@@ -7,11 +7,15 @@
 }:
 # The weekly container update (Friday 23:00): pulls the floating-tag images
 # (`homelab.containers.floating`, filled in by the app modules) and restarts the
-# containers whose image changed. Pinned images are never pulled here; Renovate
-# proposes those as pull requests (renovate.json). Reports to Healthchecks.io
-# (1Password Homelab item `healthchecks-prod-updates`, field `credential`, the check's
-# ping URL): `/start`, then the plain URL on success or `/fail` with the last 100 log
-# lines. The URL is a secret and is never printed.
+# containers whose image changed, then waits up to 5 minutes for each restarted
+# container to be running (and healthy, where the image has a healthcheck). Pinned
+# images are never pulled here; Renovate proposes those as pull requests
+# (renovate.json). Reports to Healthchecks.io (1Password Homelab item
+# `healthchecks-prod-updates`, field `credential`, the check's ping URL): `/start`,
+# then the plain URL on success or `/fail` with the last 100 log lines; a failed
+# pull, restart or wait is a failure. Without the URL (secret missing) the job fails
+# before updating anything, so an unmonitored update never runs. The URL is a secret
+# and is never printed.
 let
   cfg = config.homelab.containers;
   secretPaths = config.services.onepassword-secrets.secretPaths;
@@ -35,14 +39,43 @@ let
 
     log=$(mktemp)
     trap 'rm -f "$log"' EXIT
-    url=$(tr -d '[:space:]' <"$1")
+    url=$(tr -d '[:space:]' <"$1" 2>/dev/null || true)
+    if [ -z "$url" ]; then
+      echo "ERROR: no Healthchecks ping URL in $1 (1Password Homelab healthchecks-prod-updates missing?); not updating" >&2
+      exit 2
+    fi
 
     # A failing ping never fails the update; curl's stderr is dropped so the URL
     # cannot reach the journal.
     hc() { curl -fs -m 15 --retry 3 "$@" >/dev/null 2>&1 || true; }
 
+    # Wait (5 minutes in all) until each restarted container runs and, where the
+    # image has a healthcheck, reports healthy.
+    wait_healthy() {
+      local rc=0 name state deadline=$((SECONDS + 300))
+      for name in "$@"; do
+        while :; do
+          state=$(docker inspect -f '{{.State.Running}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name" 2>/dev/null || echo "missing")
+          case "$state" in
+            "true healthy" | "true none")
+              echo "$name: up ($state)"
+              break
+              ;;
+          esac
+          if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "$name: not up after restart ($state)"
+            rc=1
+            break
+          fi
+          sleep 5
+        done
+      done
+      return $rc
+    }
+
     run() {
       local rc=0 running new
+      local -a restarted=()
       ${lib.concatMapStrings (image: ''
         echo "pulling ${image}"
         docker pull ${lib.escapeShellArg image} || rc=1
@@ -54,6 +87,7 @@ let
             if [ -n "$new" ] && [ "$running" != "$new" ]; then
               echo "restarting ${name}: image changed"
               systemctl restart ${c.serviceName}.service || rc=1
+              restarted+=(${name})
             else
               echo "${name}: image unchanged"
             fi
@@ -62,6 +96,9 @@ let
           fi
         '') floatingContainers
       )}
+      if [ ''${#restarted[@]} -gt 0 ]; then
+        wait_healthy "''${restarted[@]}" || rc=1
+      fi
       return $rc
     }
 
