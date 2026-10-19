@@ -218,7 +218,7 @@ lib.optionalAttrs hostPlatform.isLinux {
             group = "Infrastructure";
             description = "Front-door router";
             icon = "traefikproxy";
-            url = "https://traefik.vanwaaij.com";
+            url = "https://traefik.vanwaaij.com/dashboard/";
           };
         };
       }
