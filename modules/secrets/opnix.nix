@@ -15,8 +15,9 @@
 # The one bootstrap secret per server is the token of the service account
 # `opnix-homelab` (read-only on Homelab), placed once at /etc/opnix-token with
 # `sudo opnix token set`. Without it opnix logs a warning and keeps the files it
-# already wrote. Workstations need no server secrets: off there, and on darwin
-# the module is only imported. Settings below come from the spike in
+# already wrote. Linux workstations need no secrets: off there. On darwin the
+# Lodestar agent's signing key is the only secret (modules/lodestar/agent.nix,
+# same token file). Settings below come from the spike in
 # docs/plans/2026-10-12-homelab-backup-plan.md (phase 1).
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf hostPlatform.isServer {
