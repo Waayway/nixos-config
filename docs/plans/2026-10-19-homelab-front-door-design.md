@@ -209,11 +209,11 @@ also rebuilds the service's VM. Lodestar can apply both.
 | WireGuard | vpn 110 → 118 | stays for now | keys, none |
 | Tailscale | SaaS | — | possible later, see Decisions |
 
-## B. Lodestar at lodestar.vanwaaij.com (proposed)
+## B. Lodestar at lodestar.vanwaaij.com (agreed)
 
 | Who | Path | Gets |
 |---|---|---|
-| anyone | public, not logged in | Services tab, read-only, only links with `public = true` |
+| anyone | public, not logged in | Services tab, read-only, all links with their state |
 | logged in | public or tailnet | full dashboard, read-only |
 | `lodestar-admins` | tailnet | everything, including rebuild and promote |
 | `lodestar-admins` | public | read-only; actions show "only over Tailscale" |
@@ -225,16 +225,18 @@ Lodestar repo:
 2. A second listener for Traefik on `10.0.10.170`, firewalled to the router. It
    trusts `X-Homelab-Via: tailnet` only from `trustedProxies` (`10.0.10.110`).
 3. The tailnet listener stays as it is (`tailscale whois`), for the CLI.
-4. `lodestar.links.<id>.public` (default `false`), honoured by the anonymous view.
-5. CSRF rules unchanged (`X-Lodestar: 1`, same-origin).
-6. VM test with Kanidm: anonymous sees only public links; login works; actions without
+4. CSRF rules unchanged (`X-Lodestar: 1`, same-origin).
+5. VM test with Kanidm: anonymous sees only the Services tab; login works; actions without
    the header, or with it from an untrusted address, are refused.
 
 This repo: `homelab.routes.lodestar` (public + tailnet, backend the new listener),
 `homelab.access.lodestar`, the Lodestar link URL becomes
-`https://lodestar.vanwaaij.com`, public links get `public = true`.
+`https://lodestar.vanwaaij.com`.
 
-Open: confirm hiding non-public links from anonymous visitors.
+All links are visible to anonymous visitors, on purpose: the repo is public and
+`modules/homelab/links.nix` already lists them, internal URLs (LAN, `*.ts.net`) are not
+reachable from the internet, and the page doubles as a public overview of what the
+homelab hosts. The only extra thing it reveals is live up/down state.
 
 ## C. Production, VM 100 (outline)
 
