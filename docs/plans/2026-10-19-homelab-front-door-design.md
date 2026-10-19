@@ -238,19 +238,53 @@ All links are visible to anonymous visitors, on purpose: the repo is public and
 reachable from the internet, and the page doubles as a public overview of what the
 homelab hosts. The only extra thing it reveals is live up/down state.
 
-## C. Production, VM 100 (outline)
+## C. Production, VM 100 (proposed)
 
-Not discussed yet. Starting points:
+### VM
 
-- Renumber old Main to 108 first; the new VM takes 100 / `10.0.10.100`.
-- Nextcloud (same major version, 32), MariaDB restored from a fresh dump,
-  Collabora; data stays on `/store/nextcloud/data`.
-- Jellyfin with the WX7100 moved over from 120; config on `/store/jellyfin`, library
-  read-only from `archive/shares`.
-- Immich revived as `services.immich`, library on `/store/immich`, database dumps to
-  `/store/db-dumps/immich`.
-- All three log in through Kanidm (section D).
-- Main and media stay as shut-down VMs; deleting them is the very last step.
+- VMID 100, `10.0.10.100`, hostname `prod`: 6 cores, 16 GB RAM, 64 GB root on
+  `local-lvm` (about 100 GB free there: fits, but getting full). All data stays on
+  TrueNAS over NFS.
+- The WX7100 passthrough moves from media (120); media must be off before 100 starts.
+- First, old Main is renumbered 100 → 108 on `pve` (config only, its IP inside the VM
+  stays `.100`). The new VM takes `.100` only after Main's services have moved.
+
+### Nextcloud
+
+- `services.nextcloud` on the same major version (32); moving to 33 is a separate
+  step afterwards.
+- MariaDB, current LTS, restored from a fresh dump of 10.7 (no switch to PostgreSQL:
+  an extra migration for no real gain).
+- Data stays on `/store/nextcloud/data`. Redis for caching and locking.
+  `services.collabora-online` on its own subdomain.
+- Kanidm login via `user_oidc`; existing accounts linked by username.
+- Move: maintenance mode on → dump → stop the old containers → restore → `occ
+  upgrade` check → router route to `10.0.10.100`. Rehearsed first on a clone at 230.
+
+### Jellyfin
+
+- `services.jellyfin` with VA-API on the WX7100.
+- Config stays on `/store/jellyfin`, so libraries, users and watch progress carry
+  over. Library read-only from `archive/shares`.
+- SSO plugin in the browser; TV apps keep a password or Quick Connect.
+
+### Immich
+
+- `services.immich`, library on `/store/immich` (52 GB already there), database dumps
+  to `/store/db-dumps/immich`.
+- Machine learning on the CPU: the WX7100 (Polaris) is too old for current ROCm.
+  Slower first indexing, otherwise fine.
+- Open: restore the old database (262 MB on media's local disk; albums, faces and
+  sharing come back, but it needs a stepwise upgrade from an old Immich version) or
+  start fresh (re-import and re-index the library; albums, faces and sharing lost).
+
+### Not moving
+
+jellyfetch (qBittorrent + ProtonVPN, exited since August) and voice-memo (deprecated).
+
+### Old VMs
+
+Main (108) and media (120) stay shut down. Deleting them is the very last step.
 
 ## Order
 
