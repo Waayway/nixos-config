@@ -119,7 +119,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     virtualisation.oci-containers.containers = lib.mkMerge [
       {
         nextcloud-db = {
-          image = "mariadb:11.4";
+          image = "mariadb:11.4@sha256:250e1609e93c0e6aecf64bfbab2d84d5e89d2481540fe77447ff6c855c3b1873";
           networks = [ network ];
           # Main's tuning.
           cmd = [
@@ -145,7 +145,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         # Password from the env file, so through a shell; the image's entrypoint
         # still drops to the redis user. Cache and locking only: no persistence.
         nextcloud-redis = {
-          image = "redis:7-alpine";
+          image = "redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499";
           networks = [ network ];
           entrypoint = "sh";
           cmd = [
@@ -171,7 +171,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         # Collabora Online behind the router: Traefik terminates TLS, coolwsd speaks
         # plain HTTP and builds its URLs for https://office.vanwaaij.com.
         collabora = {
-          image = "collabora/code:26.04.5.1.1";
+          image = "collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d";
           networks = [ network ];
           ports = [ "${lan.address}:${toString officePort}:${toString officePort}" ];
           environment = {
