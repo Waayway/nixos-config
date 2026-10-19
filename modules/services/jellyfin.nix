@@ -4,22 +4,24 @@
   hostPlatform,
   ...
 }:
-# Jellyfin on the official Docker image's layout: its database holds absolute paths
-# from that container (`--datadir /config --cachedir /cache`, library at /media), so
-# the unit binds the same paths: `configDir` (on TrueNAS) at /config, a local cache
-# at /cache and the library /archive/jellyfin read-only at /media. Config is then
-# /config/config and logs /config/log, as in the image.
+# Jellyfin from the official image, jellyfin/jellyfin:10.11. Follows the Docker
+# section of Jellyfin's container install docs (jellyfin.org/docs, "Container",
+# Docker compose example) and media's container today (`docker inspect jellyfin` on
+# 10.0.10.120): `--user 1000:1000` (the owner of the config on TrueNAS), `configDir`
+# at /config, a cache at /cache, the library /archive/jellyfin read-only at /media,
+# port 8096. With `gpu`: /dev/dri and the render/video groups (Intel Arc A380,
+# QSV/VA-API through the image's jellyfin-ffmpeg and iHD), as media does with the
+# card it has now.
 let
   cfg = config.homelab.jellyfin;
   lan = config.homelab.lan;
   host = "jellyfin.vanwaaij.com";
   port = 8096;
-  library = "/archive/jellyfin";
   cache = "/var/cache/jellyfin";
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.jellyfin = {
-    enable = lib.mkEnableOption "Jellyfin";
+    enable = lib.mkEnableOption "Jellyfin (container)";
     live = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -28,80 +30,70 @@ lib.optionalAttrs hostPlatform.isLinux {
     configDir = lib.mkOption {
       type = lib.types.str;
       example = "/store/jellyfin/config";
-      description = "The container's /config directory (data, config and logs), bound at /config.";
+      description = "The container's /config directory (data, config and logs), owned by 1000:1000.";
     };
     gpu = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "VA-API transcoding on the passed-through AMD GPU (/dev/dri/renderD128).";
+      description = "Hardware transcoding on the passed-through Intel Arc A380 (/dev/dri, QSV/VA-API).";
     };
   };
 
-  config = lib.mkIf cfg.enable (
-    lib.mkMerge [
+  config = lib.mkIf cfg.enable {
+    assertions = [
       {
-        services.jellyfin = {
-          enable = true;
-          # Paths inside the unit's mount namespace (bound below).
-          dataDir = "/config";
-          cacheDir = "/cache";
-        };
-
-        # Only the local cache is a real directory; /config and /cache are bind
-        # targets (systemd creates them), and /store must not be touched at boot.
-        systemd.tmpfiles.settings.jellyfinDirs = lib.mkForce {
-          ${cache}.d = {
-            mode = "0700";
-            user = "jellyfin";
-            group = "jellyfin";
-          };
-        };
-
-        systemd.services.jellyfin = {
-          serviceConfig = {
-            BindPaths = [
-              "${cfg.configDir}:/config"
-              "${cache}:/cache"
-            ];
-            BindReadOnlyPaths = [ "${library}:/media" ];
-          };
-          unitConfig.RequiresMountsFor = [
-            cfg.configDir
-            library
-          ];
-        };
-
-        networking.firewall.interfaces.${lan.interface}.allowedTCPPorts = [ port ];
-
-        homelab.routes.jellyfin = {
-          inherit host;
-          backend = "http://${lan.address}:${toString port}";
-          maintenance = !cfg.live;
-        };
-
-        lodestar.links.jellyfin = {
-          title = "Jellyfin";
-          group = "Media";
-          description = "Media server";
-          icon = "jellyfin";
-          url = "https://${host}";
-          check.url = "http://${lan.address}:${toString port}";
-        };
+        assertion = lan.address != null;
+        message = "homelab.jellyfin needs homelab.lan.address (the host file's netInterface.ip).";
       }
+    ];
 
-      (lib.mkIf cfg.gpu {
-        # Polaris (Radeon Pro WX 7100): Mesa's radeonsi VA-API driver.
-        hardware.graphics.enable = true;
-        services.jellyfin.hardwareAcceleration = {
-          enable = true;
-          type = "vaapi";
-          device = "/dev/dri/renderD128";
-        };
-        users.users.jellyfin.extraGroups = [
-          "render"
-          "video"
-        ];
-      })
-    ]
-  );
+    homelab.containers = {
+      enable = true;
+      intelGpu = lib.mkIf cfg.gpu true;
+    };
+
+    virtualisation.oci-containers.containers.jellyfin = {
+      image = "jellyfin/jellyfin:10.11";
+      user = "1000:1000";
+      networks = [ "jellyfin" ];
+      ports = [ "${lan.address}:${toString port}:${toString port}" ];
+      volumes = [
+        "${cfg.configDir}:/config"
+        "${cache}:/cache"
+        "/archive/jellyfin:/media:ro"
+      ];
+      environment = {
+        JELLYFIN_PublishedServerUrl = "https://${host}";
+      }
+      // lib.optionalAttrs (config.time.timeZone != null) { TZ = config.time.timeZone; };
+      devices = lib.optional cfg.gpu "/dev/dri:/dev/dri";
+      extraOptions = lib.optionals cfg.gpu [
+        "--group-add=${toString config.users.groups.render.gid}"
+        "--group-add=${toString config.users.groups.video.gid}"
+      ];
+    };
+
+    systemd.tmpfiles.settings.jellyfin.${cache}.d = {
+      mode = "0750";
+      user = "1000";
+      group = "1000";
+    };
+
+    networking.firewall.interfaces.${lan.interface}.allowedTCPPorts = [ port ];
+
+    homelab.routes.jellyfin = {
+      inherit host;
+      backend = "http://${lan.address}:${toString port}";
+      maintenance = !cfg.live;
+    };
+
+    lodestar.links.jellyfin = {
+      title = "Jellyfin";
+      group = "Media";
+      description = "Media server";
+      icon = "jellyfin";
+      url = "https://${host}";
+      check.url = "http://${lan.address}:${toString port}/health";
+    };
+  };
 }

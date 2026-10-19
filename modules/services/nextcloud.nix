@@ -1,18 +1,29 @@
 {
   config,
   lib,
-  pkgs,
   hostPlatform,
   ...
 }:
-# Nextcloud 32 on its own nginx (port 80) with MariaDB and Redis, plus Collabora
-# Online (office.vanwaaij.com) for richdocuments. Config and apps stay on local disk
-# (/var/lib/nextcloud); the user data is the TrueNAS copy Main used, at
-# /store/nextcloud/data, owned by uid/gid 33 (Main's www-data).
+# Nextcloud 32 from the official image (nextcloud:32-apache) with MariaDB, Redis and
+# Collabora Online (office.vanwaaij.com) for richdocuments, as containers on the
+# `nextcloud` Docker network.
 #
-# `live = false`: the public routes show the maintenance page, the tailnet ones go
-# here, and nothing runs that would touch the shared data on its own (cron timer
-# off; the app store is off for good, apps come from nixpkgs).
+# Follows Main's ~/nextcloud/docker-compose.yml (itself the nextcloud/docker README's
+# "Base version - apache" with MariaDB, Redis and a cron container), and Collabora's
+# CODE Docker instructions (sdk.collaboraonline.com, "CODE Docker image") for the
+# collabora container. Main's Traefik labels are the router's `nextcloud` route here.
+#
+# html, config and custom_apps are local (/var/lib/prod/nextcloud), the user data is
+# the TrueNAS copy Main uses, /store/nextcloud/data (www-data, 33, as in the image).
+#
+# Secrets: one env file, 1Password Homelab `nextcloud-config` field `env`, with
+# MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD and REDIS_HOST_PASSWORD (and, for a first
+# install only, NEXTCLOUD_ADMIN_USER / NEXTCLOUD_ADMIN_PASSWORD).
+#
+# Two Nextclouds on one data directory: until `live`, nothing here runs background
+# jobs (no cron container), and the app only starts once config/config.php exists
+# (copied from Main), so the image never installs a fresh instance onto the shared
+# data directory.
 let
   cfg = config.homelab.nextcloud;
   lan = config.homelab.lan;
@@ -20,27 +31,45 @@ let
 
   host = "nextcloud.vanwaaij.com";
   officeHost = "office.vanwaaij.com";
-  dataDir = "/store/nextcloud/data";
-  dumpDir = "/store/db-dumps/nextcloud";
   officePort = 9980;
+  state = "/var/lib/prod/nextcloud";
+  network = "nextcloud";
+  image = "nextcloud:32-apache";
 
-  # Units that read the data directory or the secrets.
-  units = [
-    "nextcloud-setup"
-    "nextcloud-update-db"
-    "nextcloud-cron"
-    "phpfpm-nextcloud"
+  # The app's and cron's mounts (Main's, with local paths under `state`).
+  appVolumes = [
+    "${state}/html:/var/www/html"
+    "/store/nextcloud/data:/var/www/html/data"
+    "${state}/config:/var/www/html/config"
+    "${state}/custom_apps:/var/www/html/custom_apps"
   ];
+  appEnvironment = {
+    MYSQL_HOST = "nextcloud-db";
+    MYSQL_DATABASE = "nextcloud";
+    MYSQL_USER = "nextcloud";
+    REDIS_HOST = "nextcloud-redis";
+    NEXTCLOUD_TRUSTED_DOMAINS = lib.concatStringsSep " " (
+      [ host ] ++ lib.optional (lan.address != null) lan.address
+    );
+    PHP_MEMORY_LIMIT = "1G";
+    PHP_UPLOAD_LIMIT = "16G";
+    APACHE_BODY_LIMIT = "0";
+    # Behind the router (Traefik terminates TLS).
+    TRUSTED_PROXIES = "10.0.10.110";
+    OVERWRITEPROTOCOL = "https";
+    OVERWRITEHOST = host;
+  };
+  envFiles = [ secretPaths.nextcloudEnv ];
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.nextcloud = {
-    enable = lib.mkEnableOption "Nextcloud with MariaDB, Redis and Collabora Online";
+    enable = lib.mkEnableOption "Nextcloud with MariaDB, Redis and Collabora Online (containers)";
     live = lib.mkOption {
       type = lib.types.bool;
       default = false;
       description = ''
         Serve the public hosts and run background jobs. Off: public hosts show the
-        maintenance page and nextcloud-cron does not run.
+        maintenance page and there is no nextcloud-cron container.
       '';
     };
   };
@@ -48,104 +77,126 @@ lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = !config.services.disnix.enable;
-        message = ''
-          homelab.nextcloud pins the nextcloud user and group to 33 (nixpkgs reserves
-          33 for disnix) so the data on TrueNAS stays owned as it was on Main
-          (www-data, 33). Disnix cannot run on this host.
-        '';
+        assertion = lan.address != null;
+        message = "homelab.nextcloud needs homelab.lan.address (the host file's netInterface.ip).";
       }
     ];
 
-    # Main runs 32 and the import has to stay on that major; nixpkgs marks 32 EOL.
-    # Upgrade to 33 after the cutover (one major at a time).
-    homelab.insecurePackages = [ "nextcloud-32." ];
+    homelab.containers.enable = true;
 
-    users.users.nextcloud.uid = 33;
-    users.groups.nextcloud.gid = 33;
-
-    services.onepassword-secrets.secrets = {
-      # JSON with Main's instanceid, passwordsalt and secret.
-      nextcloudSecrets = {
-        reference = "op://Homelab/nextcloud-config/secrets";
-        mode = "0400";
-        owner = "root";
-        services = units;
-      };
-      # Only used by the first install; the database import replaces the users.
-      nextcloudAdminpass = {
-        reference = "op://Homelab/nextcloud-config/adminpass";
-        mode = "0400";
-        owner = "root";
-        services = [ "nextcloud-setup" ];
-      };
+    services.onepassword-secrets.secrets.nextcloudEnv = {
+      reference = "op://Homelab/nextcloud-config/env";
+      mode = "0400";
+      owner = "root";
+      services = [
+        "docker-nextcloud-app"
+        "docker-nextcloud-db"
+        "docker-nextcloud-redis"
+      ]
+      ++ lib.optional cfg.live "docker-nextcloud-cron";
     };
 
-    services.nextcloud = {
-      enable = true;
-      package = pkgs.nextcloud32;
-      hostName = host;
-      # Config, app data from nixpkgs: local. User data: `settings.datadirectory`.
-      datadir = "/var/lib/nextcloud";
-      database.createLocally = true;
-      configureRedis = true;
-      config = {
-        dbtype = "mysql";
-        # The first install's admin, a name no account on Main has (the install
-        # runs against the shared data directory); the database import replaces it.
-        adminuser = "prod-setup";
-        adminpassFile = secretPaths.nextcloudAdminpass;
-      };
-      secretFile = secretPaths.nextcloudSecrets;
-      appstoreEnable = false;
-      extraApps = {
-        inherit (pkgs.nextcloud32Packages.apps)
-          calendar
-          contacts
-          pantry
-          richdocuments
-          ;
-      };
-      extraAppsEnable = true;
-      settings = {
-        datadirectory = dataDir;
-        # The LAN address too, for Lodestar's check.
-        trusted_domains = lib.optional (lan.address != null) lan.address;
-        trusted_proxies = [ "10.0.10.110" ];
-        overwriteprotocol = "https";
-      };
-    };
+    virtualisation.oci-containers.containers = lib.mkMerge [
+      {
+        nextcloud-db = {
+          image = "mariadb:11.4";
+          networks = [ network ];
+          # Main's tuning.
+          cmd = [
+            "--transaction-isolation=READ-COMMITTED"
+            "--log-bin=binlog"
+            "--binlog-format=ROW"
+            "--innodb-buffer-pool-size=512M"
+            "--innodb-log-file-size=128M"
+            "--innodb-flush-log-at-trx-commit=2"
+            "--innodb-flush-method=O_DIRECT"
+            "--max-connections=200"
+          ];
+          volumes = [ "${state}/db:/var/lib/mysql" ];
+          environment = {
+            MYSQL_DATABASE = "nextcloud";
+            MYSQL_USER = "nextcloud";
+            # Upgrade the system tables after a MariaDB update (Main's 10.7 data).
+            MARIADB_AUTO_UPGRADE = "1";
+          };
+          environmentFiles = envFiles;
+        };
 
-    systemd.timers.nextcloud-cron.enable = cfg.live;
+        # Password from the env file, so through a shell; the image's entrypoint
+        # still drops to the redis user. Cache and locking only: no persistence.
+        nextcloud-redis = {
+          image = "redis:7-alpine";
+          networks = [ network ];
+          entrypoint = "sh";
+          cmd = [
+            "-c"
+            ''exec docker-entrypoint.sh redis-server --requirepass "$REDIS_HOST_PASSWORD" --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""''
+          ];
+          environmentFiles = envFiles;
+        };
 
-    systemd.services = lib.mkMerge [
-      (lib.genAttrs units (_: {
-        unitConfig.RequiresMountsFor = [ dataDir ];
-      }))
-      { mysql-backup.unitConfig.RequiresMountsFor = [ dumpDir ]; }
+        nextcloud-app = {
+          inherit image;
+          networks = [ network ];
+          ports = [ "${lan.address}:80:80" ];
+          volumes = appVolumes;
+          environment = appEnvironment;
+          environmentFiles = envFiles;
+          dependsOn = [
+            "nextcloud-db"
+            "nextcloud-redis"
+          ];
+        };
+
+        # Collabora Online behind the router: Traefik terminates TLS, coolwsd speaks
+        # plain HTTP and builds its URLs for https://office.vanwaaij.com.
+        collabora = {
+          image = "collabora/code:26.04.5.1.1";
+          networks = [ network ];
+          ports = [ "${lan.address}:${toString officePort}:${toString officePort}" ];
+          environment = {
+            aliasgroup1 = "https://${host}";
+            server_name = officeHost;
+            extra_params = "--o:ssl.enable=false --o:ssl.termination=true";
+            DONT_GEN_SSL_CERT = "true";
+            dictionaries = "en_GB en_US nl";
+          };
+        };
+      }
+
+      (lib.mkIf cfg.live {
+        nextcloud-cron = {
+          inherit image;
+          networks = [ network ];
+          entrypoint = "/cron.sh";
+          volumes = appVolumes;
+          environment = appEnvironment;
+          environmentFiles = envFiles;
+          dependsOn = [ "nextcloud-app" ];
+        };
+      })
     ];
 
-    services.mysqlBackup = {
-      enable = true;
-      databases = [ "nextcloud" ];
-      location = dumpDir;
-      calendar = "01:30";
-      singleTransaction = true;
-    };
+    systemd.services.docker-nextcloud-app.unitConfig.ConditionPathExists = "${state}/config/config.php";
 
-    # Collabora Online behind the router: Traefik terminates TLS, coolwsd speaks
-    # plain HTTP and builds its URLs for https://office.vanwaaij.com.
-    services.collabora-online = {
-      enable = true;
-      port = officePort;
-      aliasGroups = [ { host = "https://${host}"; } ];
-      settings = {
-        server_name = officeHost;
-        ssl = {
-          enable = false;
-          termination = true;
-        };
-      };
+    systemd.tmpfiles.settings.nextcloud =
+      lib.genAttrs
+        [
+          "${state}/html"
+          "${state}/config"
+          "${state}/custom_apps"
+        ]
+        (_: {
+          d = {
+            mode = "0750";
+            user = "33";
+            group = "33";
+          };
+        });
+
+    homelab.containers.dumps.nextcloud = {
+      container = "nextcloud-db";
+      command = ''MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb-dump -u root --single-transaction --routines --triggers nextcloud'';
     };
 
     networking.firewall.interfaces.${lan.interface}.allowedTCPPorts = [
