@@ -258,8 +258,12 @@ a `lodestar.links` entry, its dump timer.
   app hosts → 503 page; `ap.` → 401.
 - [ ] **Step 2:** Main: `occ maintenance:mode --on`, stop `nextcloud-app` and
   `nextcloud-cron`; media: stop `jellyfin`.
-- [ ] **Step 3:** `prod-sync-nextcloud-db` (fresh dump → recreate → import → `occ upgrade`
-  → maintenance off).
+- [ ] **Step 3:** `scripts/prod-sync-nextcloud-db.sh` (Main in maintenance mode; fresh dump →
+  recreate → import), then on prod: set `homelab.nextcloud.imageTag` back to the `32-apache`
+  track and switch (`occ upgrade` runs), `occ maintenance:mode --off`, and re-point Office
+  (the import brings Main's settings back): `occ config:app:set richdocuments wopi_url
+  --value=https://office.vanwaaij.com`, `occ app:disable richdocumentscode`,
+  `occ richdocuments:activate-config` → "Detected WOPI server".
 - [ ] **Step 4:** `homelab.jellyfin.configDir = "/store/jellyfin/config"`.
 - [ ] **Step 5:** (no GPU move: the Arc A380 is already on VM 100 since Task 4 Step 3b.)
 - [ ] **Step 6:** `live = true` for all four; switch prod and router; commit `feat(prod): live`.
