@@ -331,6 +331,8 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
 
 ### Task 9: Cutover
 
+> **Superseded** by Task 8 of the production plan (`2026-10-19-homelab-front-door-production-plan-technical.md`); done 2026-10-19.
+
 - [ ] **Step 1:** On Main, in `~/nextcloud/docker-compose.yml`: publish the app on
   `10.0.10.100:8080:80` (use another port if 8080 is taken; update the `nextcloud`
   route), `docker compose up -d`. Then

@@ -76,7 +76,8 @@ nix run github:Waayway/lodestar -- status   # without installing
 ## Tailscale policy
 
 The tailnet uses an explicit grants policy (no allow-all) with these rules:
-`nixos-manager` → agents on tcp:7461; your devices (`Waayway@github`,
+`nixos-manager` → agents on tcp:7461 (the agents are `tag:fleet`, `tag:router` and
+`tag:prod` hosts); your devices (`Waayway@github`,
 `tag:personal`, `tag:nixos`, `tag:fleet`) → dashboard on tcp:8080; SSH to
 `nixos-manager` for remote builds. Laptops you use yourself stay untagged: a
 tag replaces the device's user identity.

@@ -4,31 +4,25 @@ What runs on the Proxmox host `pve`, surveyed 2026-10-12. Update this file when 
 VM moves to NixOS or a service changes. Migration and backup plans:
 `docs/plans/2026-10-12-homelab-backup-design.md` and `-plan.md`.
 
-## Changes in progress (2026-10-19)
+## State since 2026-10-19
 
-The front-door rebuild (`docs/plans/2026-10-19-homelab-front-door-*.md`) is under way;
-the sections below are the 2026-10-12 survey and are updated per VM when it is done.
-Current state:
+The front-door rebuild (`docs/plans/2026-10-19-homelab-front-door-*.md`) is live: UniFi
+forwards 80/443 to the **router** (since 2026-10-19, about 22:00), which serves the
+internet and the tailnet; **prod** runs Nextcloud, Jellyfin and Immich. Main and media
+are shut down. Details in the sections "100 prod" and "110 router" below; the
+2026-10-12 survey sections for the other VMs are updated per VM when it is done.
 
-- **router (110)**, NixOS, `10.0.10.110`, tailnet `router` (`100.73.124.104`, tags
-  `tag:nixos`, `tag:router`): Traefik, split DNS for `vanwaaij.com` (CoreDNS), Tailscale
-  Services `nextcloud`, `jellyfin`, `archipelago`, `traefik`, subnet route and exit node.
-  Serves the tailnet only; the internet still goes to Main.
-- **router-test (230)**, NixOS, `10.0.10.230`: the router's test twin (test Service
-  `test-whoami-test`); kept for the Kanidm tests.
-- **vpn → 118**, `10.0.10.118` (was 110): WireGuard (wg-easy, `WG_HOST=server.vanwaaij.com`),
-  UniFi forwards 51820/udp there.
-- **Main**: IP `10.0.10.108` (was `.100`; VMID still 100 until renumbered to 108). UniFi
-  forwards 80/443 to `.108`. Its Tailscale sidecar (`traefik` device) was removed on the
-  tailnet and disabled in `~/traefik/docker-compose.yml` (`profiles: ["disabled"]`);
-  Traefik now publishes 80/443 itself. Nextcloud's hairpin `extra_hosts` points at `.108`.
-  Originals: `*.pre-108` next to each file, `/root/ens18.nmconnection.pre-108`.
-- **prod (100)** is next: Nextcloud, Jellyfin and Immich as containers on NixOS.
-- **GPU:** an Intel Arc A380 replaces the Radeon Pro WX 7100 (installed 2026-10-20) and
-  goes to prod (100). Media (120) loses its GPU; its `hostpci0` mapping must be removed.
-- TrueNAS: new NFS export `/mnt/archive/shares` (id 8, declared in
-  `modules/truenas/homelab.nix`; not yet on `stable`, so a reconcile from `stable`
-  would remove it until promoted).
+Open items:
+
+- **Pantry** (custom Nextcloud app 0.37.0) is disabled: its migration `32Date20260908`
+  failed on Nextcloud 32.0.15 (unknown column `delete_on_done_default`).
+- **Immich**: Main's old photos (`/store/immich/library`, mounted read-only in the
+  container at `/mnt/old-library`) are not yet added as an external library; waiting
+  for an API key from the user.
+- **GPU**: the Intel Arc A380 (arrives 2026-10-20) goes to VM 100 (plan Task 4 Step
+  3b, not done); the Radeon Pro WX 7100 leaves the host the same day.
+- TrueNAS NFS export `/mnt/archive/shares` (id 8) is declared in
+  `modules/truenas/homelab.nix` and applied.
 
 ## Access
 
@@ -41,14 +35,20 @@ Current state:
 
   | VM | user |
   |---|---|
-  | 100 Main (now at `10.0.10.108`) | `goedenaam` |
-  | 105 deploy-box | `jenkins` |
-  | 120 media | `media` |
+  | 100 prod | `prod` |
+  | 108 Main (shut down, was 100) | `goedenaam` |
+  | 105 deploy-box (shut down) | `jenkins` |
+  | 110 router | `router` |
+  | 120 media (shut down) | `media` |
   | 201 archipelago | `archipelago` |
   | 170 nixos-manager | `manager` |
   | 118 vpn (was 110) | none reachable: port 22 closed from the LAN |
   | 130 truenas | `automation` (key: 1Password Homelab/truenas-automation, passwordless sudo; use `sudo midclt call …`) |
 
+- VM sizes (vCPU, RAM, disks) and `onboot` live on `pve` (`qm config <id>`), not in
+  this repo.
+- Tailscale policy edits go through the API with the 1Password Homelab item
+  `tailscale-policy-authkey` (see `docs/lodestar.md`, "Tailscale policy").
 - Guest-exec is disabled in the qemu agent on the Rocky VMs (`qm guest exec`
   fails); `qm guest cmd <id> get-osinfo|network-get-interfaces|get-fsinfo` work.
 
@@ -64,7 +64,8 @@ Current state:
     → VG `nfs-vg` → storage `store-lvm` (**97% full**, 15 GB free, thick LVM,
     `saferemove 0`).
 - PCI passthrough: AMD chipset SATA (02:00.1) and Marvell 88SE9215 SATA (04:00.0)
-  → TrueNAS; Radeon Pro WX 7100 (mapping `WX7100`) → media.
+  → TrueNAS; Radeon Pro WX 7100 (mapping `WX7100`) still on media's config (media
+  is off; the card leaves 2026-10-20, the Intel Arc A380 goes to prod).
 - Root cron: `/root/update_cert.sh` every 12 h (Tailscale cert for the PVE web UI).
 - Proxmox firewall: disabled. No vzdump/backup jobs. No notification targets.
 - `/var/lib/vz/dump` has only `vzdump-qemu-nixos-template.vma.zst`.
@@ -73,15 +74,18 @@ Current state:
 
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
-| 100 | Main | running, onboot | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | Traefik ingress + Nextcloud, tag `production` |
+| 100 | prod | running, onboot | NixOS (this repo) | 4 / 16 GB | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich (containers); Arc A380 pending |
 | 101 | router | stopped | NixOS (old attempt) | 2 / 2 GB | 64 GB (store-lvm) | unused, to delete |
-| 105 | deploy-box (`jenkins-vm`) | running, onboot | Rocky 10.1 | 4 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
-| 110 | vpn | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | unknown, one Docker container |
-| 120 | media | running, onboot | Rocky 10.1 | 4 / 8 GB + WX7100 | 128 GB (store-lvm) | Jellyfin (Immich, downloads stopped) |
+| 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
+| 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
+| 110 | router | running, onboot | NixOS (this repo) | 2 / 2 GB | 16 GB (local-lvm) | front door: Traefik, split DNS, Tailscale Services |
+| 118 | vpn (was 110) | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | WireGuard (wg-easy) |
+| 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB + WX7100 | 128 GB (store-lvm) | old Jellyfin/Immich; `hostpci0` mapping WX7100 still set |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
-| 170 | nixos-manager | running | NixOS (this repo) | 4 / 8 GB | 32 GB (store-lvm) | Lodestar server, Linux builder |
+| 170 | nixos-manager | running | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
 | 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm) | Minecraft + BlueMap |
-| 201 | archipelago | running, **not onboot** | Rocky 10.1, no guest agent | 4 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
+| 201 | archipelago | running, **not onboot** | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
+| 230 | router-test | unverified | NixOS (this repo) | 1 / 2 GB | unverified | router's test twin, test Service `test-whoami-test` |
 | 9000 | nixos-26.05-template | template | NixOS | 2 / 2 GB | 4.3 GB (store-lvm) | base image |
 
 The Garage LXC (140) that older notes mention no longer exists; `/store/garage`
@@ -92,7 +96,64 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
 (128 GB), `vm-170-disk-0` (32 GB); VM 200 `unused0` points at a storage
 `local-store` that doesn't exist.
 
-### 100 Main
+### 100 prod
+
+- NixOS from this repo (`hosts/servers/prod.nix`), `10.0.10.100`, tailnet
+  `100.121.0.124` (tags `tag:nixos`, `tag:prod`), Lodestar agent. 4 vCPU, 16 GB, 64 GB
+  on `local-lvm`. Backends only; the router is the only way in from outside.
+- Containers via `virtualisation.oci-containers` (modules `modules/services/{nextcloud,
+  jellyfin,immich,docker,updates}.nix`):
+  - **Nextcloud 32.0.15** (`nextcloud:32-apache`, track `32-apache`), MariaDB 11.4,
+    Redis; **Collabora** at `office.vanwaaij.com`. Backend `http://10.0.10.100:8080`.
+    User data on `/store/nextcloud/data`. Pantry is disabled (see open items).
+  - **Jellyfin 10.11**: config `/store/jellyfin/config` (the original media-VM config;
+    backup copy `/store/jellyfin-backup-2026-10-19`), library `/archive/jellyfin`.
+  - **Immich v2** (fresh install): media `/store/immich-v2`, Postgres in a container;
+    Main's old library `/store/immich/library` is mounted read-only at
+    `/mnt/old-library` (external library still to be added).
+- Mounts (`modules/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
+  `/archive` = `/mnt/archive/shares`, NFS automounts.
+- **Dumps:** nightly 01:30, `<app>-db-dump` timers write
+  `/store/db-dumps/<app>/<app>-<date>.sql.gz` (apps `nextcloud` via `mariadb-dump`,
+  `immich` via `pg_dumpall`; newest N kept, mode 0600). They land on ZFS, so the
+  restic backups pick them up. Restore: stop the app container, then
+  `zcat <dump> | docker exec -i <db-container> ...` (`nextcloud-db`: `mariadb -u root
+  nextcloud` with `MYSQL_PWD` set from the container's root password; `immich-postgres`:
+  `psql --username=<DB_USERNAME>`); the exact invocations are unverified, test on a
+  copy first. The restic repos also hold `/store/internal` for file-level restores.
+- **Updates:** the floating images (Nextcloud, Jellyfin, Immich) are pulled by a weekly
+  timer, Friday 23:00; it reports to Healthchecks (1Password Homelab item
+  `healthchecks-prod-updates`). **Renovate** (installed on the GitHub repo, config
+  `renovate.json`, Saturdays before 06:00) opens PRs for images in
+  `modules/services/*.nix`; floating tracks get a PR only when the track changes
+  (minor or major, e.g. Jellyfin 10.11 to 10.12), never for patches or digests.
+- Secrets from 1Password via opnix (`nextcloud-config`, `immich-config`, ...). NFS
+  automounts must not have an idle timeout (see AGENTS.md, "Gotchas").
+
+### 110 router
+
+- NixOS from this repo (`hosts/servers/router.nix`, modules in `modules/homelab/router/`),
+  `10.0.10.110`, tailnet `router` (`100.73.124.104`, tags `tag:nixos`, `tag:router`).
+- The **front door** for the internet (UniFi forwards 80/443 here) and for the tailnet:
+  Traefik with one `*.vanwaaij.com` wildcard certificate (Let's Encrypt DNS-01 via
+  Cloudflare; token in 1Password `cloudflare-dns-token`), a maintenance page, Tailscale
+  Services `nextcloud`, `jellyfin`, `immich`, `office`, `archipelago`, `traefik`
+  (split DNS `vanwaaij.com` to the router; CoreDNS resolves names through
+  `<name>.tail41ca60.ts.net`), subnet route and exit node.
+- Routes come from the `homelab.routes` of every host in this flake (prod's modules
+  declare `nextcloud`, `office`, `jellyfin`, `immich`) plus `homelab.router.extraRoutes`
+  for backends outside it (`modules/homelab/routes.nix`: `archipelago`, `traefik`);
+  unknown hosts get 404. The `tailnet` entrypoint sets
+  `X-Homelab-Via: tailnet`, the `public` entrypoint strips it.
+- **router-test (230, `10.0.10.230`)** is its test twin (test Service
+  `test-whoami-test`), kept for tests.
+- Rollback to the old setup: Main (108) is intact but shut down and its Traefik was
+  detached from the Tailscale sidecar (originals as `*.pre-108` next to each file).
+
+### 108 Main (shut down)
+
+Shut down after the cutover (2026-10-19), `onboot 0`; the description below is the
+state when it was last running. Was VMID/IP 100 until the renumbering to 108.
 
 - Docker, compose projects in `/home/goedenaam/{traefik,nextcloud}`.
 - **Traefik v3** (`traefik:v3`) sharing the network stack of a Tailscale sidecar
@@ -111,14 +172,16 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
   - Redis 7, data `~/nextcloud/data/redis`.
   - Code/config/apps in `~/nextcloud/data/nextcloud/{html,config,custom_apps}`.
   - User data on NFS: `/store/nextcloud/data` = TrueNAS `store/internal/nextcloud` (**248 GB**).
-  - Hairpin-NAT workaround: `extra_hosts nextcloud.vanwaaij.com:10.0.10.100`.
+  - Hairpin-NAT workaround: `extra_hosts` for `nextcloud.vanwaaij.com`.
 - NFS mounts: `/store` (TrueNAS `/mnt/store/internal`), `/archive`
   (`/mnt/archive/internal`, empty).
 - firewalld: ssh, cockpit, dhcpv6-client (Docker publishes 80/443 around it).
 - Secrets in plain files: `~/traefik/.env` (Cloudflare token), `~/nextcloud/.env`
   (DB and admin passwords).
 
-### 105 deploy-box (jenkins-vm)
+### 105 deploy-box (jenkins-vm, shut down)
+
+Shut down, 2 vCPU, `onboot 0`.
 
 - Jenkins LTS (jdk21) in Docker, 127.0.0.1:8080, reached through the VM's own
   Tailscale (`jenkins-vm`, Tailscale Serve on :443).
@@ -126,13 +189,17 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
   binary are mounted into Jenkins (root-equivalent on the VM).
 - Being retired; not backed up.
 
-### 110 vpn
+### 118 vpn (was 110)
 
+- `10.0.10.118`; UniFi forwards 51820/udp here (WireGuard, wg-easy, `WG_HOST=server.vanwaaij.com`).
 - 1 vCPU, 1 GB, 2.2 GB of 14 GB used. Docker with one container and a compose
   network (`br-…`). No SSH from the LAN (port 22 closed), no Tailscale.
   What it does is unknown: check from the Proxmox console.
 
-### 120 media
+### 120 media (shut down)
+
+Shut down, `onboot 0`; Jellyfin and Immich now run on prod. The state below is the
+last survey. The `hostpci0` mapping WX7100 is still set on the VM.
 
 - Docker compose projects in `/opt`:
   - **Jellyfin** (`jellyfin/jellyfin:latest`), running, :8096 open on the LAN,
@@ -196,7 +263,7 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
 - Lodestar server + agent; state in `/var/lib/lodestar-server/lodestar.db`
   (SQLite) + `mirror.git`. Leftover `/var/lib/fleet-server` from before the
   rename (67 MB).
-- Root disk 32 GB, 83% used; `/var/lib/flatpak` (1.3 GB) and
+- Root disk 64 GB (grown from 32 GB on 2026-10-19 after a full disk during an apply), 8 vCPU; `/var/lib/flatpak` (1.3 GB) and
   `interception-tools` run on it although it's a server.
 
 ### 200 minecraft (stopped)
@@ -205,6 +272,8 @@ checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-
   Not inspected (VM is off).
 
 ### 201 archipelago (`ap.vanwaaij.com`)
+
+- 2 vCPU. Routed by the router (`archipelago`, basic auth).
 
 - Docker compose in `/opt/archipelago/deploy`: nginx (10.0.10.201:8080) + web +
   multiworld, image `archipelago-base` built from `/opt/archipelago/src`.
