@@ -74,7 +74,6 @@ assert has "docker exec kanidm /sbin/kanidmd scripting recover-account -c /data/
   provision.script;
 assert has "KANIDM_PROVISION_IDM_ADMIN_TOKEN=$(recover idm_admin)" provision.script;
 assert has "--no-auto-remove" provision.script;
-assert has "KANIDM_PROVISION_IDM_ADMIN_TOKEN" provision.script;
 assert has "-kanidm-provision-1.3.0/bin/kanidm-provision --no-auto-remove" provision.script;
 # the state: people, groups, OAuth2 clients
 assert
