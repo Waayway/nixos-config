@@ -22,8 +22,9 @@
   options = {
     homelab.router = {
       enable = true;
-      # A real Let's Encrypt certificate, so the test page opens without a warning.
-      acmeStaging = false;
+      # Let's Encrypt staging (untrusted certificate, browsers warn): a test router
+      # must not spend the real wildcard's rate limit.
+      acmeStaging = true;
       # Tailscale Service names get this prefix so they don't clash with the router's.
       servicePrefix = "test-";
       # Publish only the echo service on the tailnet.

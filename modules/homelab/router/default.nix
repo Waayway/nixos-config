@@ -24,6 +24,8 @@ let
   fromFlake = tools.routesFrom { inherit lib; } { inherit (inputs.self) nixosConfigurations; };
   extra = lib.mapAttrs (_: r: r // { declaredBy = config.networking.hostName; }) cfg.extraRoutes;
   clashes = lib.attrNames (lib.intersectAttrs fromFlake extra);
+  flakeHosts = lib.mapAttrsToList (_: r: r.host) fromFlake;
+  hostClashes = lib.attrNames (lib.filterAttrs (_: r: lib.elem r.host flakeHosts) extra);
 
   tls = {
     certResolver = "cloudflare";
@@ -158,6 +160,10 @@ lib.optionalAttrs hostPlatform.isLinux {
           {
             assertion = clashes == [ ];
             message = "homelab.router.extraRoutes: route names also declared in homelab.routes: ${toString clashes}";
+          }
+          {
+            assertion = hostClashes == [ ];
+            message = "homelab.router.extraRoutes: routes whose host a homelab.routes route already serves: ${toString hostClashes}";
           }
         ];
 
