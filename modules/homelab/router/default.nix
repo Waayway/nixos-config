@@ -265,6 +265,11 @@ lib.optionalAttrs hostPlatform.isLinux {
           };
         };
 
+        # nginx's service creates /var/log/nginx (LogsDirectory, nginx:nginx 0750).
+        # The config check su's to nginx to stat the logs: run before that, on the
+        # first switch, it hits the directory still owned by root and fails.
+        systemd.services.logrotate-checkconf.after = [ "nginx.service" ];
+
         networking.firewall.allowedTCPPorts = [
           80
           443
