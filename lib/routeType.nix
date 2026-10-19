@@ -29,11 +29,6 @@ lib.types.submodule {
         default = true;
         description = "Whether the route is published on the tailnet as a Tailscale Service.";
       };
-      address = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "The Tailscale Service IP, filled in after the Service exists.";
-      };
     };
     maintenance = lib.mkOption {
       type = lib.types.bool;

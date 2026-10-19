@@ -13,7 +13,6 @@ lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf config.homelab.router.enable {
     homelab.router.extraRoutes = {
       archipelago = {
-        tailnet.address = "100.101.152.250";
         host = "ap.vanwaaij.com";
         backend = "http://10.0.10.201:8080";
         basicAuth.usersFile = config.services.onepassword-secrets.secretPaths.archipelagoBasicAuth;
@@ -21,7 +20,6 @@ lib.optionalAttrs hostPlatform.isLinux {
 
       # The dashboard, tailnet only.
       traefik = {
-        tailnet.address = "100.113.51.101";
         host = "traefik.vanwaaij.com";
         backend = "api@internal";
         public = false;

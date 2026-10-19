@@ -1,7 +1,7 @@
-# Split DNS for the tailnet: CoreDNS answers vanwaaij.com on tailscale0 with the
-# Tailscale Service IP of each published route, and forwards everything else
-# (the public records, and any other zone, for clients that use it as their only
-# nameserver) upstream. The tailnet's nameserver setting points here.
+# Split DNS for the tailnet: CoreDNS answers each published route's host on tailscale0
+# with its Tailscale Service's address, looked up by name through tailscaled, and
+# forwards everything else (the public records, and any other zone, for clients that
+# use it as their only nameserver) upstream. The tailnet's nameserver setting points here.
 # NixOS only.
 {
   config,
@@ -13,12 +13,25 @@
 let
   cfg = config.homelab.router;
 
-  withAddress = lib.filterAttrs (
-    name: r:
-    r.tailnet.enable
-    && r.tailnet.address != null
-    && (cfg.tailnetServices == null || lib.elem name cfg.tailnetServices)
+  published = lib.filterAttrs (
+    name: r: r.tailnet.enable && (cfg.tailnetServices == null || lib.elem name cfg.tailnetServices)
   ) cfg.routes;
+
+  # One server block per published host (the most specific zone wins): the host is
+  # rewritten to its Service's MagicDNS name, resolved by tailscaled, and the answer
+  # rewritten back, so no Service IP lives in the repo. Other names in vanwaaij.com
+  # (the public records) fall to the catch-all block below.
+  serviceBlock = name: r: ''
+    ${r.host}:53 {
+      bind tailscale0
+      rewrite stop {
+        name exact ${r.host} ${cfg.servicePrefix}${name}.${cfg.tailnetDomain}
+        answer auto
+      }
+      forward . 100.100.100.100
+      cache 30
+    }
+  '';
 
   waitForTailnetAddress = pkgs.writeShellScript "coredns-wait-tailnet-address" ''
     for _ in $(seq 60); do
@@ -37,18 +50,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     services.coredns = {
       enable = true;
       config = ''
-        vanwaaij.com:53 {
-          bind tailscale0
-          hosts {
-        ${lib.concatMapStringsSep "\n" (r: "    ${r.tailnet.address} ${r.host}") (
-          lib.attrValues withAddress
-        )}
-            fallthrough
-          }
-          forward . 1.1.1.1 9.9.9.9
-          cache 30
-        }
-
+        ${lib.concatStringsSep "\n" (lib.mapAttrsToList serviceBlock published)}
         .:53 {
           bind tailscale0
           forward . 1.1.1.1 9.9.9.9

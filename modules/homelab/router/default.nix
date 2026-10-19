@@ -116,6 +116,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       description = "Prefix for the Tailscale Service names, so a test router doesn't clash with the real one.";
     };
 
+    tailnetDomain = lib.mkOption {
+      type = lib.types.str;
+      default = "tail41ca60.ts.net";
+      description = "The tailnet's MagicDNS domain; a Tailscale Service answers on `<servicePrefix><route>.<tailnetDomain>`.";
+    };
+
     tailnetServices = lib.mkOption {
       type = lib.types.nullOr (lib.types.listOf lib.types.str);
       default = null;
@@ -130,11 +136,6 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     echo = {
       enable = lib.mkEnableOption "a whoami echo service routed as `whoami-test`";
-      tailnetAddress = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "The Tailscale Service IP of `whoami-test`, filled in after the Service exists.";
-      };
     };
 
     routes = lib.mkOption {
@@ -300,7 +301,6 @@ lib.optionalAttrs hostPlatform.isLinux {
         homelab.router.extraRoutes.whoami-test = {
           host = "whoami-test.vanwaaij.com";
           backend = "http://127.0.0.1:8099";
-          tailnet.address = cfg.echo.tailnetAddress;
         };
       })
     ]

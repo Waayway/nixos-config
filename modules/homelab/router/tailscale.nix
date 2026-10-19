@@ -45,10 +45,5 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
       unitConfig.StartLimitIntervalSec = 0;
     };
-
-    warnings = lib.mapAttrsToList (
-      name: _:
-      "homelab.router: tailnet route `${name}` has no tailnet.address, so split DNS can't resolve it yet"
-    ) (lib.filterAttrs (_: r: r.tailnet.address == null) published);
   };
 }
