@@ -44,6 +44,10 @@ tools.mkAppCategory args {
           [ -d "$r" ] || exit 0
           [ "$(cat "$r/app/.nix-luna" 2>/dev/null)" = "$1" ] && [ ! -e "$r/app.asar" ] && exit 0
           echo "injecting TidaLuna into TIDAL.app" >&2
+          # Copies from the store are read-only, so make old ones removable.
+          for d in "$r/app.new" "$r/app"; do
+            [ ! -e "$d" ] || chmod -R u+w "$d"
+          done
           rm -rf "$r/app.new"
           cp -R "$1" "$r/app.new"
           chmod -R u+w "$r/app.new"
