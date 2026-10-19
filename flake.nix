@@ -80,6 +80,6 @@
         darwinConfigurations
         deploy
         ;
-      inherit (programs) packages;
+      inherit (programs) packages checks;
     };
 }
