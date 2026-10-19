@@ -19,14 +19,14 @@
   ],
   "packageRules": [
     {
-      "description": "Floating app images follow their minor track through the weekly update; Renovate only proposes major jumps (list = homelab.containers.floating)",
+      "description": "Floating app images follow their track through the weekly update; Renovate proposes only a new track (minor or major), never patches or digests (list = homelab.containers.floating)",
       "matchDepNames": [
         "nextcloud",
         "jellyfin/jellyfin",
         "ghcr.io/immich-app/immich-server",
         "ghcr.io/immich-app/immich-machine-learning"
       ],
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
       "enabled": false
     }
   ]
