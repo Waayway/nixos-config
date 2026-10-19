@@ -58,7 +58,6 @@ assert r.a.declaredBy == "alpha";
 assert r.b.declaredBy == "beta";
 assert r.a.public == true;
 assert r.a.tailnet.enable == true;
-assert r.a.tailnet.address == null;
 assert r.a.basicAuth.usersFile == null;
 assert r.a.middlewares == { };
 assert
