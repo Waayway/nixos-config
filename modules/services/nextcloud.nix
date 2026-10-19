@@ -197,11 +197,16 @@ lib.optionalAttrs hostPlatform.isLinux {
       })
     ];
 
-    # Neither app nor cron runs before config.php is in place (see above).
+    # Neither app nor cron runs before config.php is in place (see above), nor while
+    # scripts/prod-sync-nextcloud-db.sh left its marker (a failed import: the database
+    # is incomplete until a successful rerun removes it).
     systemd.services =
       lib.genAttrs ([ "docker-nextcloud-app" ] ++ lib.optional cfg.live "docker-nextcloud-cron")
         (_: {
-          unitConfig.ConditionPathExists = "${state}/config/config.php";
+          unitConfig.ConditionPathExists = [
+            "${state}/config/config.php"
+            "!${state}/SYNC-FAILED"
+          ];
         });
 
     systemd.tmpfiles.settings.nextcloud =
