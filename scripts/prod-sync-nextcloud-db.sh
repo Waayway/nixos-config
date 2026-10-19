@@ -38,8 +38,11 @@ exit 1
 EOF_PROD
 
 echo "Main -> prod: dumping"
+# --skip-routines: Main's mysql.proc still has a pre-10.7 layout (mariadb-upgrade never
+# ran there; error 1728 "Cannot load from mysql.proc"), so dumping routines fails.
+# Nextcloud has no stored routines (or events); triggers (none today) still come along.
 # shellcheck disable=SC2016 # expanded inside Main's container
-ssh_ "$MAIN" 'docker exec nextcloud-db sh -c '\''MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb-dump -u root --single-transaction --routines --triggers nextcloud'\'' | gzip -c' </dev/null |
+ssh_ "$MAIN" 'set -o pipefail; docker exec nextcloud-db sh -c '\''MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mariadb-dump -u root --single-transaction --skip-routines --triggers nextcloud'\'' | gzip -c' </dev/null |
   ssh_ "$PROD" 'sudo sh -c "umask 077 && cat >/var/lib/prod/nextcloud/sync-dump.sql.gz.tmp" &&
     sudo mv /var/lib/prod/nextcloud/sync-dump.sql.gz.tmp /var/lib/prod/nextcloud/sync-dump.sql.gz'
 
