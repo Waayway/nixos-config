@@ -51,6 +51,10 @@ lib.optionalAttrs hostPlatform.isLinux {
             snapdir = "VISIBLE";
           });
 
+      # /archive on the VMs (modules/homelab/storage.nix); like the jellyfin
+      # share, open to the LAN.
+      nfsShares.archive-shares.path = "/mnt/archive/shares";
+
       # TrueNAS 26 has no SMART test schedules of its own. Errors go out by mail.
       cronJobs = {
         smart-short = {
