@@ -82,7 +82,10 @@ lib.optionalAttrs hostPlatform.isLinux {
       }
     ];
 
-    homelab.containers.enable = true;
+    homelab.containers = {
+      enable = true;
+      floating = [ image ];
+    };
 
     services.onepassword-secrets.secrets.nextcloudEnv = {
       reference = "op://Homelab/nextcloud-config/env";

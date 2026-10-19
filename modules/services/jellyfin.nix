@@ -18,6 +18,7 @@ let
   host = "jellyfin.vanwaaij.com";
   port = 8096;
   cache = "/var/cache/jellyfin";
+  image = "jellyfin/jellyfin:10.11";
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.jellyfin = {
@@ -49,11 +50,12 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     homelab.containers = {
       enable = true;
+      floating = [ image ];
       intelGpu = lib.mkIf cfg.gpu true;
     };
 
     virtualisation.oci-containers.containers.jellyfin = {
-      image = "jellyfin/jellyfin:10.11";
+      inherit image;
       user = "1000:1000";
       networks = [ "jellyfin" ];
       ports = [ "${lan.address}:${toString port}:${toString port}" ];

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex"],
+  "dependencyDashboard": true,
+  "labels": ["containers"],
+  "automerge": false,
+  "schedule": ["before 6am on saturday"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Container images in the Nix app modules: image = \"<repo>:<tag>\" (optionally @sha256:<digest>)",
+      "managerFilePatterns": ["/^modules/services/.+\\.nix$/"],
+      "matchStrings": [
+        "(?:image|serverImage|mlImage) = \"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Floating app images follow their minor track through the weekly update; Renovate only proposes major jumps (list = homelab.containers.floating)",
+      "matchDepNames": [
+        "nextcloud",
+        "jellyfin/jellyfin",
+        "ghcr.io/immich-app/immich-server",
+        "ghcr.io/immich-app/immich-machine-learning"
+      ],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "enabled": false
+    }
+  ]
+}

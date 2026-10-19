@@ -109,6 +109,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       );
     };
 
+    floating = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "nextcloud:32-apache" ];
+      description = ''
+        Images that follow a floating tag (a minor track such as `nextcloud:32-apache`).
+        The weekly update (`prod-container-update`, updates.nix) pulls only these and
+        restarts the containers whose image changed; Renovate proposes only major
+        updates for them (renovate.json lists the same images). Every other image is
+        pinned and changes through a Renovate pull request.
+      '';
+    };
+
     intelGpu = lib.mkOption {
       type = lib.types.bool;
       default = false;

@@ -28,8 +28,11 @@ let
   port = 2283;
   state = "/var/lib/prod/immich";
   network = "immich";
-  version = "v2";
   envFiles = [ secretPaths.immichEnv ];
+  serverImage = "ghcr.io/immich-app/immich-server:v2";
+  # The literal image string (tag included) is what renovate.json matches; `gpu` only
+  # appends the variant suffix.
+  mlImage = "ghcr.io/immich-app/immich-machine-learning:v2" + lib.optionalString cfg.gpu "-openvino";
 
   # Upstream's .env, minus the password.
   environment = {
@@ -68,6 +71,10 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     homelab.containers = {
       enable = true;
+      floating = [
+        serverImage
+        mlImage
+      ];
       intelGpu = lib.mkIf cfg.gpu true;
       dumps.immich = {
         container = "immich-postgres";
@@ -89,7 +96,7 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     virtualisation.oci-containers.containers = {
       immich-server = {
-        image = "ghcr.io/immich-app/immich-server:${version}";
+        image = serverImage;
         networks = [ network ];
         ports = [ "${lan.address}:${toString port}:${toString port}" ];
         volumes = [
@@ -107,7 +114,7 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
 
       immich-machine-learning = {
-        image = "ghcr.io/immich-app/immich-machine-learning:${version}${lib.optionalString cfg.gpu "-openvino"}";
+        image = mlImage;
         networks = [ network ];
         volumes = [ "${state}/model-cache:/cache" ];
         inherit environment;
