@@ -83,16 +83,16 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
 ### Task 2: Route option and flake-wide collector
 
 **Files:**
+- Create: `lib/routeType.nix` (`{ lib }: lib.types.submodule { … }`, shared by both
+  route options)
 - Create: `modules/homelab/routes-option.nix` (options only, every platform)
 - Create: `lib/routesFrom.nix`
 - Create: `tests/routes-from.nix`
 - Modify: `programs.nix` (add `checks.x86_64-linux.routes-from`)
 
 **Interfaces:**
-- Produces: option `homelab.routes.<name>` (also the element type of
-  `homelab.router.extraRoutes`, exported as `tools.routeType`… no: define the
-  submodule in `lib/routeType.nix` as `{ lib }: lib.types.submodule {…}` so both
-  options share it):
+- Produces: option `homelab.routes.<name>` of type `tools.routeType { inherit lib; }`
+  (also the element type of `homelab.router.extraRoutes` in Task 3):
   - `host`: `str`, FQDN, required
   - `backend`: `str`, `http(s)://…` URL or the literal `"api@internal"`; assertion on
     anything else
@@ -101,6 +101,9 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
   - `tailnet.address`: `nullOr str`, default `null` (the Service IP, filled in after
     the Service exists)
   - `basicAuth.usersFile`: `nullOr str`, default `null` (htpasswd lines)
+  - `middlewares`: `attrsOf anything`, default `{}`; Traefik `http.middlewares`
+    entries added for this route (named `<route>-<key>`) and attached to both of its
+    routers, for whatever Main's config has that the fields above can't express
 - Produces: `tools.routesFrom { nixosConfigurations }` → attrset name → route with
   extra attribute `declaredBy` (configuration name). Configurations without the
   option are skipped (darwin is not passed in).
@@ -136,15 +139,18 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
 - Consumes: `lib/routeType.nix`, `tools.routesFrom`.
 - Produces: options `homelab.router = { enable; acmeStaging (bool, false);
   servicePrefix (str, ""); tailnetServices (nullOr (listOf str), null = all);
-  extraRoutes (attrsOf routeType, {}); echo.enable (bool, false); }` and the read-only
+  extraRoutes (attrsOf routeType, {}); echo = { enable (bool, false);
+  tailnetAddress (nullOr str, null); }; }` and the read-only
   value `homelab.router.routes` = `routesFrom { inherit (inputs.self) nixosConfigurations; }`
   merged with `extraRoutes` (a name in both is an assertion failure). Tasks 4 and 5
   read `homelab.router.routes`.
 
-- [ ] **Step 1: Write the expectations** as `nix eval` checks against `router-test`
-  (host file comes in Task 5; until then evaluate a temporary `nixos-manager` override
-  is not allowed — write Task 5's `router-test.nix` host file first, with only
-  identity and `homelab.router.enable = true`). Expected values:
+- [ ] **Step 0: Host files** `hosts/servers/router.nix` and
+  `hosts/servers/router-test.nix` as specified in Task 5 Step 1, and the options
+  block of `modules/homelab/router/default.nix` (no config yet), so both hosts
+  evaluate. `git add` them.
+- [ ] **Step 1: Write the expectations** as `nix eval` checks against `router-test`.
+  Expected values:
   - `…router-test.config.services.traefik.staticConfigOptions.entryPoints` has
     `web` (`:80`, redirect to `public`/https), `public` (`:443`), `tailnet`
     (`127.0.0.1:8443`);
@@ -165,7 +171,8 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
     and `tailnet-marker` (`= "tailnet"`); per route `<name>-public` if `public`,
     `<name>-tailnet` if `tailnet.enable`, service `<name>` with one server
     `{ url = backend; }` (no service when `api@internal`; the routers point at it),
-    middleware `<name>-auth` (`basicAuth.usersFile`) when set.
+    middleware `<name>-auth` (`basicAuth.usersFile`) when set, plus the route's own
+    `middlewares`.
   - secret `cloudflareDnsToken` = `op://Homelab/cloudflare-dns-token/credential`,
     owner `traefik`, services `[ "traefik" ]`;
     `systemd.services.traefik.environment.CF_DNS_API_TOKEN_FILE` = its path.
@@ -174,7 +181,7 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
     `https://traefik.vanwaaij.com`, host defaults to the router.
   - `echo.enable`: `pkgs.whoami` on `127.0.0.1:8099` as a systemd service and
     `extraRoutes.whoami-test` (`host = "whoami-test.vanwaaij.com"`, backend
-    `http://127.0.0.1:8099`).
+    `http://127.0.0.1:8099`, `tailnet.address = cfg.echo.tailnetAddress`).
 - [ ] **Step 3: `modules/homelab/routes.nix`**, `mkIf config.homelab.router.enable`,
   sets `homelab.router.extraRoutes` from Main's current Traefik config, read first on
   Main (`~/traefik/dynamic/*.yml`, Nextcloud's Docker labels in
@@ -184,10 +191,8 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
   (`http://10.0.10.120:8096`, plus the middlewares in `media.yml`), `archipelago`
   (`http://10.0.10.201:8080`, `basicAuth.usersFile` from secret
   `op://Homelab/archipelago-basic-auth/htpasswd`, owner `traefik`), `traefik`
-  (`api@internal`, `public = false`). Middlewares the route type can't express go
-  into `homelab.router` as an extra `middlewares` attrset per route
-  (`http.middlewares` passthrough, `attrsOf anything`) — add that field to
-  `routeType` (`middlewares`, default `{}`) rather than special-casing. Immich and
+  (`api@internal`, `public = false`). Middlewares the route type can't express
+  go into the route's `middlewares` field (Task 2). Immich and
   BlueMap are not routed (dead today).
 - [ ] **Step 4:** Step 1 checks pass; all five hosts evaluate; nixfmt.
 - [ ] **Step 5:** Create the 1Password items with the CLI (`op --account
@@ -223,10 +228,11 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
 - [ ] **Step 3:** Expectations pass; five hosts evaluate; nixfmt.
 - [ ] **Step 4:** Commit: `feat(homelab): router tailnet services and split DNS`.
 
-### Task 5: Host files
+### Task 5: Host files, full build
 
 **Files:**
-- Create: `hosts/servers/router.nix`, `hosts/servers/router-test.nix`
+- Modify: `hosts/servers/router.nix`, `hosts/servers/router-test.nix` (created in
+  Task 3 Step 0)
 
 **Interfaces:**
 - Produces: `nixosConfigurations.router` and `.router-test`.
@@ -236,7 +242,8 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
   - `router`: user `router`, `netInterface.ip = "10.0.10.110"`, `fleet = true`,
     `options.homelab.router.enable = true`.
   - `router-test`: user `router`, `netInterface.ip = "10.0.10.230"`, `fleet = false`,
-    `options.homelab.router = { enable = true; acmeStaging = true; servicePrefix = "test-"; tailnetServices = [ "whoami-test" ]; echo.enable = true; }`.
+    `options.homelab.router = { enable = true; acmeStaging = true; servicePrefix = "test-"; tailnetServices = [ "whoami-test" ]; echo.enable = true; }`
+    (`echo.tailnetAddress` is added in Task 6 Step 4).
   Proxmox sizes live on `pve`, not here.
 - [ ] **Step 2:** `git add`; all seven NixOS/darwin configurations evaluate;
   `nix flake check --no-build --keep-going` passes.
@@ -277,8 +284,8 @@ Tailscale 1.98 (`services.tailscale.serve`), opnix, Proxmox `qm` on `pve`.
   - `curl -skI --resolve jellyfin.vanwaaij.com:443:10.0.10.230 https://jellyfin.vanwaaij.com`
     → Jellyfin answers; `ap.` → 401 without credentials;
   - certificate issuer is the LE staging CA (`openssl s_client … | openssl x509 -noout -issuer`).
-- [ ] **Step 4: Tailnet path:** after the Service is approved, record its IP as
-  `tailnet.address` of `whoami-test` (in the echo route), rebuild 230. From atlas:
+- [ ] **Step 4: Tailnet path:** after the Service is approved, set its IP as
+  `homelab.router.echo.tailnetAddress` in `router-test.nix`, rebuild 230. From atlas:
   `dig +short @<230's tailscale IP> whoami-test.vanwaaij.com` → the Service IP;
   `dig +short @<same> example.com` → an answer;
   `curl -sk --resolve whoami-test.vanwaaij.com:443:<svc IP> https://whoami-test.vanwaaij.com`
