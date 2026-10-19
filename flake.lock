@@ -519,7 +519,8 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim",
         "opnix": "opnix",
-        "rofiThemeRepo": "rofiThemeRepo"
+        "rofiThemeRepo": "rofiThemeRepo",
+        "tidaluna": "tidaluna"
       }
     },
     "systems": {
@@ -580,6 +581,19 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "tidaluna": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790777571,
+        "narHash": "sha256-Xikqxg5kfaUzTUYUEOK/lcRLv3y7GQ3KDftsoz4sxsE=",
+        "type": "tarball",
+        "url": "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip"
       }
     },
     "utils": {
