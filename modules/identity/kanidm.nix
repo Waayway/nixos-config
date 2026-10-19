@@ -18,14 +18,18 @@
 # app, an OAuth2 client per app with `oidc`, and `oauth2-proxy` (the router's sign-in
 # gate) whose scope maps admit every gated app's group. `kanidm-provision` applies it
 # after every start of the container and on every change; `--no-auto-remove`, so
-# what exists only in Kanidm is never deleted.
+# what exists only in Kanidm is never deleted. Two consequences: the members of
+# `admins` and every `<app>-users` group are overwritten from Nix on every run
+# (kanidm-provision's `overwriteMembers` default; members added in Kanidm by hand are
+# removed), and an app removed from access keeps its group, OAuth2 client and scope
+# map in Kanidm until deleted there by hand.
 #
 # No admin password is stored anywhere: each run gets a fresh one from the container
 # (`kanidmd scripting recover-account`, over its admin socket) and passes it on in
-# the environment only. Break-glass is the same command on the host. Kanidm generates
-# the OAuth2 client secrets (the official image can't take provisioned ones);
-# scripts/kanidm-oauth2-secret.sh copies one into 1Password with
-# `kanidm-oauth2-basic-secret` (installed here).
+# kanidm-provision's environment or on the tools container's stdin only. Break-glass
+# is the same command on the host. Kanidm generates the OAuth2 client secrets (the
+# official image can't take provisioned ones); scripts/kanidm-oauth2-secret.sh
+# copies one into 1Password with `kanidm-oauth2-basic-secret` (installed here).
 #
 # Provisioning talks to the LAN address with `--accept-invalid-certs`: the traffic
 # never leaves the host, and on a test VM the certificate is from Let's Encrypt
@@ -159,14 +163,24 @@ let
       printf '%s' "$pw"
     }
   '';
-  # Runs a shell script in the tools image against the server; the caller exports
-  # the passwords the script logs in with (passed by name, never on a command line).
-  toolsRun = ''
-    docker run --rm --network host \
+  # `toolsRun <script>`: a shell command running <script> in the tools image against
+  # the server. The caller pipes in two lines, idm_admin's and admin's password (the
+  # second may be empty); the container reads them into IDM_ADMIN_PASSWORD and
+  # ADMIN_PASSWORD from stdin, so they are never on a command line or in the
+  # container's environment (`docker inspect`).
+  toolsRun = script: ''
+    docker run -i --rm --network host \
       -e KANIDM_URL=${url} -e KANIDM_ACCEPT_INVALID_CERTS=true \
-      -e IDM_ADMIN_PASSWORD -e ADMIN_PASSWORD \
       -v ${./branding/logo.svg}:/branding/logo.svg:ro \
-      --entrypoint /bin/sh ${toolsImage} -euc'';
+      --entrypoint /bin/sh ${toolsImage} -euc ${
+        lib.escapeShellArg (
+          ''
+            IFS= read -r IDM_ADMIN_PASSWORD
+            IFS= read -r ADMIN_PASSWORD || true
+          ''
+          + script
+        )
+      }'';
   shellPath = [
     config.virtualisation.docker.package
     pkgs.curl
@@ -196,11 +210,11 @@ let
       fi
       ${recoverFn}
       IDM_ADMIN_PASSWORD=$(recover idm_admin)
-      ADMIN_PASSWORD=""
-      export IDM_ADMIN_PASSWORD ADMIN_PASSWORD
       # shellcheck disable=SC2016 # expanded in the container
-      ${toolsRun} 'KANIDM_PASSWORD="$IDM_ADMIN_PASSWORD" kanidm login -D idm_admin >/dev/null
-        kanidm system oauth2 show-basic-secret "$1" -D idm_admin' sh "$1"
+      printf '%s\n\n' "$IDM_ADMIN_PASSWORD" | ${toolsRun ''
+        KANIDM_PASSWORD="$IDM_ADMIN_PASSWORD" kanidm login -D idm_admin >/dev/null
+        kanidm system oauth2 show-basic-secret "$1" -D idm_admin
+      ''} sh "$1"
     '';
   };
 in
@@ -365,8 +379,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           ${recoverFn}
           IDM_ADMIN_PASSWORD=$(recover idm_admin)
           ADMIN_PASSWORD=$(recover admin)
-          export IDM_ADMIN_PASSWORD ADMIN_PASSWORD
-          ${toolsRun} ${lib.escapeShellArg policyScript}
+          printf '%s\n%s\n' "$IDM_ADMIN_PASSWORD" "$ADMIN_PASSWORD" | ${toolsRun policyScript}
         '';
       };
 
