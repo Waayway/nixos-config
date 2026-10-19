@@ -5,9 +5,8 @@ app, and Lodestar on a real URL that is read-only from the internet and fully us
 over Tailscale. Replaces Main (VM 100) as ingress and, later, Main and media as the
 place the apps run.
 
-Status: in progress (brainstorm 2026-10-19). Sections marked **agreed** were approved
-in conversation; **proposed** sections are still open; **outline** sections have not
-been discussed yet.
+Status: approved in conversation 2026-10-19 (all sections). Implementation plans per
+part, starting with the template and the router.
 
 This supersedes phase 6 of `2026-10-12-homelab-backup-plan.md` for Main and media
 (Traefik moves to its own router VM; Nextcloud, Jellyfin and Immich share one
@@ -59,9 +58,9 @@ The IP's last octet is the VMID (notes on `pve`). New VMs are cloned from templa
 
 | VMID | IP | Name | Role | Size |
 |---|---|---|---|---|
-| 100 | 10.0.10.100 | prod (new) | Nextcloud, Jellyfin (WX7100), Immich | tbd (section C) |
-| 108 | 10.0.10.108 | Main (old) | renumbered from 100, shut down after C | as is |
-| 110 | 10.0.10.110 | router | Traefik, CoreDNS, Tailscale Services, oauth2-proxy, subnet route, exit node | tbd |
+| 100 | 10.0.10.100 | prod (new) | Nextcloud, Jellyfin (GPU), Immich | 6 cores, 16 GB, 64 GB root |
+| 108 | 10.0.10.100 until C | Main (old) | renumbered from 100 during C, then shut down | as is |
+| 110 | 10.0.10.110 | router | Traefik, CoreDNS, Tailscale Services, oauth2-proxy, subnet route, exit node | 2 cores, 2 GB, 16 GB root |
 | 111 | 10.0.10.111 | identity | Kanidm | 1 core, 2 GB |
 | 118 | 10.0.10.118 | vpn (old) | renumbered from 110, WireGuard keeps running | as is |
 | 120 | 10.0.10.120 | media (old) | shut down after C | as is |
@@ -108,8 +107,19 @@ homelab.routes.jellyfin = {
 ```
 
 The router collects every `homelab.routes` in the flake (as Lodestar collects
-`lodestar.links`) and generates Traefik routers, Tailscale Service definitions and
-CoreDNS records. Lodestar's Services links can be derived from the same data.
+`lodestar.links`) and generates Traefik routers, the `tailscale serve --service`
+config and CoreDNS records. Routes for backends this flake doesn't manage yet (Main,
+media, archipelago) are declared by hand in `modules/homelab/routes.nix`, active on the
+router only, like `modules/homelab/links.nix`. Lodestar's Services links can be derived
+from the same data.
+
+Tailscale assigns each Service its IP when the Service is created in the admin
+console; that IP is recorded in the route (`tailnet.address`) so CoreDNS can answer
+for it. A route with `tailnet = true` and no address yet is served publicly only and
+reported by an evaluation warning.
+
+LAN devices without Tailscale resolve the public record and reach the router through
+UniFi's NAT loopback (hairpin); no LAN DNS override is part of this design.
 
 Initial routes point at today's backends: Nextcloud on Main, Jellyfin on 120, `ap.` on
 201 (keeps its basic auth until the gate exists).
@@ -122,7 +132,8 @@ Initial routes point at today's backends: Nextcloud on Main, Jellyfin on 120, `a
    `svc:` names; check every route with `curl --resolve` from the LAN and over the
    tailnet.
 3. **vpn → 118** (Claude, on `pve`): stop VM 110, renumber to 118, set its IP to
-   `10.0.10.118`, start, check it answers. **User:** point the 51820/udp forward in
+   `10.0.10.118` by editing its network config on the stopped disk from `pve` (no
+   login into the VM works), start, check WireGuard answers. **User:** point the 51820/udp forward in
    UniFi at `10.0.10.118`.
 4. **Router 110** (Claude): clone 9000, `sudo opnix token set`, switch to the config.
 5. **Tailscale admin console** (user, or Claude via an OAuth client in 1Password
@@ -238,7 +249,7 @@ All links are visible to anonymous visitors, on purpose: the repo is public and
 reachable from the internet, and the page doubles as a public overview of what the
 homelab hosts. The only extra thing it reveals is live up/down state.
 
-## C. Production, VM 100 (proposed)
+## C. Production, VM 100 (agreed)
 
 ### VM
 
@@ -249,8 +260,9 @@ homelab hosts. The only extra thing it reveals is live up/down state.
 - Open: the WX7100 may be replaced by a newer GPU (AV1, HDR tone mapping, Immich ML
   acceleration); the user is choosing one. The design only assumes one GPU passed
   through to VM 100.
-- First, old Main is renumbered 100 → 108 on `pve` (config only, its IP inside the VM
-  stays `.100`). The new VM takes `.100` only after Main's services have moved.
+- Old Main is renumbered 100 → 108 on `pve` while it is stopped for the Nextcloud
+  move (renaming its disks needs the VM off). Its IP inside the VM stays `.100`; it is
+  never started again after the move, so the new VM 100 can take `.100`.
 
 ### Nextcloud
 
