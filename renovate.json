@@ -11,9 +11,9 @@
     {
       "customType": "regex",
       "description": "Container images in the Nix app modules: image = \"<repo>:<tag>\" (optionally @sha256:<digest>; the string may start on the next line)",
-      "managerFilePatterns": ["/^modules/services/.+\\.nix$/"],
+      "managerFilePatterns": ["/^modules/(services|identity)/.+\\.nix$/"],
       "matchStrings": [
-        "(?:image|serverImage|mlImage)\\s*=\\s*\"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
+        "(?:image|serverImage|mlImage|toolsImage)\\s*=\\s*\"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
       ],
       "datasourceTemplate": "docker"
     }
@@ -29,6 +29,15 @@
       "description": "Immich's images (server, machine-learning, PostgreSQL) move together: one pull request for the whole release (modules/services/immich.nix)",
       "matchPackageNames": ["ghcr.io/immich-app/**"],
       "groupName": "immich"
+    },
+    {
+      "description": "Kanidm's server and tools images move together, one pull request per minor: Kanidm supports upgrading one minor at a time only (modules/identity/kanidm.nix)",
+      "matchPackageNames": ["kanidm/**"],
+      "groupName": "kanidm",
+      "separateMultipleMinor": true,
+      "prBodyNotes": [
+        "Kanidm upgrades go **one minor at a time** (never skip one). Before merging, run `sudo docker exec kanidm kanidmd domain upgrade-check` on the identity VM (10.0.10.111) and merge only if it reports no blockers; merge the next minor's pull request after this one is deployed."
+      ]
     }
   ]
 }

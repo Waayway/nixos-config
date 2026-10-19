@@ -1,0 +1,26 @@
+/* vanwaaij.com branding on top of Kanidm's default UI (mounted over /hpkg/override.css) */
+:root, [data-bs-theme=dark] {
+  --bs-body-bg: #0f1720;
+  --bs-body-color: #e6edf3;
+  --bs-primary: #2f9e6e;
+  --bs-primary-rgb: 47, 158, 110;
+  --bs-link-color: #4cc38a;
+  --bs-border-radius: 14px;
+}
+body {
+  background: radial-gradient(1200px 600px at 50% -10%, #1f3b2f 0%, #0f1720 60%) fixed;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+main, .container, form { max-width: 380px; margin-inline: auto; }
+form {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 28px 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.btn-primary { background: #2f9e6e; border-color: #2f9e6e; border-radius: 10px; padding: .5rem 1.4rem; }
+.btn-primary:hover { background: #268559; border-color: #268559; }
+.form-control { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.15); color: #e6edf3; }
+h1, h2, h3, .h3 { font-weight: 650; letter-spacing: -.01em; }
+footer { opacity: .5; }

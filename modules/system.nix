@@ -14,6 +14,7 @@
       ./gaming
       ./hardware
       ./homelab
+      ./identity
       ./locale
       ./lodestar
       ./networking

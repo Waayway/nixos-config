@@ -29,4 +29,11 @@ in
     pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
     inherit lib tools;
   };
+
+  # Evaluation check of the identity module on router-test (tests/identity.nix).
+  checks.x86_64-linux.identity = import ./tests/identity.nix {
+    pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+    inherit lib;
+    inherit (inputs.self) nixosConfigurations;
+  };
 }
