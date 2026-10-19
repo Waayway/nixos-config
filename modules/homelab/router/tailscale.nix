@@ -23,7 +23,8 @@ lib.optionalAttrs hostPlatform.isLinux {
         "--advertise-routes=10.0.10.0/24"
         "--advertise-exit-node"
       ];
-      # The module adds the `svc:` prefix itself.
+      # The module adds the `svc:` prefix itself; it asserts `services` is non-empty.
+      serve.enable = published != { };
       serve.services = lib.mapAttrs' (
         name: _:
         lib.nameValuePair "${cfg.servicePrefix}${name}" {
