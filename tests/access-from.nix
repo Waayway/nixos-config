@@ -9,6 +9,7 @@
 }:
 let
   accessFrom = tools.accessFrom { inherit lib; };
+  accessProblems = tools.accessProblems { inherit lib; };
   stub =
     access:
     lib.evalModules {
@@ -41,15 +42,19 @@ let
       plain = noOption;
     };
   };
-  dup = accessFrom {
-    nixosConfigurations = {
-      alpha = stub { dup = { }; };
-      beta = stub { dup = { }; };
-    };
+  dup = accessFrom { nixosConfigurations = dupConfigs; };
+  dupConfigs = {
+    alpha = stub { dup = { }; };
+    beta = stub { dup = { }; };
   };
-  unknown = accessFrom {
-    nixosConfigurations.alpha = stub { app.members = [ "nobody" ]; };
+  unknownConfigs.alpha = stub {
+    app.members = [
+      "ann"
+      "nobody"
+    ];
+    fine.members = [ "ann" ];
   };
+  unknown = accessFrom { nixosConfigurations = unknownConfigs; };
   ok = v: (builtins.tryEval (builtins.deepSeq v v)).success;
 in
 assert r.a.declaredBy == "alpha";
@@ -74,5 +79,25 @@ assert
   ];
 assert !ok dup;
 assert !ok unknown;
+# eager: reading only the names still fails
+assert !ok (lib.attrNames unknown);
+assert
+  accessProblems { nixosConfigurations = dupConfigs; } == {
+    duplicates.dup = [
+      "alpha"
+      "beta"
+    ];
+    unknownMembers = { };
+  };
+assert
+  accessProblems { nixosConfigurations = unknownConfigs; } == {
+    duplicates = { };
+    unknownMembers.app = [ "nobody" ];
+  };
+assert
+  accessProblems { nixosConfigurations.alpha = stub { a.members = [ "ann" ]; }; } == {
+    duplicates = { };
+    unknownMembers = { };
+  };
 assert (stub { x.members = [ "ann" ]; }).config.homelab.people.ann.admin == false;
 pkgs.runCommand "access-from" { } "touch $out"
