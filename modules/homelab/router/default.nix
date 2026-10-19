@@ -49,16 +49,52 @@ let
         service = if r.backend == "api@internal" then "api@internal" else name;
         middlewares = lib.attrNames auth ++ lib.attrNames own;
       };
+      # While in maintenance the public side shows the local page, with no
+      # route middlewares (basic auth would prompt before the page).
+      publicRouter =
+        if r.maintenance then
+          (router "public")
+          // {
+            service = "maintenance";
+            middlewares = [ ];
+          }
+        else
+          router "public";
     in
     {
       routers =
-        lib.optionalAttrs r.public { "${name}-public" = router "public"; }
+        lib.optionalAttrs r.public { "${name}-public" = publicRouter; }
         // lib.optionalAttrs r.tailnet.enable { "${name}-tailnet" = router "tailnet"; };
       services = lib.optionalAttrs (r.backend != "api@internal") {
         ${name}.loadBalancer.servers = [ { url = r.backend; } ];
       };
       middlewares = auth // own;
     };
+
+  maintenancePage = pkgs.writeTextDir "maintenance.html" ''
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>We're working on it</title>
+    <style>
+    :root { color-scheme: light dark; --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #ececea; --muted: #8f8f8a; } }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; background: var(--bg); color: var(--fg);
+      font: 18px/1.5 system-ui, -apple-system, sans-serif; text-align: center; padding: 0 16px; box-sizing: border-box; }
+    h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 .5rem; }
+    p { margin: 0; color: var(--muted); }
+    footer { position: fixed; bottom: 1.5rem; font-size: .85rem; color: var(--muted); }
+    </style>
+    </head>
+    <body>
+    <main><h1>We're working on it &mdash; back soon.</h1><p>This page is temporarily unavailable.</p></main>
+    <footer>vanwaaij.com</footer>
+    </body>
+    </html>
+  '';
 
   perRoute = lib.mapAttrsToList routeConfig cfg.routes;
   collect = key: lib.foldl' (a: b: a // b.${key}) { } perRoute;
@@ -175,7 +211,9 @@ lib.optionalAttrs hostPlatform.isLinux {
           dynamicConfigOptions = {
             http = {
               routers = collect "routers";
-              services = collect "services";
+              services = collect "services" // {
+                maintenance.loadBalancer.servers = [ { url = "http://127.0.0.1:8097"; } ];
+              };
               middlewares = collect "middlewares" // {
                 # An empty value removes the header.
                 strip-marker.headers.customRequestHeaders.X-Homelab-Via = "";
@@ -204,6 +242,27 @@ lib.optionalAttrs hostPlatform.isLinux {
         };
         systemd.services.traefik.environment.CF_DNS_API_TOKEN_FILE =
           config.services.onepassword-secrets.secretPaths.cloudflareDnsToken;
+
+        # The maintenance page: every path answers 503, on loopback only.
+        services.nginx = {
+          enable = true;
+          virtualHosts.maintenance = {
+            default = true;
+            listen = [
+              {
+                addr = "127.0.0.1";
+                port = 8097;
+              }
+            ];
+            root = "${maintenancePage}";
+            extraConfig = ''
+              add_header Retry-After 3600 always;
+              error_page 503 /maintenance.html;
+            '';
+            locations."/".return = "503";
+            locations."= /maintenance.html".extraConfig = "internal;";
+          };
+        };
 
         networking.firewall.allowedTCPPorts = [
           80

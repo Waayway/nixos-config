@@ -35,6 +35,14 @@ lib.types.submodule {
         description = "The Tailscale Service IP, filled in after the Service exists.";
       };
     };
+    maintenance = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Serve the maintenance page (HTTP 503) on the route's public router instead
+        of the app; the tailnet router keeps going to the app.
+      '';
+    };
     basicAuth.usersFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
