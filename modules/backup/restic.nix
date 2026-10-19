@@ -84,6 +84,12 @@ let
           r init
         fi
 
+        # Locks of a restic that was killed (a Storage Box disconnect, Backrest
+        # restarted mid-index) block prune/check until removed. `unlock` only
+        # removes stale ones: older than 30 minutes, or from a process on this
+        # host that no longer exists.
+        r unlock
+
         ${lib.optionalString (repo.local.sqlite != { } || repo.local.paths != [ ]) ''
           echo "== local (nixos-manager)"
           state=/var/lib/restic-${name}
