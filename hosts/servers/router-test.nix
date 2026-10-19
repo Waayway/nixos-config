@@ -29,6 +29,8 @@
       # Publish only the echo service on the tailnet.
       tailnetServices = [ "whoami-test" ];
       echo.enable = true;
+      # The Tailscale Service IP of svc:test-whoami-test.
+      echo.tailnetAddress = "100.126.16.116";
     };
   };
 
