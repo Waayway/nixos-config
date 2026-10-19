@@ -205,11 +205,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792093232,
-        "narHash": "sha256-nLU2xCLidtBMXJ3N2vrERxsGMdty1zlC9UnWHVE49RM=",
+        "lastModified": 1792395782,
+        "narHash": "sha256-7NOaftUykhqraVbR9whOY84NKqPdkRwITWx/bAW6r3Y=",
         "owner": "Waayway",
         "repo": "lodestar",
-        "rev": "6c9f7334439a2cc30286066579eb89dead998145",
+        "rev": "abe019fe63f9f262d837668800b4ba2d1e1528c9",
         "type": "github"
       },
       "original": {
