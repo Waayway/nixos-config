@@ -246,6 +246,9 @@ homelab hosts. The only extra thing it reveals is live up/down state.
   `local-lvm` (about 100 GB free there: fits, but getting full). All data stays on
   TrueNAS over NFS.
 - The WX7100 passthrough moves from media (120); media must be off before 100 starts.
+- Open: the WX7100 may be replaced by a newer GPU (AV1, HDR tone mapping, Immich ML
+  acceleration); the user is choosing one. The design only assumes one GPU passed
+  through to VM 100.
 - First, old Main is renumbered 100 → 108 on `pve` (config only, its IP inside the VM
   stays `.100`). The new VM takes `.100` only after Main's services have moved.
 
