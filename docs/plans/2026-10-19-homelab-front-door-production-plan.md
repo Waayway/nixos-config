@@ -102,8 +102,11 @@ Two Nextclouds on the same files is fine for reading, but Claude switches off th
 one's background jobs until the final switch, so it doesn't change files behind Main's
 back.
 
-Jellyfin on VM 100 runs without the graphics card for now (the card stays in media until
-the final switch), so video conversion is slower during testing.
+**The graphics card:** you install the new **Intel Arc A380** tomorrow (replacing the
+WX7100). Claude then gives it straight to VM 100, so Jellyfin there converts video with
+it during testing already, and Immich uses it for recognising faces and objects. Jellyfin
+on media has no graphics card from then on, so on the old setup video conversion is
+slower until the final switch.
 
 ## Step 5: Tailscale points at VM 100 (you + Claude)
 
@@ -135,11 +138,11 @@ At a moment you pick:
 2. Claude stops Nextcloud on Main and Jellyfin on media.
 3. **The databases move:** a fresh copy of Nextcloud's database goes to VM 100 (and gets
    upgraded to the newer version), and Jellyfin's settings are copied one last time.
-4. The graphics card moves from media to VM 100.
+4. (The graphics card is already in VM 100.)
 5. Claude switches the new Nextcloud's background jobs on, takes the page down, and the
    internet goes to VM 100.
 6. Claude checks everything from outside your home: Nextcloud (login, calendar, contacts,
-   Collabora), Jellyfin (a film plays, with the graphics card), Immich, Archipelago.
+   Collabora), Jellyfin (a film plays, converted by the Arc card), Immich, Archipelago.
 
 **If anything fails:** the page stays up, the port forward goes back to Main (`.108`),
 and Main and media are started again with their original databases, which weren't

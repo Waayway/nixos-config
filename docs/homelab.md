@@ -4,6 +4,32 @@ What runs on the Proxmox host `pve`, surveyed 2026-10-12. Update this file when 
 VM moves to NixOS or a service changes. Migration and backup plans:
 `docs/plans/2026-10-12-homelab-backup-design.md` and `-plan.md`.
 
+## Changes in progress (2026-10-19)
+
+The front-door rebuild (`docs/plans/2026-10-19-homelab-front-door-*.md`) is under way;
+the sections below are the 2026-10-12 survey and are updated per VM when it is done.
+Current state:
+
+- **router (110)**, NixOS, `10.0.10.110`, tailnet `router` (`100.73.124.104`, tags
+  `tag:nixos`, `tag:router`): Traefik, split DNS for `vanwaaij.com` (CoreDNS), Tailscale
+  Services `nextcloud`, `jellyfin`, `archipelago`, `traefik`, subnet route and exit node.
+  Serves the tailnet only; the internet still goes to Main.
+- **router-test (230)**, NixOS, `10.0.10.230`: the router's test twin (test Service
+  `test-whoami-test`); kept for the Kanidm tests.
+- **vpn → 118**, `10.0.10.118` (was 110): WireGuard (wg-easy, `WG_HOST=server.vanwaaij.com`),
+  UniFi forwards 51820/udp there.
+- **Main**: IP `10.0.10.108` (was `.100`; VMID still 100 until renumbered to 108). UniFi
+  forwards 80/443 to `.108`. Its Tailscale sidecar (`traefik` device) was removed on the
+  tailnet and disabled in `~/traefik/docker-compose.yml` (`profiles: ["disabled"]`);
+  Traefik now publishes 80/443 itself. Nextcloud's hairpin `extra_hosts` points at `.108`.
+  Originals: `*.pre-108` next to each file, `/root/ens18.nmconnection.pre-108`.
+- **prod (100)** is next: Nextcloud, Jellyfin and Immich as containers on NixOS.
+- **GPU:** an Intel Arc A380 replaces the Radeon Pro WX 7100 (installed 2026-10-20) and
+  goes to prod (100). Media (120) loses its GPU; its `hostpci0` mapping must be removed.
+- TrueNAS: new NFS export `/mnt/archive/shares` (id 8, declared in
+  `modules/truenas/homelab.nix`; not yet on `stable`, so a reconcile from `stable`
+  would remove it until promoted).
+
 ## Access
 
 - VMIDs and IPs follow `docs/vmids.md` (also in the `pve` node notes): the
@@ -15,12 +41,12 @@ VM moves to NixOS or a service changes. Migration and backup plans:
 
   | VM | user |
   |---|---|
-  | 100 Main | `goedenaam` |
+  | 100 Main (now at `10.0.10.108`) | `goedenaam` |
   | 105 deploy-box | `jenkins` |
   | 120 media | `media` |
   | 201 archipelago | `archipelago` |
   | 170 nixos-manager | `manager` |
-  | 110 vpn | none reachable: port 22 closed from the LAN |
+  | 118 vpn (was 110) | none reachable: port 22 closed from the LAN |
   | 130 truenas | `automation` (key: 1Password Homelab/truenas-automation, passwordless sudo; use `sudo midclt call …`) |
 
 - Guest-exec is disabled in the qemu agent on the Rocky VMs (`qm guest exec`

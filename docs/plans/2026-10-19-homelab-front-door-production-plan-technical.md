@@ -7,7 +7,8 @@ Plain-language version (what happens, who does what): `2026-10-19-homelab-front-
 **Goal:** NixOS VM 100 (`prod`, `10.0.10.100`) runs Nextcloud 32 (+ MariaDB, Redis,
 Collabora), Jellyfin and Immich from their official Docker images on data mounted from
 TrueNAS at `/store` and `/archive`; verified over the tailnet on copies of the databases;
-then one cutover moves the databases, the GPU and the public port forward (to the router).
+then one cutover moves the databases and the public port forward (to the router). The
+Intel Arc A380 (replacing the WX7100) is passed to VM 100 as soon as it is installed.
 
 **Architecture:** NixOS provides the VM (Docker engine, TrueNAS mounts, Tailscale,
 firewall, timers). Each app is a feature module under `modules/services/` that declares
@@ -135,7 +136,8 @@ modify `hosts/servers/prod.nix`, `modules/homelab/routes.nix` (hand routes `next
 `jellyfin` removed), `modules/homelab/links.nix` (their links removed).
 
 **Produces:** per app `homelab.<app> = { enable; live : bool = false; }`, plus
-`homelab.jellyfin = { configDir : str; gpu : bool = false; }`. Each module declares its
+`homelab.jellyfin = { configDir : str; gpu : bool = false; }` and
+`homelab.immich.gpu : bool = false` (Intel Arc A380 via `/dev/dri`). Each module declares its
 containers, `homelab.routes.<name> = { host; backend = "http://10.0.10.100:<port>"; maintenance = !live; }`,
 a `lodestar.links` entry, its dump timer.
 
@@ -155,7 +157,11 @@ a `lodestar.links` entry, its dump timer.
     `10.0.10.110`, `OVERWRITEPROTOCOL=https`, `OVERWRITEHOST=nextcloud.vanwaaij.com`.
   - Jellyfin: `jellyfin/jellyfin:10.11`, `--user 1000:1000`, volumes `<configDir>:/config`,
     `/var/cache/jellyfin:/cache`, `/archive/jellyfin:/media:ro`, port 8096; `/dev/dri`
-    and the render/video groups only when `gpu`.
+    and the render/video groups only when `gpu` (Intel QSV/VA-API; VM 100 gets
+    `hardware.graphics` with `intel-media-driver` and `vpl-gpu-rt`,
+    `hardware.enableRedistributableFirmware`, kernel param `i915.enable_guc=3`).
+  - Immich with `gpu`: machine-learning image `…immich-machine-learning:v2-openvino`
+    with `/dev/dri`.
   - Immich: server (`ghcr.io/immich-app/immich-server:v2`, port 2283,
     `/store/immich-v2:/data`, `/store/immich/library:/mnt/old-library:ro`),
     machine-learning (`…immich-machine-learning:v2`), `valkey` and PostgreSQL exactly as
@@ -202,6 +208,13 @@ a `lodestar.links` entry, its dump timer.
   `--cores 6 --memory 16384 --onboot 1`, `qm resize 100 virtio0 64G`; switch to `#prod`
   from nixos-manager; reboot; on `.100`, tagged `tag:nixos,tag:prod`; `/store` and
   `/archive` readable.
+- [ ] **Step 3b — GPU (after the user installs the Arc A380, 2026-10-20):** on `pve`
+  remove `hostpci0: mapping=WX7100` from VM 120 (the card is gone; media transcodes in
+  software until the cutover) and the old mapping; create a PCI mapping `ArcA380` for
+  the new card (`pvesh` / Datacenter → Resource Mappings; check IOMMU group, ReBAR);
+  `hostpci0: mapping=ArcA380,pcie=1` on VM 100 (q35 machine if needed); set
+  `homelab.jellyfin.gpu = true` and `homelab.immich.gpu = true`; switch; check
+  `ls /dev/dri` in VM 100 and `vainfo` (iHD driver, AV1 encode profiles listed).
 - [ ] **Step 4:** On TrueNAS create `/mnt/store/internal/{immich-v2,jellyfin-test,db-dumps/nextcloud,db-dumps/immich}`
   with owners matching the container uids.
 
@@ -247,14 +260,14 @@ a `lodestar.links` entry, its dump timer.
   `nextcloud-cron`; media: stop `jellyfin`.
 - [ ] **Step 3:** `prod-sync-nextcloud-db` (fresh dump → recreate → import → `occ upgrade`
   → maintenance off).
-- [ ] **Step 4:** `homelab.jellyfin.configDir = "/store/jellyfin/config"`, `gpu = true`.
-- [ ] **Step 5:** `qm shutdown 120`; move `hostpci0: mapping=WX7100` to VM 100; reboot 100.
+- [ ] **Step 4:** `homelab.jellyfin.configDir = "/store/jellyfin/config"`.
+- [ ] **Step 5:** (no GPU move: the Arc A380 is already on VM 100 since Task 4 Step 3b.)
 - [ ] **Step 6:** `live = true` for all four; switch prod and router; commit `feat(prod): live`.
 - [ ] **Step 7:** Checks from outside: Nextcloud login, `status.php`, WebDAV 207,
-  CalDAV/CardDAV discovery, Collabora; Jellyfin plays with VA-API; Immich ping; `ap.`
+  CalDAV/CardDAV discovery, Collabora; Jellyfin plays with QSV on the Arc (ffmpeg log shows `qsv`/`vaapi`); Immich ping; `ap.`
   401; Nextcloud admin overview clean. User confirms on the phone.
 - [ ] **Step 8 — Rollback:** forward → `.108`; Main `docker compose up -d`, maintenance
-  off; media: GPU back to 120, start Jellyfin there. Nothing on Main or media was changed
+  off; media: start Jellyfin there (software transcoding; the WX7100 is gone). Nothing on Main or media was changed
   or deleted.
 
 ### Task 9: Docs and cleanup

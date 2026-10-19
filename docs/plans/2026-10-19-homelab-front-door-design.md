@@ -279,9 +279,11 @@ homelab hosts. The only extra thing it reveals is live up/down state.
 - VMID 100, `10.0.10.100`, hostname `prod`: 6 cores, 16 GB RAM, 64 GB root on
   `local-lvm`. NixOS provides Docker, the TrueNAS mounts, Tailscale, firewall, the dump
   and update timers.
-- The WX7100 passthrough moves from media (120) at the cutover; media must be off first.
-- Open: the WX7100 may be replaced by a newer GPU (AV1, HDR tone mapping, Immich ML
-  acceleration); the design only assumes one GPU passed through to VM 100.
+- GPU: an **Intel Arc A380** replaces the WX7100 (installed 2026-10-20) and is passed
+  through to VM 100 straight away, so testing already has hardware transcoding (AV1,
+  HDR tone mapping via Intel QSV/VA-API) and Immich's machine learning runs on it
+  (OpenVINO). The WX7100 leaves the server; media (120) loses its GPU and transcodes in
+  software until the cutover.
 - Old Main moves to IP `10.0.10.108` (user) and VMID 108 (Claude).
 
 ### Nextcloud
@@ -295,14 +297,15 @@ homelab hosts. The only extra thing it reveals is live up/down state.
 
 ### Jellyfin
 
-- `jellyfin/jellyfin:10.11` with `/dev/dri` once the GPU has moved; `/config`, `/cache`
+- `jellyfin/jellyfin:10.11` with `/dev/dri` (Intel Arc A380, QSV); `/config`, `/cache`
   and `/media` mounted as on media today (`/media` = `/archive/jellyfin`, read-only).
 - Testing on a copy of the config (`/store/jellyfin-test`); the original
   `/store/jellyfin` at the cutover.
 
 ### Immich
 
-- Upstream's containers: server, machine-learning (CPU), valkey, PostgreSQL (pinned).
+- Upstream's containers: server, machine-learning (`-openvino` variant on the Arc
+  A380), valkey, PostgreSQL (pinned).
 - Starts fresh: new media location `/store/immich-v2`; the existing photos in
   `/store/immich/library` are added as a read-only external library.
 
