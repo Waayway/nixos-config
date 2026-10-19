@@ -11,11 +11,14 @@
 #
 # A route with `passthrough` gets TCP routers instead (`HostSNI`, TLS passed through
 # unopened, on both entrypoints; the Tailscale Service forwards TCP, so SNI arrives
-# intact). A route with `auth.gate` gets the sign-in gate (gate.nix): an errors
-# middleware that turns a 401 into a redirect to oauth2-proxy's sign-in, then a
-# forwardAuth asking oauth2-proxy whether the user is in `<route>-users`; the route
-# must have an access entry with `gate = true` on the identity host (`identityHost`),
-# or evaluation fails. NixOS only.
+# intact). A route with `auth.gate` gets the sign-in gate (gate.nix): a forwardAuth
+# on oauth2-proxy's proxy endpoint, which answers 202 for a signed-in member of
+# `<route>-users`, 403 for anyone else signed in, and redirects to the sign-in
+# itself (302) when there's no session. No errors middleware, so a 401 from the
+# backend reaches the client untouched (no sign-in loop). The route must have an
+# access entry with `gate = true` on the identity host (`identityHost`), or
+# evaluation fails, and can't also have basic auth. The gate (and its route, named
+# after the gate host) is on when any route is gated (`gate.enable`). NixOS only.
 {
   config,
   lib,
@@ -53,6 +56,16 @@ let
     address = idConfig.homelab.lan.address;
   };
 
+  # The gate's own route (oauth2-proxy's pages), named after the gate host's first
+  # label, while the gate is on. Kept out of `extraRoutes`, whose routes decide
+  # whether it is.
+  ownRoutes = fromFlake // extra;
+  gateRoute = lib.optionalAttrs cfg.gate.enable {
+    ${lib.head (lib.splitString "." identity.gateHost)} = cfg.gate.route // {
+      declaredBy = config.networking.hostName;
+    };
+  };
+
   # Routes that can't be expressed: wrong backend/passthrough combinations.
   malformed = lib.filterAttrs (
     _: r:
@@ -67,6 +80,7 @@ let
         || r.insecureBackend
       )
     )
+    || (r.auth.gate && r.basicAuth.usersFile != null)
   ) cfg.routes;
 
   tls = {
@@ -100,7 +114,7 @@ let
       tcpServices.${name}.loadBalancer.servers = [ { address = r.passthrough; } ];
     };
 
-  # The gate's two middlewares for a route; fails unless the identity host lets the
+  # The gate's middleware for a route; fails unless the identity host lets the
   # route's app through the gate.
   gateMiddlewares =
     name:
@@ -110,20 +124,17 @@ let
     assert lib.assertMsg (a != null && a.gate)
       "homelab.router: route '${name}' has auth.gate but ${cfg.identityHost}'s homelab.identity.access has no app '${name}' with gate = true";
     {
-      # Listed first: catches the forwardAuth's 401 and answers with oauth2-proxy's
-      # sign-in redirect (302; the errors middleware would otherwise keep the 401).
-      "${name}-gate-signin".errors = {
-        status = [ "401" ];
-        statusRewrites."401" = 302;
-        service = "oauth2-proxy";
-        query = "/oauth2/start?rd={url}";
-      };
+      # The proxy endpoint, not /oauth2/auth: it starts the sign-in itself (the
+      # original URL from X-Forwarded-*, `--reverse-proxy`), and forwardAuth hands
+      # any non-2xx answer, the 302 included, to the client.
       "${name}-gate".forwardAuth = {
-        address = "http://127.0.0.1:4180/oauth2/auth?allowed_groups=${name}-users@${identity.domain}";
+        address = "http://127.0.0.1:4180/?allowed_groups=${name}-users@${identity.domain}";
         authResponseHeaders = [
           "X-Auth-Request-User"
           "X-Auth-Request-Email"
         ];
+        # Also removes every X-Auth-Request-* header the client sent.
+        authResponseHeadersRegex = "^X-Auth-Request-";
       };
     };
 
@@ -139,13 +150,7 @@ let
         rule = "Host(`${r.host}`)";
         entryPoints = [ entryPoint ];
         service = if r.backend == "api@internal" then "api@internal" else name;
-        middlewares =
-          lib.optionals r.auth.gate [
-            "${name}-gate-signin"
-            "${name}-gate"
-          ]
-          ++ lib.attrNames auth
-          ++ lib.attrNames own;
+        middlewares = lib.optional r.auth.gate "${name}-gate" ++ lib.attrNames auth ++ lib.attrNames own;
       };
       # While in maintenance the public side shows the local page, with no
       # route middlewares (basic auth would prompt before the page).
@@ -250,6 +255,28 @@ lib.optionalAttrs hostPlatform.isLinux {
       '';
     };
 
+    gate = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = lib.any (r: r.auth.gate) (lib.attrValues ownRoutes);
+        defaultText = lib.literalMD "whether any route has `auth.gate`";
+        description = ''
+          The sign-in gate: oauth2-proxy (with Docker and its two secrets, gate.nix)
+          and its route. On by itself once a route is gated; a test router turns it
+          on to try it.
+        '';
+      };
+      route = lib.mkOption {
+        type = routeType;
+        internal = true;
+        default = {
+          host = identity.gateHost;
+          backend = "http://127.0.0.1:4180";
+        };
+        description = "The gate's own route (sign-in, callback), added to `routes` while the gate is on.";
+      };
+    };
+
     identity = lib.mkOption {
       type = lib.types.attrsOf lib.types.raw;
       readOnly = true;
@@ -261,7 +288,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     routes = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       readOnly = true;
-      default = fromFlake // extra;
+      default = ownRoutes // gateRoute;
       defaultText = lib.literalMD "every configuration's `homelab.routes` and `extraRoutes`";
       description = ''
         Every route the router serves: `homelab.routes` from all configurations in
@@ -285,7 +312,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           }
           {
             assertion = malformed == { };
-            message = "homelab.router: routes need exactly one of backend and passthrough, and a passthrough route takes no maintenance, basicAuth, middlewares, auth.gate or insecureBackend: ${toString (lib.attrNames malformed)}";
+            message = "homelab.router: routes need exactly one of backend and passthrough, a passthrough route takes no maintenance, basicAuth, middlewares, auth.gate or insecureBackend, and auth.gate excludes basicAuth: ${toString (lib.attrNames malformed)}";
           }
           {
             assertion = identity.enable;

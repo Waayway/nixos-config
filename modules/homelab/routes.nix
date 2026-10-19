@@ -4,9 +4,9 @@
 # `homelab.routes.<name>` (Nextcloud, Jellyfin, Immich: modules/services/). BlueMap
 # isn't routed (dead today).
 #
-# Also the identity's two routes, named after their hosts' first label (`id`/`auth`,
-# on router-test `id-test`/`auth-test`): Kanidm, passed through as TLS (it serves its
-# own certificate), and the sign-in gate (oauth2-proxy, modules/homelab/router/gate.nix).
+# Also the identity route, named after its host's first label (`id`, on router-test
+# `id-test`): Kanidm, passed through as TLS (it serves its own certificate). The
+# sign-in gate's route (`auth`) comes with the gate (modules/homelab/router/default.nix).
 {
   config,
   lib,
@@ -23,11 +23,6 @@ lib.optionalAttrs hostPlatform.isLinux {
       ${label id.domain} = {
         host = id.domain;
         passthrough = "${id.address}:8443";
-      };
-
-      ${label id.gateHost} = {
-        host = id.gateHost;
-        backend = "http://127.0.0.1:4180";
       };
 
       # Self-signed certificate on the appliance; tailnet only.

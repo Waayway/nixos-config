@@ -1,12 +1,15 @@
 # The router's sign-in gate: oauth2-proxy (official image) on 127.0.0.1:4180, a
 # client of Kanidm (`oauth2-proxy`, provisioned by modules/identity/kanidm.nix) on
-# the identity host (`homelab.router.identityHost`). Routes with `auth.gate` ask it
-# through Traefik's forwardAuth (`/oauth2/auth?allowed_groups=<route>-users@<domain>`,
-# default.nix); its own pages (sign-in, callback) are the route named after the gate
-# host (`auth`, `auth-test`; modules/homelab/routes.nix). The session cookie is set on
-# the parent domain (`.vanwaaij.com`), so one sign-in covers every gated site, and
-# `rd` redirects only within it. A test gate gets its own cookie name, so its cookie
-# doesn't clash with the real one.
+# the identity host (`homelab.router.identityHost`). On only with
+# `homelab.router.gate.enable` (by default: some route is gated); otherwise the router
+# has no Docker, container or gate secrets. Routes with `auth.gate` ask it through
+# Traefik's forwardAuth (`/?allowed_groups=<route>-users@<domain>`, default.nix),
+# which also redirects to the sign-in; its own pages (callback) are the route named
+# after the gate host (`auth`, `auth-test`). OIDC discovery and token calls go to the
+# router's own Traefik (:443), which passes the identity host through to Kanidm. The
+# session cookie is set on the parent domain (`.vanwaaij.com`, SameSite=Lax), so one
+# sign-in covers every gated site, and `rd` redirects only within it. A test router
+# (servicePrefix set) uses its own cookie name and 1Password items.
 #
 # The client secret (copied out of Kanidm by scripts/kanidm-oauth2-secret.sh) and the
 # cookie secret come from 1Password (`kanidm-oauth2-oauth2-proxy[-test]`,
@@ -26,8 +29,8 @@ let
 
   image = "quay.io/oauth2-proxy/oauth2-proxy:v7.15.5@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916";
 
-  # "id" -> "", "id-test" -> "-test": the 1Password items and cookie of a test gate.
-  suffix = lib.removePrefix "id" (lib.head (lib.splitString "." id.domain));
+  # A test router (servicePrefix set) uses its own 1Password items and cookie.
+  suffix = lib.optionalString (cfg.servicePrefix != "") "-test";
   # "id.vanwaaij.com" -> "vanwaaij.com"
   parentDomain = lib.concatStringsSep "." (lib.tail (lib.splitString "." id.domain));
 
@@ -35,7 +38,7 @@ let
   uid = 4180;
 in
 lib.optionalAttrs hostPlatform.isLinux {
-  config = lib.mkIf cfg.enable {
+  config = lib.mkIf (cfg.enable && cfg.gate.enable) {
     homelab.containers.enable = true;
 
     users.users.oauth2-proxy = {
@@ -70,8 +73,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       extraOptions = [
         # Listens on the host's loopback only (--http-address).
         "--network=host"
-        # Straight to Kanidm, not through the router's own front door.
-        "--add-host=${id.domain}:${id.address}"
+        # The router's own Traefik (:443), which passes the identity host's name
+        # through to Kanidm; Kanidm itself listens on 8443 only.
+        "--add-host=${id.domain}:127.0.0.1"
       ];
       cmd = [
         "--http-address=127.0.0.1:4180"
@@ -92,6 +96,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         "--cookie-name=_oauth2_proxy${lib.replaceStrings [ "-" ] [ "_" ] suffix}"
         "--cookie-domain=.${parentDomain}"
         "--cookie-secure=true"
+        "--cookie-samesite=lax"
         "--whitelist-domain=.${parentDomain}"
         # forwardAuth only; nothing is proxied.
         "--upstream=static://202"
@@ -105,11 +110,6 @@ lib.optionalAttrs hostPlatform.isLinux {
     systemd.services.docker-oauth2-proxy.unitConfig.ConditionPathExists = [
       secrets.oauth2ProxyClientSecret
       secrets.oauth2ProxyCookieSecret
-    ];
-
-    # The errors middleware's target (default.nix).
-    services.traefik.dynamicConfigOptions.http.services.oauth2-proxy.loadBalancer.servers = [
-      { url = "http://127.0.0.1:4180"; }
     ];
   };
 }
