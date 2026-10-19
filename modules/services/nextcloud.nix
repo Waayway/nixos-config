@@ -17,13 +17,18 @@
 # the TrueNAS copy Main uses, /store/nextcloud/data (www-data, 33, as in the image).
 #
 # Secrets: one env file, 1Password Homelab `nextcloud-config` field `env`, with
-# MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD and REDIS_HOST_PASSWORD (and, for a first
-# install only, NEXTCLOUD_ADMIN_USER / NEXTCLOUD_ADMIN_PASSWORD).
+# MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD and REDIS_HOST_PASSWORD (Main's, so the copied
+# config.php stays valid). No NEXTCLOUD_ADMIN_*: with those set and an empty html
+# directory the image's entrypoint tries `occ maintenance:install`, which fails on a
+# copied (installed) config.php.
 #
 # Two Nextclouds on one data directory: until `live`, nothing here runs background
 # jobs (no cron container), and the app only starts once config/config.php exists
 # (copied from Main), so the image never installs a fresh instance onto the shared
-# data directory.
+# data directory. `imageTag` pins the app to Main's exact version while both run on
+# that data directory, so the entrypoint never runs `occ upgrade` on it.
+#
+# The database copy from Main (also at the cutover): scripts/prod-sync-nextcloud-db.sh.
 let
   cfg = config.homelab.nextcloud;
   lan = config.homelab.lan;
@@ -34,7 +39,9 @@ let
   officePort = 9980;
   state = "/var/lib/prod/nextcloud";
   network = "nextcloud";
+  # The floating track (the weekly update and renovate.json follow this literal).
   image = "nextcloud:32-apache";
+  appImage = if cfg.imageTag == null then image else "nextcloud:${cfg.imageTag}";
 
   # The app's and cron's mounts (Main's, with local paths under `state`).
   appVolumes = [
@@ -72,6 +79,16 @@ lib.optionalAttrs hostPlatform.isLinux {
         maintenance page and there is no nextcloud-cron container.
       '';
     };
+    imageTag = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "32.0.8-apache";
+      description = ''
+        Pin app and cron to this exact `nextcloud` tag instead of the floating track
+        (`32-apache`). A pinned image is not pulled by the weekly update; null follows
+        the track.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -84,7 +101,7 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     homelab.containers = {
       enable = true;
-      floating = [ image ];
+      floating = lib.optional (cfg.imageTag == null) image;
     };
 
     services.onepassword-secrets.secrets.nextcloudEnv = {
@@ -139,7 +156,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         };
 
         nextcloud-app = {
-          inherit image;
+          image = appImage;
           networks = [ network ];
           ports = [ "${lan.address}:80:80" ];
           volumes = appVolumes;
@@ -169,7 +186,7 @@ lib.optionalAttrs hostPlatform.isLinux {
 
       (lib.mkIf cfg.live {
         nextcloud-cron = {
-          inherit image;
+          image = appImage;
           networks = [ network ];
           entrypoint = "/cron.sh";
           volumes = appVolumes;
