@@ -7,9 +7,12 @@
 # Immich v2 from the official images, translated from upstream's docker-compose.yml
 # of release v2.7.5 (github.com/immich-app/immich/releases/download/v2.7.5/
 # docker-compose.yml, the current v2 release; same as media's /opt/immich): server,
-# machine-learning, valkey and Immich's PostgreSQL, the last two pinned to upstream's
-# tag + digest. Compose's service names become container names on the `immich`
-# network (DB_HOSTNAME / REDIS_HOSTNAME point at them). With `gpu`: QSV transcoding
+# machine-learning, valkey and Immich's PostgreSQL. Server and machine-learning are
+# pinned to that release's tag, valkey and PostgreSQL to the tag + digest of its
+# compose, so all of Immich moves together: Renovate groups the ghcr.io/immich-app
+# images into one pull request (renovate.json); the weekly update never pulls them.
+# Compose's service names become container names on the `immich` network
+# (DB_HOSTNAME / REDIS_HOSTNAME point at them). With `gpu`: QSV transcoding
 # (hwaccel.transcoding.yml `quicksync`) and the `-openvino` machine-learning image
 # (hwaccel.ml.yml `openvino`), both with /dev/dri, on the Intel Arc A380.
 #
@@ -29,10 +32,11 @@ let
   state = "/var/lib/prod/immich";
   network = "immich";
   envFiles = [ secretPaths.immichEnv ];
-  serverImage = "ghcr.io/immich-app/immich-server:v2";
   # The literal image string (tag included) is what renovate.json matches; `gpu` only
-  # appends the variant suffix.
-  mlImage = "ghcr.io/immich-app/immich-machine-learning:v2" + lib.optionalString cfg.gpu "-openvino";
+  # appends the variant suffix. Keep both on the same release.
+  serverImage = "ghcr.io/immich-app/immich-server:v2.7.5";
+  mlImage =
+    "ghcr.io/immich-app/immich-machine-learning:v2.7.5" + lib.optionalString cfg.gpu "-openvino";
 
   # Upstream's .env, minus the password.
   environment = {
@@ -56,7 +60,7 @@ lib.optionalAttrs hostPlatform.isLinux {
       default = false;
       description = ''
         Use the passed-through Intel Arc A380: QSV transcoding and OpenVINO machine
-        learning (`immich-machine-learning:v2-openvino`), both with /dev/dri.
+        learning (`immich-machine-learning:<release>-openvino`), both with /dev/dri.
       '';
     };
   };
@@ -71,10 +75,6 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     homelab.containers = {
       enable = true;
-      floating = [
-        serverImage
-        mlImage
-      ];
       intelGpu = lib.mkIf cfg.gpu true;
       dumps.immich = {
         container = "immich-postgres";

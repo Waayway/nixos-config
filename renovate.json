@@ -9,10 +9,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Container images in the Nix app modules: image = \"<repo>:<tag>\" (optionally @sha256:<digest>)",
+      "description": "Container images in the Nix app modules: image = \"<repo>:<tag>\" (optionally @sha256:<digest>; the string may start on the next line)",
       "managerFilePatterns": ["/^modules/services/.+\\.nix$/"],
       "matchStrings": [
-        "(?:image|serverImage|mlImage) = \"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
+        "(?:image|serverImage|mlImage)\\s*=\\s*\"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
       ],
       "datasourceTemplate": "docker"
     }
@@ -20,14 +20,14 @@
   "packageRules": [
     {
       "description": "Floating app images follow their track through the weekly update; Renovate proposes only a new track (minor or major), never patches or digests (list = homelab.containers.floating)",
-      "matchDepNames": [
-        "nextcloud",
-        "jellyfin/jellyfin",
-        "ghcr.io/immich-app/immich-server",
-        "ghcr.io/immich-app/immich-machine-learning"
-      ],
+      "matchDepNames": ["nextcloud", "jellyfin/jellyfin"],
       "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
       "enabled": false
+    },
+    {
+      "description": "Immich's images (server, machine-learning, PostgreSQL) move together: one pull request for the whole release (modules/services/immich.nix)",
+      "matchPackageNames": ["ghcr.io/immich-app/**"],
+      "groupName": "immich"
     }
   ]
 }
