@@ -1,5 +1,10 @@
-args@{ pkgs, user, ... }:
-import ../../lib/mkAppCategory.nix args {
+args@{
+  pkgs,
+  user,
+  tools,
+  ...
+}:
+tools.mkAppCategory args {
   name = "utilities";
   apps = {
     _1password = {

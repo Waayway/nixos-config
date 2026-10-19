@@ -38,7 +38,13 @@ lib.optionalAttrs enabled {
       networking.useDHCP = lib.mkForce false;
       networking.useNetworkd = true;
       systemd.network.networks."10-lan" = {
-        matchConfig.Type = "ether";
+        # The NIC only (virtio-net, ens18 on the template). `Type = "ether"` alone also
+        # matches Docker's veth pairs: networkd then gave every container veth the
+        # LAN address and pulled it off its bridge, cutting the containers off.
+        matchConfig = {
+          Type = "ether";
+          Name = "en*";
+        };
         address = [ "${net.ip}/${toString net.prefixLength}" ];
         gateway = [ gateway ];
         dns = [ gateway ];

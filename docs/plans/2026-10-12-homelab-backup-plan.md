@@ -234,6 +234,8 @@ Numbers are referenced from "What could be better" in `docs/homelab.md`.
 
 ## Phase 6: migrate VMs to NixOS, one at a time
 
+> For Main and media, the front-door design (`2026-10-19-homelab-front-door-design.md`) supersedes this phase: Nextcloud, Jellyfin and Immich run on prod (VM 100), Main and media are shut down.
+
 Order: vpn (or retire) → archipelago → media → Main. Per VM:
 
 1. `hosts/servers/<name>.nix` (thin: identity, `netInterface` with a new

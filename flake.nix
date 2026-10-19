@@ -54,6 +54,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # TIDAL client mod (modules/apps/media.nix): the prebuilt release, the
+    # same files on every platform. Bump the tag to update.
+    tidaluna = {
+      url = "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip";
+      flake = false;
+    };
+
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -73,6 +80,6 @@
         darwinConfigurations
         deploy
         ;
-      inherit (programs) packages;
+      inherit (programs) packages checks;
     };
 }

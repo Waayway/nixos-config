@@ -12,11 +12,17 @@ at `~/.flake` on each machine. Read this before changing anything.
 | apollo | personal MacBook Pro M1 Pro | aarch64-darwin | thijsvw | workstations |
 | hermes | Framework 13 (AMD) | x86_64-linux | waayway | workstations |
 | hephaestus | desktop (AMD) | x86_64-linux | waayway | workstations |
+| router | Proxmox VM 110, the front door (Traefik, split DNS, Tailscale Services) | x86_64-linux | router | servers |
+| router-test | Proxmox VM 230, the router's test twin | x86_64-linux | router-test (unverified) | servers |
+| prod | Proxmox VM 100, Nextcloud + Jellyfin + Immich (containers) | x86_64-linux | prod | servers |
 | nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
 10.0.10.0/24, gateway 10.0.10.1). Other VMs there still run Rocky/Debian and are
 being migrated to NixOS (see `docs/plans/2026-10-12-fleet-manager-design.md`).
+VM sizes (vCPU, RAM) and `onboot` are set on `pve` (`qm config <id>`), not in this
+repo. Tailscale policy edits go through the API with the 1Password Homelab item
+`tailscale-policy-authkey` (`docs/lodestar.md`). `docs/homelab.md` has the inventory.
 Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 (`14m2max`), the Jenkins VM.
 
@@ -27,9 +33,13 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   `programs.nix` (packages: the proxmox template).
 - `hosts/<category>/<name>.nix`: one file per machine. Categories are folders
   (`servers`, `workstations`); a host is `foo.nix` or `foo/default.nix`.
-- `lib/`: `discoverHosts.nix`, `mkSystem.nix` (NixOS), `mkDarwin.nix`,
-  `mkHome.nix` (home-manager), `mkAppCategory.nix`,
-  `mkDeployNode.nix` (deploy-rs), `umport.nix` (recursive importer).
+- `lib/`: helper functions. `lib/default.nix` imports every file there into
+  one attrset keyed by file name (`tools.mkSystem`, `tools.mkAppCategory`, …);
+  `systems.nix` uses it, and every module gets it as the `tools` specialArg
+  (use `tools.<name>`, not a relative import). Files: `discoverHosts.nix`,
+  `mkSystem.nix` (NixOS), `mkDarwin.nix`, `mkHome.nix` (home-manager),
+  `mkAppCategory.nix`, `mkDeployNode.nix` (deploy-rs), `umport.nix`
+  (recursive importer).
 - `modules/<category>/`: all configuration. `*_home.nix` files are
   home-manager modules; everything else is a system module.
 - `modules/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
@@ -174,6 +184,15 @@ lodestar` here.
   post-activation → home-manager. If Homebrew fails, home-manager never runs.
   ThermalForge compiles from source and needs the full Xcode app. Writing
   `com.apple.universalaccess` needs Full Disk Access for the terminal.
+- **NFS automounts must not have an idle timeout** (`x-systemd.idle-timeout`) on
+  hosts with containers: the host sees the mount as idle (containers hold their own
+  bind in their mount namespace), the automount expires, the mount unit stops and
+  everything with `RequiresMountsFor` is stopped with it (prod, 2026-10-19; fixed in
+  `modules/homelab/storage.nix`).
+- **The opnix trust credential is `tag:nixos`.** In the Tailscale policy `tag:nixos`
+  owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet` are owned by
+  `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
+  or the host cannot join.
 - **NixOS maps a machine's own hostname to `127.0.0.2`** in `/etc/hosts`.
   Anything that resolves "itself" by name gets loopback, not its Tailscale IP.
 - **git as root on a user's repo** fails with "dubious ownership"; run git as

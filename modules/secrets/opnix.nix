@@ -24,15 +24,19 @@ lib.optionalAttrs hostPlatform.isLinux {
     services.onepassword-secrets = {
       enable = true;
       tokenFile = "/etc/opnix-token";
-      # The main run already restarts the units of changed secrets; the path
-      # watcher only fetched everything a second time.
-      systemdIntegration.changeDetection.enable = false;
+      # Change detection (a hash file) is what lets opnix restart only the units
+      # of secrets that changed; without it every poll restarted all of them.
+      systemdIntegration.changeDetection.enable = true;
       # Rotated secrets reach servers without waiting for a switch.
       systemdIntegration.polling = {
         enable = true;
         interval = "6h";
       };
     };
+
+    # …but its path watcher re-ran a full fetch after every run; the main run
+    # already restarts what changed.
+    systemd.paths.opnix-secrets-watcher.enable = false;
 
     systemd.services.opnix-secrets = {
       # When 1Password is unreachable, don't hold boot or a switch for minutes;

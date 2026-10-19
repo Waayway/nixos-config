@@ -17,7 +17,7 @@
 # An app without a field for the current platform is simply not installed there.
 #
 # Usage in a module:
-#   args@{ ... }: import ../../lib/mkAppCategory.nix args { name = "..."; apps = { ... }; }
+#   args@{ tools, ... }: tools.mkAppCategory args { name = "..."; apps = { ... }; }
 {
   config,
   lib,

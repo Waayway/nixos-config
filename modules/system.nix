@@ -13,6 +13,7 @@
       ./editor
       ./gaming
       ./hardware
+      ./homelab
       ./locale
       ./lodestar
       ./networking
@@ -20,6 +21,7 @@
       ./packages
       ./secrets
       ./security
+      ./services
       ./shell
       ./system
       ./truenas

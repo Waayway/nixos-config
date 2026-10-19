@@ -205,11 +205,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791897986,
-        "narHash": "sha256-vRaB4w4se4SD70Bo00tJ+9tSavLFzhZE8SxxCdBQcVQ=",
+        "lastModified": 1792395782,
+        "narHash": "sha256-7NOaftUykhqraVbR9whOY84NKqPdkRwITWx/bAW6r3Y=",
         "owner": "Waayway",
         "repo": "lodestar",
-        "rev": "3bdfab1c7d53f8e584c64e4a76ae449e6cba4641",
+        "rev": "abe019fe63f9f262d837668800b4ba2d1e1528c9",
         "type": "github"
       },
       "original": {
@@ -325,11 +325,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1779622335,
-        "narHash": "sha256-ViA62qtL5za7V3d5I8OA9q9JcFhsVAiL5jVHwEclWqk=",
+        "lastModified": 1792295010,
+        "narHash": "sha256-F7meJtbqGttmUoMmYjRRgkVs42sn7bh7vvRvLPlUN98=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "705e9929918b43bd7b715dc0a878ac870449bb03",
+        "rev": "8ce73368d1efd4d657e9064d29b144a52046b4e8",
         "type": "github"
       },
       "original": {
@@ -519,7 +519,8 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim",
         "opnix": "opnix",
-        "rofiThemeRepo": "rofiThemeRepo"
+        "rofiThemeRepo": "rofiThemeRepo",
+        "tidaluna": "tidaluna"
       }
     },
     "systems": {
@@ -580,6 +581,19 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "tidaluna": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790777571,
+        "narHash": "sha256-Xikqxg5kfaUzTUYUEOK/lcRLv3y7GQ3KDftsoz4sxsE=",
+        "type": "tarball",
+        "url": "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip"
       }
     },
     "utils": {
