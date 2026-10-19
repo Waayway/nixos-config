@@ -60,19 +60,33 @@ Claude adds one setting that mounts TrueNAS on a VM:
 
 ## Step 3: Describing VM 100
 
-Claude writes the configuration for VM **100** (6 cores, 16 GB memory, 64 GB disk):
+Claude writes the configuration for VM **100** (6 cores, 16 GB memory, 64 GB disk). The
+VM itself is NixOS; **the apps and their databases run from the makers' official Docker
+images**, described in the repo:
 
-- **Nextcloud** on the same major version (32), with its own MariaDB database, Redis and
-  **Collabora** (the document editor, at `office.vanwaaij.com`) instead of the built-in
-  one. Its files are the same files on `/store/nextcloud/data`.
+- **Nextcloud** 32 with its own MariaDB database, Redis and **Collabora** (the document
+  editor, at `office.vanwaaij.com`). Its files are the same files on
+  `/store/nextcloud/data`, at the same place inside the container as on Main today.
 - **Jellyfin** with its library from `/archive`, and its settings, users and watch history
   from a copy of `/store/jellyfin`.
 - **Immich**, starting fresh. The photos already on TrueNAS are added as a library it
   reads from, so nothing is lost; albums and faces are rebuilt.
-- **Nightly database dumps** to `/store/db-dumps`, which the existing backup to Hetzner
-  already picks up.
+- **Databases** live on VM 100's own disk; every night a copy goes to `/store/db-dumps`,
+  which the existing backup to Hetzner already picks up.
 - On the router: a **"we're working on it" page** that any website can be switched to
-  with one setting.
+  with one setting. (Done.)
+- The router finds the Tailscale address of each app by its name, so no addresses have to
+  be copied into the repo anymore.
+
+**Staying up to date:**
+
+- **Every Friday night** VM 100 fetches the newest versions within each app's current
+  line (Nextcloud 32.x, Jellyfin 10.11.x, Immich 2.x) and restarts what changed. If that
+  goes wrong, Healthchecks.io mails you.
+- **Bigger steps** (a new major version of an app, any database update) are never taken
+  automatically. A bot on GitHub (Renovate) opens a pull request for each one, with the
+  release notes; you get a notification, and merging it is the upgrade. **You:** install
+  the Renovate app on the GitHub repo once (Claude tells you when).
 
 Before anything is installed, Claude checks that everything builds.
 
@@ -80,7 +94,8 @@ Before anything is installed, Claude checks that everything builds.
 
 Claude creates VM 100, installs the configuration and fills it with **copies**:
 
-- a fresh copy of Nextcloud's database (Main keeps running on the original);
+- a fresh copy of Nextcloud's database, loaded into the new MariaDB (Main keeps running
+  on the original);
 - a copy of Jellyfin's settings folder (Jellyfin on media keeps running on the original).
 
 Two Nextclouds on the same files is fine for reading, but Claude switches off the new

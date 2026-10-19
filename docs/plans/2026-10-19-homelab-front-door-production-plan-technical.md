@@ -5,67 +5,72 @@
 Plain-language version (what happens, who does what): `2026-10-19-homelab-front-door-production-plan.md`.
 
 **Goal:** NixOS VM 100 (`prod`, `10.0.10.100`) runs Nextcloud 32 (+ MariaDB, Redis,
-Collabora), Jellyfin and Immich on data mounted from TrueNAS at `/store` and `/archive`;
-verified over the tailnet on copies of the databases; then one cutover moves the
-databases, the GPU and the public port forward (to the router).
+Collabora), Jellyfin and Immich from their official Docker images on data mounted from
+TrueNAS at `/store` and `/archive`; verified over the tailnet on copies of the databases;
+then one cutover moves the databases, the GPU and the public port forward (to the router).
 
-**Architecture:** A generic `homelab.storage` module mounts TrueNAS NFS on any VM. One
-feature module per app under `modules/services/` declares the service, its
-`homelab.routes` entry (route name = Tailscale Service name) and its `lodestar.links`
-entry, with a per-app `live` switch: `live = false` → the router's public router for that
-host serves a maintenance page; `true` → it proxies to VM 100. The tailnet path always
-goes to VM 100. Main and media are never modified beyond stopping containers at cutover.
+**Architecture:** NixOS provides the VM (Docker engine, TrueNAS mounts, Tailscale,
+firewall, timers). Each app is a feature module under `modules/services/` that declares
+its containers with `virtualisation.oci-containers` (translated from upstream's compose
+file), its `homelab.routes` entry (route name = Tailscale Service name), its
+`lodestar.links` entry and its nightly DB dump, with a per-app `live` switch
+(`live = false` → the router's public router serves the maintenance page). A weekly
+timer pulls floating tags; Renovate proposes pinned/major updates as pull requests. The
+router's CoreDNS resolves `<name>.vanwaaij.com` through the Service's MagicDNS name, so
+routes carry no IPs.
 
-**Tech Stack:** NixOS 26.05 (`services.nextcloud` with `pkgs.nextcloud32`,
-`services.mysql` MariaDB 11.4, `services.collabora-online`, `services.jellyfin`
-10.11, `services.immich` 2.7), NFS, Traefik 3.7 on the router, Tailscale API
-(`op://Homelab/tailscale-policy-authkey`), Proxmox `qm`.
+**Tech Stack:** NixOS 26.05, `virtualisation.oci-containers` (backend `docker`),
+images `nextcloud:32-apache`, `mariadb:11.4`, `redis:7-alpine`, `collabora/code`,
+`jellyfin/jellyfin:10.11`, Immich `v2` (server, machine-learning, valkey, its pinned
+PostgreSQL); NFS; Traefik 3.7 + CoreDNS on the router; Renovate (GitHub app);
+Healthchecks.io; Tailscale API; Proxmox `qm`.
 
-**Spec:** `docs/plans/2026-10-19-homelab-front-door-design.md` (section C), amended by the
-user on 2026-10-19: generic `/store` + `/archive` mounts; databases move last; tailnet
-verification before any public change; maintenance page during cutover; Kanidm/OIDC
-deferred to the identity plan; the router plan's Task 9 (cutover via Main) is replaced by
-Task 8 here.
+**Spec:** `docs/plans/2026-10-19-homelab-front-door-design.md` (section C, revised
+2026-10-19: Docker). The router plan's Task 9 (cutover via Main) is replaced by Task 8
+here.
 
 **Depends on:** router plan Tasks 1–8 (router 110 live on the tailnet, split DNS →
-router, `homelab.routes` with `tailnet.address`).
+router).
 
 ## Global Constraints
 
-- VM 100: `10.0.10.100`, hostname `prod`, 6 cores, 16 GB, 64 GB root on `local-lvm`
-  (≈84 GB free there), `tags = [ "tag:prod" ]` (policy: `"tag:prod": ["autogroup:admin", "tag:nixos"]`).
-- Old Main: VMID 100 → 108, IP `10.0.10.108` (user changes the IP). Its disk is
-  `store-lvm:vm-100-disk-0`.
+- VM 100: `10.0.10.100`, hostname `prod`, 6 cores, 16 GB, 64 GB root on `local-lvm`,
+  `tags = [ "tag:prod" ]` (already in the Tailscale policy).
+- Old Main: IP `10.0.10.108` (user), VMID 100 → 108 (Claude); disk `store-lvm:vm-100-disk-0`.
 - Mounts: `/store` ← `10.0.10.130:/mnt/store/internal`, `/archive` ←
-  `10.0.10.130:/mnt/archive/shares` (new export), NFS, `_netdev`, `x-systemd.automount`.
-- Paths: Nextcloud data `/store/nextcloud/data` (same files as Main, owned uid/gid 33);
-  Jellyfin config: test copy `/store/jellyfin-test/config`, after cutover the original
-  `/store/jellyfin/config`; library `/archive/jellyfin`; Immich media `/store/immich-v2`,
-  old photos `/store/immich/library` as a read-only external library; dumps
-  `/store/db-dumps/{nextcloud,immich}`.
-- Hostnames: `nextcloud.vanwaaij.com`, `office.vanwaaij.com` (Collabora),
-  `jellyfin.vanwaaij.com`, `immich.vanwaaij.com`; route/Service names `nextcloud`,
-  `office`, `jellyfin`, `immich`.
-- Nextcloud: major 32 (DB from 32.0.8 upgraded to nixpkgs' 32.0.15 by `occ upgrade`);
-  `instanceid`, `passwordsalt`, `secret` carried over from Main's `config.php` via
-  1Password item `nextcloud-config` (field `secrets`, JSON) → `services.nextcloud.secretFile`;
-  `trusted_proxies = [ "10.0.10.110" ]`, `overwriteprotocol = "https"`.
-- Secrets never printed; never in the repo.
-- Repo rules as in the router plan's context file (modules always imported, gated; RFC
-  nixfmt; own paths; author thijs@vanwaaij.com; no AI trailer; no push without the user).
+  `10.0.10.130:/mnt/archive/shares` (done in Task 1). Every container using them gets
+  `RequiresMountsFor` on its systemd unit.
+- Container paths as in today's setups: Nextcloud data `/store/nextcloud/data` →
+  `/var/www/html/data`; Jellyfin `<configDir>` → `/config`, cache → `/cache`,
+  `/archive/jellyfin` → `/media` (ro); Immich upload location `/store/immich-v2`, old
+  photos `/store/immich/library` → read-only external library.
+- Databases on VM 100's disk under `/var/lib/prod/<app>/db`; nightly dumps to
+  `/store/db-dumps/<app>` (01:30).
+- Versions: floating minor tracks for apps (`nextcloud:32-apache`,
+  `jellyfin/jellyfin:10.11`, Immich `v2`); pinned for `mariadb:11.4`, Immich's PostgreSQL
+  (exact upstream tag+digest), `redis:7-alpine`, `valkey`, `collabora/code`.
+- Weekly update: Friday 23:00 (`OnCalendar=Fri 23:00`), pull + restart changed
+  containers, ping `op://Homelab/healthchecks-prod-updates/credential` (`/start`, success,
+  `/fail` with the log tail).
+- Hostnames/route names: `nextcloud`, `office` (Collabora), `jellyfin`, `immich` on
+  `*.vanwaaij.com`.
+- Secrets never printed; never in the repo (1Password Homelab via opnix).
+- Repo rules (AGENTS.md): modules always imported, gated; RFC nixfmt; own paths; author
+  thijs@vanwaaij.com; no AI trailer; no push without the user.
 
 ## Review Focus
 
-1. Nextcloud's storage id: the DB says `local::/var/www/html/data/`; the new path must be
-   rewritten in `oc_storages` at every DB import, or every file looks new (Task 5, Task 8).
-2. File ownership over NFS (root squashed): services must run with the uid that owns the
-   data (Nextcloud 33) or the copy must be chowned (Jellyfin) (Task 3, Task 5).
-3. Two Nextclouds on one data dir: the VM-100 instance has `nextcloud-cron` and app
-   updates off until `live` (Task 3, Step 1 expectations).
-4. Jellyfin's DB holds absolute container paths (`/config`, `/cache`, `/media`): the unit
-   binds those paths so they stay valid (Task 3).
-5. A `live = false` app's public host returns the maintenance page (503), never another
-   app or a Traefik 404 (Task 2).
+1. Two Nextclouds on one data dir: the VM-100 cron container is off until `live`
+   (Task 3).
+2. File ownership over NFS (root squashed): images run as the uids that own the data
+   (Nextcloud www-data 33, Jellyfin 1000 via `--user 1000:1000` as today, Immich as
+   upstream) (Task 3, Task 5).
+3. A `live = false` app's public host returns the maintenance page (503), never another
+   app (Task 2, checked live in Task 6).
+4. The weekly update must not jump majors: floating tags are minor tracks only; pinned
+   images are never pulled to newer versions by the timer (Task 3b).
+5. CoreDNS name resolution via MagicDNS: if a Service name doesn't resolve, the record is
+   omitted (NXDOMAIN → public answer is not returned either), never a stale IP (Task 2b).
 
 ---
 
@@ -103,141 +108,158 @@ on it — back soon", `vanwaaij.com`, no external assets, `Retry-After: 3600`).
 - [ ] **Step 2:** Implement. **Step 3:** Evaluate all hosts; build router on
   nixos-manager; commit `feat(homelab): router maintenance page`.
 
-### Task 3: VM 100 configuration
+### Task 2b: Routes resolve by Service name (no IPs in the repo)
 
-**Files:** create `hosts/servers/prod.nix`, `modules/services/nextcloud.nix`,
-`modules/services/jellyfin.nix`, `modules/services/immich.nix`; modify
-`modules/homelab/routes.nix` (remove the hand routes `nextcloud`, `jellyfin`; keep
-`archipelago`, `traefik`).
+**Files:** modify `lib/routeType.nix` (remove `tailnet.address`),
+`modules/homelab/router/dns.nix`, `modules/homelab/router/tailscale.nix` (drop the
+missing-address warning), `modules/homelab/routes.nix`, `hosts/servers/router-test.nix`
+(drop `echo.tailnetAddress`), and any module setting `tailnet.address`.
+
+- [ ] **Step 1:** Expectations on `router` / `router-test`: no `tailnet.address` option;
+  CoreDNS config for each published tailnet route maps `<host>` to
+  `<servicePrefix><name>.tail41ca60.ts.net` (CoreDNS `rewrite name exact … answer auto`
+  in the `vanwaaij.com` zone, forwarded to `100.100.100.100`); other names forward to
+  1.1.1.1 / 9.9.9.9 as before; the tailnet domain is an option
+  (`homelab.router.tailnetDomain`, default `"tail41ca60.ts.net"`).
+- [ ] **Step 2:** Implement; build router + router-test; switch router-test first and
+  check from atlas: `dig +short @100.64.217.0 whoami-test.vanwaaij.com` → `100.126.16.116`;
+  then the router: `dig +short @100.73.124.104 jellyfin.vanwaaij.com` → `100.84.78.44`.
+- [ ] **Step 3:** Commit `feat(homelab): router DNS follows Tailscale Service names`.
+
+### Task 3: VM 100 configuration (Docker)
+
+**Files:** replace the native modules from commit 165f4b0
+(`modules/services/{nextcloud,jellyfin,immich}.nix`) with container modules; create
+`modules/services/docker.nix` (engine, shared network, dump/update helpers) if useful;
+modify `hosts/servers/prod.nix`, `modules/homelab/routes.nix` (hand routes `nextcloud`,
+`jellyfin` removed), `modules/homelab/links.nix` (their links removed).
 
 **Produces:** per app `homelab.<app> = { enable; live : bool = false; }`, plus
-`homelab.jellyfin = { configDir : str; gpu : bool = false; }`. Each module declares
-`homelab.routes.<name> = { host; backend = "http://10.0.10.100:<port>"; maintenance = !live; tailnet.address = <Service IP>; }`
-(nextcloud/jellyfin keep their existing Service IPs 100.76.170.121 / 100.84.78.44; immich
-and office get theirs in Task 6) and a `lodestar.links` entry.
+`homelab.jellyfin = { configDir : str; gpu : bool = false; }`. Each module declares its
+containers, `homelab.routes.<name> = { host; backend = "http://10.0.10.100:<port>"; maintenance = !live; }`,
+a `lodestar.links` entry, its dump timer.
 
-- [ ] **Step 0:** `hosts/servers/prod.nix`: thin; user `prod`, IP `10.0.10.100`,
-  `tags = [ "tag:prod" ]`, `fleet = true`, `options = { homelab.storage.enable = true; homelab.nextcloud.enable = true; homelab.jellyfin = { enable = true; configDir = "/store/jellyfin-test/config"; }; homelab.immich.enable = true; }`.
+- [ ] **Step 0:** `hosts/servers/prod.nix` options: `homelab.storage.enable = true;
+  homelab.nextcloud.enable = true; homelab.jellyfin = { enable = true; configDir =
+  "/store/jellyfin-test/config"; }; homelab.immich.enable = true;`.
 - [ ] **Step 1: Expectations** on `prod` (fail first):
-  - Nextcloud: `services.nextcloud.package.version` starts with `32.`;
-    `hostName == "nextcloud.vanwaaij.com"`; `datadir` such that data is
-    `/store/nextcloud/data`; `config.dbtype == "mysql"`; `database.createLocally`;
-    `configureRedis`; `settings.trusted_proxies == [ "10.0.10.110" ]`;
-    `settings.overwriteprotocol == "https"`; `secretFile` from opnix;
-    `users.users.nextcloud.uid == 33` and group gid 33 (verify 33 is free in NixOS's
-    `ids`); `systemd.timers.nextcloud-cron.enable == false` while `live = false`;
-    `appstoreEnable == false`; apps `contacts`, `calendar`, `richdocuments` from
-    `nextcloud32Packages.apps` (and `pantry` if packaged; otherwise note it).
-  - Collabora: `services.collabora-online.enable`, port 9980, `aliasGroups` allow
-    `https://nextcloud.vanwaaij.com`; route `office`.
-  - Jellyfin: `services.jellyfin.enable`; unit has `BindPaths` `<configDir>:/config`,
-    `/var/cache/jellyfin:/cache`, and `BindReadOnlyPaths` `/archive/jellyfin:/media`,
-    with Jellyfin's data/config dirs pointing at `/config` (match the official image's
-    layout `--datadir /config --cachedir /cache`); `gpu = false` → no
-    `hardware.graphics`.
-  - Immich: `services.immich.enable`, `mediaLocation == "/store/immich-v2"`,
-    `machine-learning` on, host `0.0.0.0`, port 2283.
-  - Backups: `services.mysqlBackup` (`nextcloud`, `/store/db-dumps/nextcloud`, 01:30),
-    `services.postgresqlBackup` (`immich`, `/store/db-dumps/immich`).
-  - Firewall: app ports (80/nextcloud nginx, 9980, 8096, 2283) open on the LAN interface.
-  - `homelab.routes` collected by the router: `nextcloud`, `office`, `jellyfin`,
-    `immich` with `maintenance = true`.
-- [ ] **Step 2: Implement.** Nextcloud behind its own nginx on port 80 (NixOS default);
-  Jellyfin via `systemd.services.jellyfin.serviceConfig` binds; GPU block
-  (`hardware.graphics` + VA-API, jellyfin in `render`/`video`) under `gpu`.
+  - `virtualisation.docker.enable`, `virtualisation.oci-containers.backend == "docker"`.
+  - Nextcloud: containers `nextcloud-app` (`nextcloud:32-apache`, port 80 on the LAN,
+    volumes `/store/nextcloud/data:/var/www/html/data` and local html/config/custom_apps
+    under `/var/lib/prod/nextcloud`), `nextcloud-cron` (same image, `/cron.sh`, only
+    when `live`), `nextcloud-db` (`mariadb:11.4`, data `/var/lib/prod/nextcloud/db`,
+    `MARIADB_AUTO_UPGRADE=1`), `nextcloud-redis` (`redis:7-alpine`), `collabora`
+    (`collabora/code`, port 9980, `aliasgroup1=https://nextcloud.vanwaaij.com`,
+    `extra_params=--o:ssl.enable=false --o:ssl.termination=true`); env from an opnix
+    env file (`op://Homelab/nextcloud-config/env`: DB passwords, admin); trusted proxy
+    `10.0.10.110`, `OVERWRITEPROTOCOL=https`, `OVERWRITEHOST=nextcloud.vanwaaij.com`.
+  - Jellyfin: `jellyfin/jellyfin:10.11`, `--user 1000:1000`, volumes `<configDir>:/config`,
+    `/var/cache/jellyfin:/cache`, `/archive/jellyfin:/media:ro`, port 8096; `/dev/dri`
+    and the render/video groups only when `gpu`.
+  - Immich: server (`ghcr.io/immich-app/immich-server:v2`, port 2283,
+    `/store/immich-v2:/data`, `/store/immich/library:/mnt/old-library:ro`),
+    machine-learning (`…immich-machine-learning:v2`), `valkey` and PostgreSQL exactly as
+    upstream's compose for the v2 line (tag + digest), DB at `/var/lib/prod/immich/db`.
+  - Each container's unit has `RequiresMountsFor` for the /store or /archive paths it uses.
+  - Dumps: `nextcloud-db-dump` and `immich-db-dump` timers at 01:30 writing
+    `/store/db-dumps/<app>/<app>-%F.sql.gz`, keeping 14.
+  - Router collects routes `nextcloud`, `office`, `jellyfin`, `immich`, all
+    `maintenance = true`.
+  - Firewall: 80, 9980, 8096, 2283 open on the LAN.
+- [ ] **Step 2: Implement.** Translate upstream compose files; keep a comment with the
+  upstream file/version each module follows.
 - [ ] **Step 3:** All hosts evaluate; build `prod` and `router` on nixos-manager; nixfmt;
-  commit `feat(prod): Nextcloud, Jellyfin and Immich on VM 100`.
+  commit `feat(prod): Nextcloud, Jellyfin and Immich as containers on VM 100`.
+
+### Task 3b: Weekly updates and Renovate
+
+**Files:** create `modules/services/updates.nix`, `renovate.json` (repo root).
+
+- [ ] **Step 1:** Expectations on `prod`: timer `prod-container-update` with
+  `OnCalendar = "Fri 23:00"`, `Persistent = true`; its service pulls only the floating
+  images (list derived from the app modules, an option `homelab.containers.floating`),
+  restarts containers whose image id changed, pings Healthchecks (`/start`, success,
+  `/fail` with the last 100 log lines) from the opnix secret.
+- [ ] **Step 2:** `renovate.json`: a regex manager over `modules/services/**/*.nix` for
+  `image = "<repo>:<tag>"` (and `@sha256:` digests); package rules: floating app images →
+  only `major` updates; pinned images → all updates; `automerge = false`; label
+  `containers`; schedule weekly. Validate with
+  `npx --yes --package renovate -- renovate-config-validator renovate.json`.
+- [ ] **Step 3 (user):** install the Renovate GitHub app on `Waayway/nixos-config`
+  (after the next push); Claude checks the onboarding PR.
+- [ ] **Step 4:** Commit `feat(prod): weekly container updates and Renovate`.
 
 ### Task 4: Main to 108, VM 100 up
 
 - [ ] **Step 1 (user):** Main's IP `10.0.10.100` → `10.0.10.108`, then the web port
-  forward 80/443 → `.108`. Claude checks: `ssh -J pve goedenaam@10.0.10.108` works,
-  `curl -sI --resolve nextcloud.vanwaaij.com:443:10.0.10.108 https://nextcloud.vanwaaij.com/status.php`
-  → 200; update Main's Nextcloud `extra_hosts` hairpin to `10.0.10.108`
-  (keep a `.pre-108` copy) and `docker compose up -d`.
-- [ ] **Step 2:** At a moment the user OKs: `qm shutdown 100`; rename
-  `store-lvm`'s `vm-100-disk-0` → `vm-108-disk-0` (`lvrename nfs-vg …`), move
-  `100.conf` → `108.conf` with the disk name replaced, `qm start 108`; Main answers on
-  `.108` again. Update `docs/homelab.md` access table later (Task 9).
-- [ ] **Step 3:** Policy via API: `"tag:prod": ["autogroup:admin", "tag:nixos"]`.
-- [ ] **Step 4:** `qm clone 9000 100 --name prod --full --storage local-lvm`,
+  forward 80/443 → `.108`. Claude checks `ssh -J pve goedenaam@10.0.10.108`, a
+  `--resolve`d `status.php` → 200, and updates Main's Nextcloud `extra_hosts` hairpin to
+  `10.0.10.108` (keep a `.pre-108` copy), `docker compose up -d`.
+- [ ] **Step 2:** At a moment the user OKs: `qm shutdown 100`; `lvrename` its
+  `store-lvm` disk `vm-100-disk-0` → `vm-108-disk-0`; move `100.conf` → `108.conf` with
+  the disk renamed; `qm start 108`; Main answers on `.108`.
+- [ ] **Step 3:** `qm clone 9000 100 --name prod --full --storage local-lvm`,
   `--cores 6 --memory 16384 --onboot 1`, `qm resize 100 virtio0 64G`; switch to `#prod`
-  from nixos-manager (agent-forwarded key, as for the router); reboot; on `.100`, tagged
-  `tag:nixos,tag:prod`; `/store` and `/archive` mounted (`ls /store/nextcloud/data`,
-  `ls /archive/jellyfin`).
-- [ ] **Step 5:** On TrueNAS: create `/mnt/store/internal/{immich-v2,jellyfin-test,db-dumps/nextcloud,db-dumps/immich}`
-  owned by the uids VM 100 uses for immich, jellyfin, mysql and postgres (read them on
-  VM 100 with `id`).
+  from nixos-manager; reboot; on `.100`, tagged `tag:nixos,tag:prod`; `/store` and
+  `/archive` readable.
+- [ ] **Step 4:** On TrueNAS create `/mnt/store/internal/{immich-v2,jellyfin-test,db-dumps/nextcloud,db-dumps/immich}`
+  with owners matching the container uids.
 
 ### Task 5: Copies for testing
 
-- [ ] **Step 1 — Nextcloud DB copy:** on Main
-  `docker exec nextcloud-db mariadb-dump --single-transaction --routines --triggers nextcloud`
-  (credentials from Main's `.env`, never printed) → stream into VM 100's MariaDB
-  (`mysql nextcloud`). Then `UPDATE oc_storages SET id='local::/store/nextcloud/data/' WHERE id='local::/var/www/html/data/';`.
-- [ ] **Step 2 — Nextcloud secrets:** `instanceid`, `passwordsalt`, `secret` from Main's
-  `config.php` → 1Password `nextcloud-config` (`secrets` = JSON) before the first start
-  that matters; restart `nextcloud-setup`.
-- [ ] **Step 3:** `nextcloud-occ upgrade`, `nextcloud-occ maintenance:mode --off`,
-  `nextcloud-occ status` → installed, version 32.0.15, no DB upgrade needed;
-  `nextcloud-occ files:scan --all --dry-run` is NOT run (it would touch the shared dir).
-- [ ] **Step 4 — Jellyfin copy:** `rsync -a /store/jellyfin/config/ /store/jellyfin-test/config/`
-  on VM 100, chown to jellyfin's uid, start jellyfin; `/System/Info/Public` answers.
-- [ ] **Step 5 — Immich:** starts on an empty DB; nothing to copy.
-- [ ] **Step 6:** Each copy step is a re-runnable script under
-  `modules/services/` (e.g. `prod-sync-nextcloud-db`, `prod-sync-jellyfin`) installed on
-  VM 100, so Task 8 runs the exact same thing; commit them.
+- [ ] **Step 1 — Nextcloud:** copy Main's `config.php` secrets (`instanceid`,
+  `passwordsalt`, `secret`, DB settings adapted) into 1Password `nextcloud-config`; copy
+  `custom_apps` (pantry) from Main; dump Main's DB
+  (`docker exec nextcloud-db mariadb-dump --single-transaction --routines --triggers nextcloud`)
+  and stream it into `nextcloud-db` on VM 100; start the app; `occ upgrade`,
+  `occ maintenance:mode --off`; `occ status` → installed, no DB upgrade needed.
+- [ ] **Step 2 — Jellyfin:** `rsync -a /store/jellyfin/config/ /store/jellyfin-test/config/`,
+  start; `/System/Info/Public` answers.
+- [ ] **Step 3 — Immich:** starts empty.
+- [ ] **Step 4:** The copy steps are scripts on VM 100 (`prod-sync-nextcloud-db`,
+  `prod-sync-jellyfin`), declared in the modules, reused at the cutover; commit.
 
 ### Task 6: Tailnet points at VM 100
 
 - [ ] **Step 1 (user):** create Services `immich` and `office` (tcp:443).
-- [ ] **Step 2:** Policy via API: grant + autoApprovers for `svc:immich`, `svc:office`.
-- [ ] **Step 3:** Record their IPs as `tailnet.address`; switch router; `tailscale serve
-  drain`/`advertise` for the two new Services if they don't get routed (known quirk).
-- [ ] **Step 4 — Claude's checks over the tailnet (split DNS, no `--resolve`):**
-  Nextcloud `status.php` 200 with `"maintenance":false`; WebDAV `PROPFIND` on
-  `/remote.php/dav/files/<user>/` with an app password the user creates → 207;
-  `/.well-known/caldav` → 301; `https://office.vanwaaij.com/hosting/discovery` → 200
-  XML; Jellyfin `/System/Info/Public` 200; Immich `/api/server/ping` → `pong`.
-  Public path still Main: `curl -sI https://nextcloud.vanwaaij.com` from outside the
-  tailnet (e.g. nixos-manager with Tailscale DNS off, or `--resolve` to the WAN IP) shows
-  Main.
+- [ ] **Step 2:** Policy via API (controller): grant + autoApprovers for `svc:immich`,
+  `svc:office`.
+- [ ] **Step 3:** Switch the router (first time with Task 2/2b/3 routes); `tailscale serve
+  drain`/`advertise` for new Services if they aren't routed.
+- [ ] **Step 4 — checks over the tailnet (split DNS):** Nextcloud `status.php` 200;
+  WebDAV `PROPFIND` with an app password → 207; `/.well-known/caldav` → 301;
+  `https://office.vanwaaij.com/hosting/discovery` → 200; Jellyfin
+  `/System/Info/Public` 200; Immich `/api/server/ping` → pong. Public path: the router's
+  public entrypoint (`--resolve … :10.0.10.110`) returns the 503 maintenance page for all
+  four; the internet itself still reaches Main (`.108`).
 
 ### Task 7: The user tests
 
-- [ ] User checks the plain plan's step 6 list on laptop and phone. Claude fixes what
-  fails (commit per fix, re-run Task 6 Step 4). Immich: user creates the admin account;
-  Claude adds `/store/immich/library` as an external library (read-only) through the
-  Immich API with a key the user creates. Done when the user says it works.
+- [ ] User checks the plain plan's list on laptop and phone; Claude fixes and re-checks.
+  Immich: user creates the admin account; Claude adds `/mnt/old-library` as a read-only
+  external library with an API key the user creates.
 
 ### Task 8: Cutover (user picks the moment)
 
-- [ ] **Step 1:** Router: all four routes already `maintenance = true` (live = false).
-  **User:** web port forward → `10.0.10.110`. Check from outside: every app host → 503
-  maintenance page; `ap.` → 401.
-- [ ] **Step 2:** Main: `occ maintenance:mode --on`, then stop `nextcloud-app`,
-  `nextcloud-cron`. media: stop `jellyfin`.
-- [ ] **Step 3:** Run `prod-sync-nextcloud-db` (fresh dump → drop/recreate → import →
-  `oc_storages` update → `occ upgrade` → `maintenance:mode --off`).
-- [ ] **Step 4:** `homelab.jellyfin.configDir = "/store/jellyfin/config"`: chown the
-  original to jellyfin's uid (record the old owner 1000:1000 for rollback). `gpu = true`.
-- [ ] **Step 5:** `qm shutdown 120`; move `hostpci0: mapping=WX7100` from 120 to 100;
-  restart 100.
-- [ ] **Step 6:** Set `live = true` for all four apps; switch prod and router; commit
-  `feat(prod): live`.
-- [ ] **Step 7:** Checks from outside (phone off Wi-Fi or `--resolve` to the WAN IP):
-  Nextcloud login page, `status.php` 200, WebDAV 207, CalDAV/CardDAV discovery,
-  Collabora discovery; Jellyfin plays with VA-API (`/dev/dri/renderD128` used, ffmpeg log
-  shows `vaapi`); Immich ping; `ap.` 401. Nextcloud admin overview: no warnings about
-  proxies/HTTPS. User confirms on phone.
-- [ ] **Step 8 — Rollback:** port forward → `.108`; on Main `docker compose up -d` and
-  `occ maintenance:mode --off`; media: chown `/store/jellyfin/config` back to 1000:1000,
-  move the GPU back to 120, start it. Nothing on Main or media was deleted.
+- [ ] **Step 1 (user):** web port forward → `10.0.10.110`. Check from outside: the four
+  app hosts → 503 page; `ap.` → 401.
+- [ ] **Step 2:** Main: `occ maintenance:mode --on`, stop `nextcloud-app` and
+  `nextcloud-cron`; media: stop `jellyfin`.
+- [ ] **Step 3:** `prod-sync-nextcloud-db` (fresh dump → recreate → import → `occ upgrade`
+  → maintenance off).
+- [ ] **Step 4:** `homelab.jellyfin.configDir = "/store/jellyfin/config"`, `gpu = true`.
+- [ ] **Step 5:** `qm shutdown 120`; move `hostpci0: mapping=WX7100` to VM 100; reboot 100.
+- [ ] **Step 6:** `live = true` for all four; switch prod and router; commit `feat(prod): live`.
+- [ ] **Step 7:** Checks from outside: Nextcloud login, `status.php`, WebDAV 207,
+  CalDAV/CardDAV discovery, Collabora; Jellyfin plays with VA-API; Immich ping; `ap.`
+  401; Nextcloud admin overview clean. User confirms on the phone.
+- [ ] **Step 8 — Rollback:** forward → `.108`; Main `docker compose up -d`, maintenance
+  off; media: GPU back to 120, start Jellyfin there. Nothing on Main or media was changed
+  or deleted.
 
 ### Task 9: Docs and cleanup
 
-- [ ] `docs/homelab.md` (VM 100 prod, Main 108 and media 120 shut down, mounts, dumps,
-  restore steps), `AGENTS.md` machine table (+ prod), `modules/homelab/links.nix`
-  (drop Main/media entries now declared by the service modules), router plan Task 9
-  marked superseded. Main and media: `qm shutdown`, `onboot 0`. Commit
-  `docs(homelab): production VM 100`.
+- [ ] `docs/homelab.md` (VM 100 prod and its containers, Main 108 and media 120 shut
+  down, mounts, dumps and restore steps, the update timer and Renovate), `AGENTS.md`
+  machine table (+ prod), router plan Task 9 marked superseded. Main and media:
+  `qm shutdown`, `onboot 0`. Commit `docs(homelab): production VM 100`.
