@@ -33,6 +33,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       ) published;
     };
 
+    # `serve set-config` fails while the node is logged out: retry until it's in.
+    systemd.services.tailscale-serve = lib.mkIf config.services.tailscale.serve.enable {
+      after = [
+        "tailscaled.service"
+        "tailscaled-autoconnect.service"
+      ];
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = "10s";
+      };
+      unitConfig.StartLimitIntervalSec = 0;
+    };
+
     warnings = lib.mapAttrsToList (
       name: _:
       "homelab.router: tailnet route `${name}` has no tailnet.address, so split DNS can't resolve it yet"
