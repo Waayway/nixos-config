@@ -177,7 +177,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       })
     ];
 
-    systemd.services.docker-nextcloud-app.unitConfig.ConditionPathExists = "${state}/config/config.php";
+    # Neither app nor cron runs before config.php is in place (see above).
+    systemd.services =
+      lib.genAttrs ([ "docker-nextcloud-app" ] ++ lib.optional cfg.live "docker-nextcloud-cron")
+        (_: {
+          unitConfig.ConditionPathExists = "${state}/config/config.php";
+        });
 
     systemd.tmpfiles.settings.nextcloud =
       lib.genAttrs

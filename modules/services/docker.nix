@@ -7,22 +7,38 @@
 }:
 # What the container apps in this folder (nextcloud.nix, jellyfin.nix, immich.nix)
 # share: the Docker engine as the `virtualisation.oci-containers` backend, one bridge
-# network per app (containers reach each other by name, as in a compose project),
-# `RequiresMountsFor` on every container that binds a path from TrueNAS, nightly
-# database dumps, and the Intel GPU (Arc A380) for the apps that ask for it.
+# network per app (containers reach each other by name, as in a compose project; each
+# container's unit creates it), `RequiresMountsFor` on every container that binds a
+# path from TrueNAS, nightly database dumps, and the Intel GPU (Arc A380) for the apps
+# that ask for it.
 let
   cfg = config.homelab.containers;
   containers = config.virtualisation.oci-containers.containers;
   docker = config.virtualisation.docker.package;
 
-  # Docker's own networks; everything else is created by `docker-network-<name>`.
+  # Docker's own networks; every other network a container names is created by the
+  # container's own unit before `docker run` (`ensureNetworks`).
   builtinNetworks = [
     "bridge"
     "host"
     "none"
   ];
   ownNetworks = c: lib.subtractLists builtinNetworks c.networks;
-  networks = lib.unique (lib.concatMap ownNetworks (lib.attrValues containers));
+
+  # Not a separate oneshot unit: the weekly `docker system prune` (autoPrune) removes
+  # networks no running container uses, and a oneshot with RemainAfterExit would still
+  # count as active, so a container started after a prune would find its network gone.
+  # Created on every start instead; the trailing inspect tolerates two containers of one
+  # app creating it at the same moment.
+  ensureNetworks =
+    name: c:
+    pkgs.writeShellScript "docker-${name}-networks" (
+      lib.concatMapStrings (net: ''
+        ${lib.getExe docker} network inspect ${net} >/dev/null 2>&1 ||
+          ${lib.getExe docker} network create ${net} >/dev/null ||
+          ${lib.getExe docker} network inspect ${net} >/dev/null
+      '') (ownNetworks c)
+    );
 
   # Host side of `-v host:container[:opts]` when it is on an NFS mount.
   nfsPaths =
@@ -45,7 +61,11 @@ let
         pkgs.findutils
         pkgs.gzip
       ];
-      serviceConfig.Type = "oneshot";
+      serviceConfig = {
+        Type = "oneshot";
+        # Dumps hold every password hash and file share: owner-only on TrueNAS.
+        UMask = "0077";
+      };
       script = ''
         set -euo pipefail
         dir=${dumpDir app}
@@ -113,33 +133,13 @@ lib.optionalAttrs hostPlatform.isLinux {
         virtualisation.oci-containers.backend = "docker";
 
         systemd.services = lib.mkMerge [
-          # One bridge network per app.
-          (lib.listToAttrs (
-            map (
-              net:
-              lib.nameValuePair "docker-network-${net}" {
-                description = "Docker network ${net}";
-                after = [
-                  "docker.service"
-                  "docker.socket"
-                ];
-                requires = [ "docker.service" ];
-                path = [ docker ];
-                serviceConfig = {
-                  Type = "oneshot";
-                  RemainAfterExit = true;
-                };
-                script = "docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}";
-              }
-            ) networks
-          ))
-
-          # Containers wait for their networks and for the TrueNAS paths they bind.
+          # Containers create their networks and wait for the TrueNAS paths they bind.
           (lib.mapAttrs' (
-            _: c:
+            name: c:
             lib.nameValuePair c.serviceName {
-              after = map (n: "docker-network-${n}.service") (ownNetworks c);
-              requires = map (n: "docker-network-${n}.service") (ownNetworks c);
+              serviceConfig.ExecStartPre = lib.mkIf (ownNetworks c != [ ]) (
+                lib.mkBefore [ "${ensureNetworks name c}" ]
+              );
               unitConfig.RequiresMountsFor = nfsPaths c;
             }
           ) containers)
