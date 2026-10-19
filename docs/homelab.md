@@ -6,6 +6,8 @@ VM moves to NixOS or a service changes. Migration and backup plans:
 
 ## Access
 
+- VMIDs and IPs follow `docs/vmids.md` (also in the `pve` node notes): the
+  IP's last octet is the VMID.
 - `ssh pve` (root, tailnet `pve.tail41ca60.ts.net`, LAN 10.0.10.50).
 - VMs: `ssh -J pve <user>@10.0.10.<vmid>` with `~/.ssh/proxmox_vms_rsa`
   (`~/.ssh/config` matches `10.0.10.*`). Each Rocky VM has its own login user,
