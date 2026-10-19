@@ -85,6 +85,9 @@ let
 
   # --- the kanidm-provision state (github.com/oddlama/kanidm-provision#json-schema)
   title = s: lib.toUpper (lib.substring 0 1 s) + lib.substring 1 (-1) s;
+  # Kanidm stores an origin without a path with a trailing slash; kanidm-provision
+  # compares strings, so without it every run would "update" the origin again.
+  withSlash = u: if builtins.match "[a-z]+://[^/]+" u != null then u + "/" else u;
   people = config.homelab.people;
   provisionState = {
     persons = lib.mapAttrs (_: p: {
@@ -100,8 +103,8 @@ let
     systems.oauth2 =
       lib.mapAttrs (app: a: {
         displayName = title app;
-        originUrl = a.oidc.originUrls;
-        inherit (a.oidc) originLanding;
+        originUrl = map withSlash a.oidc.originUrls;
+        originLanding = withSlash a.oidc.originLanding;
         scopeMaps."${app}-users" = a.oidc.scopes;
       }) (lib.filterAttrs (_: a: a.oidc != null) access)
       // {

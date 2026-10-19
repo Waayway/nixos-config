@@ -94,6 +94,9 @@ assert
     ];
   };
 assert !(state.systems.oauth2 ? archipelago);
+# origins without a path get Kanidm's trailing slash (else every provisioning run rewrites them)
+assert state.systems.oauth2.proxmox.originLanding == "https://pve.tail41ca60.ts.net:8006/";
+assert lib.all (lib.hasSuffix "/") state.systems.oauth2.proxmox.originUrl;
 assert
   state.systems.oauth2.oauth2-proxy.originUrl == [ "https://auth-test.vanwaaij.com/oauth2/callback" ];
 assert
