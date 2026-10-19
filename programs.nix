@@ -36,4 +36,11 @@ in
     inherit lib;
     inherit (inputs.self) nixosConfigurations;
   };
+
+  # Evaluation check of the router on router-test and router (tests/router.nix).
+  checks.x86_64-linux.router = import ./tests/router.nix {
+    pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+    inherit lib;
+    inherit (inputs.self) nixosConfigurations;
+  };
 }

@@ -7,7 +7,15 @@
 # `public`, and one on the `tailnet` entrypoint (127.0.0.1:8443, behind the Tailscale
 # Service) when `tailnet.enable`. The `tailnet` entrypoint sets `X-Homelab-Via:
 # tailnet`; the `public` one removes any such header a client sent. One Let's Encrypt
-# wildcard for vanwaaij.com via Cloudflare DNS-01 covers both. NixOS only.
+# wildcard for vanwaaij.com via Cloudflare DNS-01 covers both.
+#
+# A route with `passthrough` gets TCP routers instead (`HostSNI`, TLS passed through
+# unopened, on both entrypoints; the Tailscale Service forwards TCP, so SNI arrives
+# intact). A route with `auth.gate` gets the sign-in gate (gate.nix): an errors
+# middleware that turns a 401 into a redirect to oauth2-proxy's sign-in, then a
+# forwardAuth asking oauth2-proxy whether the user is in `<route>-users`; the route
+# must have an access entry with `gate = true` on the identity host (`identityHost`),
+# or evaluation fails. NixOS only.
 {
   config,
   lib,
@@ -27,6 +35,40 @@ let
   flakeHosts = lib.mapAttrsToList (_: r: r.host) fromFlake;
   hostClashes = lib.attrNames (lib.filterAttrs (_: r: lib.elem r.host flakeHosts) extra);
 
+  # The configuration running Kanidm: this one's own evaluation when it is the
+  # identity host (router-test), else the flake's.
+  idConfig =
+    if cfg.identityHost == config.networking.hostName then
+      config
+    else
+      inputs.self.nixosConfigurations.${cfg.identityHost}.config;
+  identity = {
+    inherit (idConfig.homelab.identity)
+      enable
+      domain
+      gateHost
+      acmeStaging
+      access
+      ;
+    address = idConfig.homelab.lan.address;
+  };
+
+  # Routes that can't be expressed: wrong backend/passthrough combinations.
+  malformed = lib.filterAttrs (
+    _: r:
+    (r.backend == null) == (r.passthrough == null)
+    || (
+      r.passthrough != null
+      && (
+        r.maintenance
+        || r.basicAuth.usersFile != null
+        || r.middlewares != { }
+        || r.auth.gate
+        || r.insecureBackend
+      )
+    )
+  ) cfg.routes;
+
   tls = {
     certResolver = "cloudflare";
     domains = [
@@ -39,17 +81,71 @@ let
 
   # Traefik dynamic config for one route: its routers, service and middlewares.
   routeConfig =
+    name: r: if r.passthrough != null then passthroughConfig name r else httpConfig name r;
+
+  passthroughConfig =
+    name: r:
+    let
+      router = entryPoint: {
+        rule = "HostSNI(`${r.host}`)";
+        entryPoints = [ entryPoint ];
+        service = name;
+        tls.passthrough = true;
+      };
+    in
+    {
+      tcpRouters =
+        lib.optionalAttrs r.public { "${name}-public" = router "public"; }
+        // lib.optionalAttrs r.tailnet.enable { "${name}-tailnet" = router "tailnet"; };
+      tcpServices.${name}.loadBalancer.servers = [ { address = r.passthrough; } ];
+    };
+
+  # The gate's two middlewares for a route; fails unless the identity host lets the
+  # route's app through the gate.
+  gateMiddlewares =
+    name:
+    let
+      a = identity.access.${name} or null;
+    in
+    assert lib.assertMsg (a != null && a.gate)
+      "homelab.router: route '${name}' has auth.gate but ${cfg.identityHost}'s homelab.identity.access has no app '${name}' with gate = true";
+    {
+      # Listed first: catches the forwardAuth's 401 and answers with oauth2-proxy's
+      # sign-in redirect (302; the errors middleware would otherwise keep the 401).
+      "${name}-gate-signin".errors = {
+        status = [ "401" ];
+        statusRewrites."401" = 302;
+        service = "oauth2-proxy";
+        query = "/oauth2/start?rd={url}";
+      };
+      "${name}-gate".forwardAuth = {
+        address = "http://127.0.0.1:4180/oauth2/auth?allowed_groups=${name}-users@${identity.domain}";
+        authResponseHeaders = [
+          "X-Auth-Request-User"
+          "X-Auth-Request-Email"
+        ];
+      };
+    };
+
+  httpConfig =
     name: r:
     let
       own = lib.mapAttrs' (k: v: lib.nameValuePair "${name}-${k}" v) r.middlewares;
       auth = lib.optionalAttrs (r.basicAuth.usersFile != null) {
         "${name}-auth".basicAuth.usersFile = r.basicAuth.usersFile;
       };
+      gate = lib.optionalAttrs r.auth.gate (gateMiddlewares name);
       router = entryPoint: {
         rule = "Host(`${r.host}`)";
         entryPoints = [ entryPoint ];
         service = if r.backend == "api@internal" then "api@internal" else name;
-        middlewares = lib.attrNames auth ++ lib.attrNames own;
+        middlewares =
+          lib.optionals r.auth.gate [
+            "${name}-gate-signin"
+            "${name}-gate"
+          ]
+          ++ lib.attrNames auth
+          ++ lib.attrNames own;
       };
       # While in maintenance the public side shows the local page, with no
       # route middlewares (basic auth would prompt before the page).
@@ -68,9 +164,12 @@ let
         lib.optionalAttrs r.public { "${name}-public" = publicRouter; }
         // lib.optionalAttrs r.tailnet.enable { "${name}-tailnet" = router "tailnet"; };
       services = lib.optionalAttrs (r.backend != "api@internal") {
-        ${name}.loadBalancer.servers = [ { url = r.backend; } ];
+        ${name}.loadBalancer = {
+          servers = [ { url = r.backend; } ];
+        }
+        // lib.optionalAttrs r.insecureBackend { serversTransport = "insecure-backend"; };
       };
-      middlewares = auth // own;
+      middlewares = gate // auth // own;
     };
 
   maintenancePage = pkgs.writeTextDir "maintenance.html" ''
@@ -99,7 +198,7 @@ let
   '';
 
   perRoute = lib.mapAttrsToList routeConfig cfg.routes;
-  collect = key: lib.foldl' (a: b: a // b.${key}) { } perRoute;
+  collect = key: lib.foldl' (a: b: a // (b.${key} or { })) { } perRoute;
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.router = {
@@ -140,6 +239,25 @@ lib.optionalAttrs hostPlatform.isLinux {
       enable = lib.mkEnableOption "a whoami echo service routed as `whoami-test`";
     };
 
+    identityHost = lib.mkOption {
+      type = lib.types.str;
+      default = "identity";
+      example = "router-test";
+      description = ''
+        The configuration running Kanidm (`homelab.identity`). Its domain, gate host,
+        address and access give the identity route, the sign-in gate and each gated
+        route's group check.
+      '';
+    };
+
+    identity = lib.mkOption {
+      type = lib.types.attrsOf lib.types.raw;
+      readOnly = true;
+      internal = true;
+      default = identity;
+      description = "`identityHost`'s `homelab.identity` values and LAN address.";
+    };
+
     routes = lib.mkOption {
       type = lib.types.attrsOf lib.types.anything;
       readOnly = true;
@@ -164,6 +282,14 @@ lib.optionalAttrs hostPlatform.isLinux {
           {
             assertion = hostClashes == [ ];
             message = "homelab.router.extraRoutes: routes whose host a homelab.routes route already serves: ${toString hostClashes}";
+          }
+          {
+            assertion = malformed == { };
+            message = "homelab.router: routes need exactly one of backend and passthrough, and a passthrough route takes no maintenance, basicAuth, middlewares, auth.gate or insecureBackend: ${toString (lib.attrNames malformed)}";
+          }
+          {
+            assertion = identity.enable;
+            message = "homelab.router.identityHost: configuration '${cfg.identityHost}' doesn't enable homelab.identity.";
           }
         ];
 
@@ -226,6 +352,12 @@ lib.optionalAttrs hostPlatform.isLinux {
                 strip-marker.headers.customRequestHeaders.X-Homelab-Via = "";
                 tailnet-marker.headers.customRequestHeaders.X-Homelab-Via = "tailnet";
               };
+              # For backends with `insecureBackend` (self-signed appliances).
+              serversTransports.insecure-backend.insecureSkipVerify = true;
+            };
+            tcp = {
+              routers = collect "tcpRouters";
+              services = collect "tcpServices";
             };
             # TLS defaults as on Main (dynamic/tls.yml).
             tls.options.default = {

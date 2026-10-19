@@ -30,6 +30,8 @@
       # Publish only the echo service on the tailnet.
       tailnetServices = [ "whoami-test" ];
       echo.enable = true;
+      # Its identity route and sign-in gate point at the test Kanidm below.
+      identityHost = "router-test";
     };
     # A test Kanidm (modules/identity/) next to the test router, with a staging
     # certificate; the production one is VM 111 (hosts/servers/identity.nix).

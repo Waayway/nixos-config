@@ -166,6 +166,14 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cfg.port ];
 
+    # On the front door as backrest.vanwaaij.com, tailnet only (the router reaches it
+    # over the tailnet).
+    homelab.routes.backrest = {
+      host = "backrest.vanwaaij.com";
+      backend = "http://${cfg.listenAddress}:${toString cfg.port}";
+      public = false;
+    };
+
     environment.systemPackages = [ index ];
 
     # Index each repo right after its backup run.
