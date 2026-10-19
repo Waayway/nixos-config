@@ -41,7 +41,11 @@ lib.optionalAttrs hostPlatform.isLinux {
     systemd.services.coredns = {
       after = [ "tailscaled.service" ];
       wants = [ "tailscaled.service" ];
-      serviceConfig.Restart = lib.mkForce "on-failure";
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = "2s";
+      };
+      unitConfig.StartLimitIntervalSec = 0;
     };
 
     networking.firewall.interfaces.tailscale0 = {
