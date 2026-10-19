@@ -1,0 +1,36 @@
+{
+  system = "x86_64-linux";
+  user = {
+    name = "router";
+    fullname = "Router";
+  };
+
+  type = "server";
+  useDefaultHardware = true;
+  isHomeServer = true;
+
+  netInterface = {
+    ip = "10.0.10.230";
+    prefixLength = 24;
+  };
+
+  tags = [ "tag:router" ];
+
+  # A disposable copy of the router to try changes on; not managed by Lodestar.
+  fleet = false;
+
+  options = {
+    homelab.router = {
+      enable = true;
+      # Let's Encrypt staging: no rate limits, untrusted certificates.
+      acmeStaging = true;
+      # Tailscale Service names get this prefix so they don't clash with the router's.
+      servicePrefix = "test-";
+      # Publish only the echo service on the tailnet.
+      tailnetServices = [ "whoami-test" ];
+      echo.enable = true;
+    };
+  };
+
+  config = { ... }: { };
+}
