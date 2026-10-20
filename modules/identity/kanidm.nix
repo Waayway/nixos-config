@@ -233,6 +233,35 @@ let
       ''} sh "$1"
     '';
   };
+
+  # On the host, for scripts/kanidm-reset-link.sh: a credential reset (enrolment) link
+  # for one person, on `https://<domain>` (the CLI builds it from the address it talks
+  # to, here the LAN IP and port 8443, where a passkey can't be registered for the
+  # domain). The link is on stdout, its expiry on stderr.
+  resetLink = pkgs.writeShellApplication {
+    name = "kanidm-reset-link";
+    runtimeInputs = shellPath ++ [ pkgs.gnused ];
+    text = ''
+      if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+        echo "usage: kanidm-reset-link <person> [ttl seconds, default 86400]" >&2
+        exit 2
+      fi
+      ${recoverFn}
+      IDM_ADMIN_PASSWORD=$(recover idm_admin)
+      # shellcheck disable=SC2016 # expanded in the container
+      out=$(printf '%s\n\n' "$IDM_ADMIN_PASSWORD" | ${toolsRun ''
+        KANIDM_PASSWORD="$IDM_ADMIN_PASSWORD" kanidm login -D idm_admin >/dev/null
+        kanidm person credential create-reset-token "$1" --ttl "$2" -D idm_admin
+      ''} sh "$1" "''${2:-86400}")
+      token=$(sed -n 's/^This link: .*[?&]token=\([^&[:space:]]*\).*$/\1/p' <<<"$out")
+      if [ -z "$token" ]; then
+        echo "kanidm: no reset token for $1" >&2
+        exit 1
+      fi
+      printf 'https://%s/ui/reset?token=%s\n' ${lib.escapeShellArg cfg.domain} "$token"
+      sed -n 's/^This token will expire at: /expires: /p' <<<"$out" >&2
+    '';
+  };
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.identity = {
@@ -436,7 +465,10 @@ lib.optionalAttrs hostPlatform.isLinux {
         '';
       };
 
-      environment.systemPackages = [ basicSecret ];
+      environment.systemPackages = [
+        basicSecret
+        resetLink
+      ];
 
       # The certificate via Cloudflare DNS-01, readable by the container (root).
       # Kanidm re-reads it on SIGHUP.
