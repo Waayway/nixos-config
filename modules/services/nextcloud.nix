@@ -265,6 +265,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
     };
 
+    # Who may sign in (Kanidm group nextcloud-users); OIDC comes with the app's login.
+    homelab.access.nextcloud.members = [
+      "thijs"
+      "arie"
+    ];
+
     lodestar.links.nextcloud = {
       title = "Nextcloud";
       group = "Apps";

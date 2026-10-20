@@ -89,6 +89,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       maintenance = !cfg.live;
     };
 
+    # Who may sign in (Kanidm group jellyfin-users); OIDC comes with the app's login.
+    homelab.access.jellyfin.members = [
+      "thijs"
+      "arie"
+    ];
+
     lodestar.links.jellyfin = {
       title = "Jellyfin";
       group = "Media";

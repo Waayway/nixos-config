@@ -9,6 +9,7 @@
 # Backrest; their routes are in modules/homelab/routes.nix) and Proxmox VE, which
 # signs in through its own OpenID realm (`pveum realm add kanidm …`; Proxmox sends its
 # UI's origin as redirect URL, so both addresses it's opened on are listed).
+# These are Thijs's only; Arie has Nextcloud, Immich and Jellyfin (their modules).
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf config.homelab.identity.enable {
     homelab.identity.extraAccess =

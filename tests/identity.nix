@@ -20,6 +20,10 @@ let
   policy = cfg.systemd.services.kanidm-policy;
   has = lib.hasInfix;
   ok = v: (builtins.tryEval (builtins.deepSeq v v)).success;
+  everyone = [
+    "thijs"
+    "arie"
+  ];
 
   extend = m: (host.extendModules { modules = [ m ]; }).config.homelab.identity.access;
   unknown = extend {
@@ -77,13 +81,33 @@ assert has "--no-auto-remove" provision.script;
 assert has "-kanidm-provision-1.3.0/bin/kanidm-provision --no-auto-remove" provision.script;
 # the state: people, groups, OAuth2 clients
 assert
-  state.persons.thijs == {
-    displayName = "Thijs van Waaij";
-    mailAddresses = [ "thijs@vanwaaij.com" ];
+  state.persons == {
+    thijs = {
+      displayName = "Thijs";
+      mailAddresses = [ "thijs@vanwaaij.com" ];
+    };
+    arie = {
+      displayName = "Arie";
+      mailAddresses = [ "arie@vanwaaij.com" ];
+    };
   };
+# Arie: Nextcloud, Immich and Jellyfin only, not an admin
 assert state.groups.admins.members == [ "thijs" ];
-assert state.groups.proxmox-users.members == [ "thijs" ];
-assert state.groups.archipelago-users.members == [ "thijs" ];
+assert lib.all (app: state.groups."${app}-users".members == [ "thijs" ]) [
+  "archipelago"
+  "proxmox"
+  "traefik"
+  "truenas"
+  "backrest"
+];
+assert lib.all (app: state.groups."${app}-users".members == everyone) [
+  "nextcloud"
+  "immich"
+  "jellyfin"
+];
+# the apps on prod come from its configuration (tools.accessFrom), without OIDC yet
+assert id.access.nextcloud.declaredBy == "prod";
+assert id.access.jellyfin.oidc == null;
 assert
   state.systems.oauth2.proxmox.scopeMaps == {
     proxmox-users = [

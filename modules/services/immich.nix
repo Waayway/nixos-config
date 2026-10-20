@@ -149,6 +149,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       maintenance = !cfg.live;
     };
 
+    # Who may sign in (Kanidm group immich-users); OIDC comes with the app's login.
+    homelab.access.immich.members = [
+      "thijs"
+      "arie"
+    ];
+
     lodestar.links.immich = {
       title = "Immich";
       group = "Media";

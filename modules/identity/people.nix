@@ -3,9 +3,13 @@
 {
   homelab.people = {
     thijs = {
-      displayName = "Thijs van Waaij";
+      displayName = "Thijs";
       email = "thijs@vanwaaij.com";
       admin = true;
+    };
+    arie = {
+      displayName = "Arie";
+      email = "arie@vanwaaij.com";
     };
   };
 }
