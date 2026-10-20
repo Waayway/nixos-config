@@ -18,8 +18,8 @@ Open items:
 
 - **Pantry** (custom Nextcloud app): its migration broke at the cutover because two
   `occ upgrade` ran at once; repaired (backup
-  `/store/db-dumps/nextcloud/pantry-before-repair-2026-10-19.sql.gz`). Whether the app
-  is enabled again: unverified. Rule: wait for "Initializing finished" in the container
+  `/store/db-dumps/nextcloud/pantry-before-repair-2026-10-19.sql.gz`). Pantry 0.37.0 is
+  enabled again (no data lost). Rule: wait for "Initializing finished" in the container
   log before `occ` after a restart.
 - **Immich**: Main's old photos (`/store/immich/library`, mounted read-only in the
   container at `/mnt/old-library`) are not yet added as an external library; waiting
@@ -88,14 +88,14 @@ Open items:
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
 | 110 | router | running, onboot | NixOS (this repo) | 2 / 2 GB | 16 GB (local-lvm) | front door: Traefik, split DNS, Tailscale Services |
-| 111 | identity | running (unverified: onboot) | NixOS (this repo) | unverified | unverified (store-lvm) | Kanidm (`id.vanwaaij.com`), sign-in for apps |
+| 111 | identity | running, onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | Kanidm (`id.vanwaaij.com`), sign-in for apps |
 | 118 | vpn (was 110) | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | WireGuard (wg-easy) |
 | 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB | 128 GB (store-lvm) | old Jellyfin/Immich (`hostpci` removed) |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
-| 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 64 GB disk, RAM unverified (64 GB per the task notes) | 64 GB (store-lvm) | Lodestar server, Linux builder |
+| 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
 | 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm; move to store-lvm aborted, see below) | Minecraft + BlueMap |
 | 201 | archipelago | running, onboot (set 2026-10-20) | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
-| 230 | router-test | unverified | NixOS (this repo) | 1 / 2 GB | unverified | router's test twin, test Service `test-whoami-test` |
+| 230 | router-test | running, not onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | router's test twin, test Service `test-whoami-test` |
 | 9000 | nixos-26.05-template | template | NixOS | 2 / 2 GB | 4.3 GB (store-lvm) | base image |
 
 The Garage LXC (140) that older notes mention no longer exists; `/store/garage`
@@ -426,7 +426,7 @@ done, fixed (with date).
 | 45 | **Identity's system** includes neovim and moonlight-qt (some app modules are not gated off on servers). | Gate those app modules on `!isServer`. | - | Open |
 | 46 | **Kanidm upgrades** must go one minor at a time. | Renovate PR per minor; run `kanidmd domain upgrade-check` first. | - | Open (process) |
 | 47 | **Kanidm backup schedule**: the next backup after an ACME reload runs a day later (skipped day). | Re-trigger the backup after a cert reload. | - | Open |
-| 48 | **Identity module code**: the `withAccess` filter is duplicated in `accessFrom.nix` and `accessProblems.nix`; policy passwords went via `docker -e` (visible in container config while running; should go via stdin); `/store/kanidm` is a hard dependency of the IdP; failure tests don't check the message; the test Kanidm gets all prod clients. | Deduplicate; pass secrets on stdin; the rest are minor. Whether the stdin and comment items from Task 2 were done: unverified. | - | Open (minor) |
+| 48 | **Identity module code**: the `withAccess` filter is duplicated in `accessFrom.nix` and `accessProblems.nix`; policy passwords went via `docker -e` (visible in container config while running; should go via stdin); `/store/kanidm` is a hard dependency of the IdP; failure tests don't check the message; the test Kanidm gets all prod clients. | Deduplicate; pass secrets on stdin; the rest are minor. Stdin handover and the overwrite/no-revoke comment were done (3896032). | - | Open (minor) |
 | 49 | **Jellyfin config** edited by hand (`encoding.xml`). | Keep the backup next to it; consider declaring it. | - | Open (minor) |
 | 50 | **Kanidm look**: default icons, "Sign-in gate" name, credential page CSS, reset links using the IP. | App icons, the client shown as "Services", a centred credential card, reset links on `id.vanwaaij.com`. | - | Fixed 2026-10-20 (commits `b26199c`, `a8c4830`, `09f7869`, `d5b2c8c`) |
 
