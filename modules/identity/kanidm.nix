@@ -358,11 +358,10 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     servicesUrl = lib.mkOption {
       type = lib.types.str;
-      default = "http://nixos-manager:8080/#/services";
+      default = "https://lodestar.vanwaaij.com/#/services";
       description = ''
         Where the "Services" tile in Kanidm's app list (the `oauth2-proxy` client's
-        landing) goes: Lodestar's Services tab. Over the tailnet until Lodestar has a
-        public name.
+        landing) goes: Lodestar's Services tab on its public URL.
       '';
     };
 

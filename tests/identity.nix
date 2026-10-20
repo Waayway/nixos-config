@@ -143,6 +143,20 @@ assert
     ];
   };
 assert !(state.systems.oauth2 ? archipelago);
+# Lodestar (declared by nixos-manager): any member may log in, admins act via `admins`
+assert state.groups.lodestar-users.members == [ "thijs" ];
+assert id.access.lodestar.declaredBy == "nixos-manager";
+assert state.systems.oauth2.lodestar.originUrl == [ "https://lodestar.vanwaaij.com/auth/callback" ];
+assert state.systems.oauth2.lodestar.preferShortUsername;
+assert
+  state.systems.oauth2.lodestar.scopeMaps == {
+    lodestar-users = [
+      "openid"
+      "profile"
+      "groups"
+    ];
+  };
+assert state.systems.oauth2.lodestar.originLanding == "https://lodestar.vanwaaij.com/";
 # origins without a path get Kanidm's trailing slash (else every provisioning run rewrites them)
 assert state.systems.oauth2.proxmox.originLanding == "https://pve.tail41ca60.ts.net:8006/";
 assert lib.all (lib.hasSuffix "/") state.systems.oauth2.proxmox.originUrl;
@@ -150,7 +164,8 @@ assert
   state.systems.oauth2.oauth2-proxy.originUrl == [ "https://auth-test.vanwaaij.com/oauth2/callback" ];
 # the gate's client: "Services" in the app list, landing on Lodestar's Services tab, with icons
 assert state.systems.oauth2.oauth2-proxy.displayName == "Services";
-assert state.systems.oauth2.oauth2-proxy.originLanding == "http://nixos-manager:8080/#/services";
+assert
+  state.systems.oauth2.oauth2-proxy.originLanding == "https://lodestar.vanwaaij.com/#/services";
 assert lib.hasSuffix "-services.svg" state.systems.oauth2.oauth2-proxy.imageFile;
 assert lib.hasSuffix "-proxmox.svg" state.systems.oauth2.proxmox.imageFile;
 # reset links on the domain, not the address the CLI talks to

@@ -87,13 +87,50 @@ lodestar rebuild --channel stable --wait
 nix run github:Waayway/lodestar -- status   # without installing
 ```
 
+## Public URL
+
+`https://lodestar.vanwaaij.com` (route `lodestar` in `modules/lodestar/server.nix`:
+public and on the tailnet, not behind the gate; Lodestar logs in with Kanidm itself).
+The router forwards to nixos-manager's proxy listener `10.0.10.170:8081`, which only the
+router (`10.0.10.110`, `trustedProxies`) can reach: the firewall opens that port for
+this source only and the server answers other peers with 403. The tailnet dashboard
+(`http://nixos-manager:8080`) and the CLI are unchanged.
+
+Who sees what:
+
+- anonymous: a reduced Services feed (title, group, description, icon, up/down) and a
+  **Log in** button;
+- Kanidm group `lodestar-users` (`thijs`): the whole dashboard, read-only;
+- Kanidm group `admins`: may also apply and promote, but only on requests that arrive
+  over Tailscale (the router's tailnet entrypoint sets `X-Homelab-Via: tailnet`);
+  elsewhere the buttons read "Only over Tailscale". An admin must **also be in
+  `lodestar-users`**: Kanidm's scope map exists only for that group, so a user in
+  `admins` alone is refused by Kanidm at login.
+
+The Kanidm client `lodestar` is provisioned from `homelab.access.lodestar`
+(redirect `https://lodestar.vanwaaij.com/auth/callback`, short user names, scopes
+`openid profile groups`). Like every client, Kanidm generates its secret. It goes into
+the 1Password item `kanidm-oauth2-lodestar` (Homelab vault, field `credential`; created
+with `scripts/kanidm-oauth2-secret.sh lodestar` from atlas, Touch ID) and is delivered
+to `/var/lib/opnix/secrets/kanidmOauth2Lodestar` (owner `lodestar-server`, mode 0400).
+The server reads the file at each login, so a rotated secret needs no restart. Groups
+come from the ID token at login: a membership change applies at the next login.
+
+Policy grants: the server fetches Kanidm's discovery document and keys from
+`id.vanwaaij.com`; if that name resolves to the tailnet Service on nixos-manager,
+`tag:manager` needs a grant to `svc:id` on tcp:443 like `tag:prod` has. The router
+reaches the listener over the LAN: no grant. Check at rollout. The Services link of
+this dashboard and Kanidm's "Services" tile (`homelab.identity.servicesUrl`) point to
+`https://lodestar.vanwaaij.com`.
+
 ## nixos-manager
 
 - Services: `lodestar-server.service` (user `lodestar-server`, state in
   `/var/lib/lodestar-server`: `lodestar.db`, `mirror.git`) and
   `lodestar-agent.service` (root, state in `/var/lib/lodestar-agent`). Config:
   `/etc/lodestar-server/{config,hosts}.json`, `/etc/lodestar-agent/config.json`.
-- Both ports (8080, 7461) are opened on `tailscale0` only.
+- Ports 8080 and 7461 are opened on `tailscale0` only; 8081 (public URL) for the router's
+  address only.
 - Its `~/.flake` is a clean checkout of `stable` that the agent manages; don't
   build or edit there (see AGENTS.md, "Linux builder").
 

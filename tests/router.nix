@@ -109,6 +109,13 @@ assert
     "nextcloud-caldav"
     "nextcloud-headers"
   ];
+# Lodestar (nixos-manager): public and on the tailnet, not gated (it logs in itself)
+assert http.services.lodestar.loadBalancer.servers == [ { url = "http://10.0.10.170:8081"; } ];
+assert http.routers.lodestar-public.rule == "Host(`lodestar.vanwaaij.com`)";
+assert http.routers ? lodestar-tailnet;
+assert !(lib.any (lib.hasSuffix "-gate") http.routers.lodestar-public.middlewares);
+assert !(lib.any (lib.hasSuffix "-gate") http.routers.lodestar-tailnet.middlewares);
+assert cfg.homelab.router.routes.lodestar.tailnet.enable;
 # Archipelago's basic auth is gone
 assert !(http.middlewares ? archipelago-auth);
 assert !(cfg.services.onepassword-secrets.secrets ? archipelagoBasicAuth);

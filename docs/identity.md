@@ -37,6 +37,7 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 | Nextcloud | Kanidm (OIDC, `user_oidc`) | `usernames` maps thijs to the old account `Waayway`, arie to `Arie` |
 | Immich | Kanidm (OIDC) | accounts are not created by login; email links the login to the account |
 | Jellyfin | Kanidm (SSO-Auth plugin, provider `kanidm`) | a first login creates the user; people with `admin = true` in `people.nix` become Jellyfin administrators (plugin `AdminRoles`), and everyone gets all libraries |
+| Lodestar | Kanidm (OIDC, its own login at `lodestar.vanwaaij.com`) | `lodestar-users` may log in as readers; `admins` act (and must also be in `lodestar-users`: the scope map exists only for that group); see `docs/lodestar.md` |
 | Proxmox | Kanidm (realm `kanidm`, OpenID) | users are created by hand, see below |
 | Archipelago, Traefik dashboard, TrueNAS, Backrest | the gate | TrueNAS still has its own login behind it |
 
@@ -111,9 +112,10 @@ Where the secret lives, per consumer (so you can rotate it):
 | Nextcloud | set once with `occ` (`user_oidc` provider `vanwaaij.com`) |
 | Immich | copy in the Immich database, `system_metadata`, key `oauth` (admin UI: Administration, Settings, Authentication) |
 | Jellyfin | `plugins/configurations/SSO-Auth.xml` in Jellyfin's state |
+| Lodestar | opnix file from `kanidm-oauth2-lodestar` on nixos-manager, read at each login |
 | Proxmox | realm `kanidm` in `/etc/pve/domains.cfg` |
 
-Only the gate reads 1Password at runtime. The other four hold their own copy, so after
+Only the gate and Lodestar read 1Password at runtime. The other four hold their own copy, so after
 resetting a client's secret update each by hand. Immich's and Jellyfin's copies are
 also in their backups and DB dumps. Immich's OAuth settings were written to the database
 directly (no admin token without the user's password); the admin UI shows and edits
