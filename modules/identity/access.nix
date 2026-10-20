@@ -33,6 +33,7 @@ lib.optionalAttrs hostPlatform.isLinux {
               "https://10.0.10.50:8006"
             ];
             originLanding = "https://pve.tail41ca60.ts.net:8006";
+            icon = ./branding/icons/proxmox.svg;
           };
         };
       };

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Services (Lodestar's Services tab): a 2x2 grid in the zinc style of logo.svg, a
+       rounded square in the foreground colour (zinc-900, or zinc-50 in dark mode) with
+       the grid in the background colour. -->
+  <style>
+    .mark { color: #18181b; }
+    .ink { fill: #fafafa; }
+    @media (prefers-color-scheme: dark) {
+      .mark { color: #fafafa; }
+      .ink { fill: #18181b; }
+    }
+  </style>
+  <g class="mark">
+    <rect width="64" height="64" rx="14" fill="currentColor"/>
+    <g class="ink">
+      <rect x="17" y="17" width="13" height="13" rx="3"/>
+      <rect x="34" y="17" width="13" height="13" rx="3"/>
+      <rect x="17" y="34" width="13" height="13" rx="3"/>
+      <rect x="34" y="34" width="13" height="13" rx="3"/>
+    </g>
+  </g>
+</svg>

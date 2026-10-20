@@ -21,6 +21,18 @@ lib.types.submodule {
               type = lib.types.str;
               description = "The app's landing URL, shown in Kanidm's app list.";
             };
+            icon = lib.mkOption {
+              type = lib.types.nullOr lib.types.path;
+              default = null;
+              example = lib.literalExpression "../identity/branding/icons/nextcloud.svg";
+              description = ''
+                The app's icon in Kanidm's app list (SVG, PNG, JPEG, GIF or WebP, at most
+                256 KiB and 1024×1024; modules/identity/branding/icons has some),
+                uploaded on every provisioning run. null leaves the image in Kanidm as it
+                is (Kanidm's default icon for a new client; a removed icon stays until
+                deleted there).
+              '';
+            };
             scopes = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [

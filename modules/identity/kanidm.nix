@@ -15,8 +15,9 @@
 # `homelab.access` (collected with `tools.accessFrom`) plus `extraAccess` (apps outside
 # NixOS, modules/identity/access.nix) are rendered into a kanidm-provision state
 # (`provisionState`): every person, a group `admins` and a group `<app>-users` per
-# app, an OAuth2 client per app with `oidc`, and `oauth2-proxy` (the router's sign-in
-# gate, "Services" in the app list, landing on `servicesUrl`) whose scope maps admit
+# app, an OAuth2 client per app with `oidc` (its `icon` as the client's image; icons
+# in branding/icons), and `oauth2-proxy` (the router's sign-in gate, "Services" with a
+# grid icon in the app list, landing on `servicesUrl`) whose scope maps admit
 # every gated app's group. `kanidm-provision` applies it after every start of the
 # container and on every change; `--no-auto-remove`, so what exists only in Kanidm is
 # never deleted. Two consequences: the members of `admins` and every `<app>-users`
@@ -106,17 +107,22 @@ let
     // lib.mapAttrs' (app: a: lib.nameValuePair "${app}-users" { inherit (a) members; }) access;
 
     systems.oauth2 =
-      lib.mapAttrs (app: a: {
-        displayName = title app;
-        originUrl = map withSlash a.oidc.originUrls;
-        originLanding = withSlash a.oidc.originLanding;
-        scopeMaps."${app}-users" = a.oidc.scopes;
-      }) (lib.filterAttrs (_: a: a.oidc != null) access)
+      lib.mapAttrs (
+        app: a:
+        {
+          displayName = title app;
+          originUrl = map withSlash a.oidc.originUrls;
+          originLanding = withSlash a.oidc.originLanding;
+          scopeMaps."${app}-users" = a.oidc.scopes;
+        }
+        // lib.optionalAttrs (a.oidc.icon != null) { imageFile = "${a.oidc.icon}"; }
+      ) (lib.filterAttrs (_: a: a.oidc != null) access)
       // {
         # The gate has no page of its own; its tile in the app list opens Lodestar's
         # service overview. The redirect stays the gate's callback.
         oauth2-proxy = {
           displayName = "Services";
+          imageFile = "${./branding/icons/services.svg}";
           originUrl = [ "https://${cfg.gateHost}/oauth2/callback" ];
           originLanding = withSlash cfg.servicesUrl;
           scopeMaps = lib.mapAttrs' (app: _: lib.nameValuePair "${app}-users" defaultScopes) (
