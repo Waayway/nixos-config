@@ -51,6 +51,30 @@ now its own flake. Usage, the CLI, options, the security model and development
    switched to a revision that lists it: the host list is computed at build
    time).
 
+On a Mac, also place the opnix token once (before the first switch), then
+switch twice (see "Agent signing on the Macs"):
+
+```sh
+NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#_1password-cli -c \
+  op read "op://Personal/opnix-homelab service account/credential" |
+  sudo install -m 640 /dev/stdin /etc/opnix-token
+```
+
+## Agent signing on the Macs
+
+The agent binary (`/var/lib/lodestar-agent/bin/lodestar-agent`) is signed with
+one certificate for all Macs, so macOS permissions survive updates:
+`modules/lodestar/lodestar-agent-signing.pem` (SHA-1
+`f546f94d49ec2d267e04f47ad78181c70d282d02`). Its private key is the 1Password
+document **Lodestar Agent Signing Key** (vault Homelab, file `key.pem`); opnix
+(`modules/lodestar/agent.nix`) writes it to
+`/var/lib/lodestar-agent/signing/key.pem` with the `opnix-homelab` token in
+`/etc/opnix-token`. opnix runs as a launchd daemon (log
+`/var/log/opnix-secrets.log`), after the activation that signs, so the first
+switch fetches the key and the next one signs. Check with
+`codesign -dr - /var/lib/lodestar-agent/bin/lodestar-agent`: it must name
+`certificate leaf = H"f546f94d…"`.
+
 ## Using it
 
 Dashboard: http://nixos-manager:8080. The `lodestar` CLI is installed on every
@@ -96,8 +120,7 @@ tag replaces the device's user identity.
 2. Advertise `tag:fleet` on enrolled Linux hosts (Lodestar has no option for
    it yet; use `services.tailscale.extraUpFlags`) and fix nixos-manager's
    Tailscale tags (it still carries `tag:server`).
-3. Enrol atlas, apollo, hermes and hephaestus (`fleet = true`). The darwin
-   agent has not run on a real Mac yet.
+3. Enrol hephaestus (`fleet = true`); atlas, apollo and hermes are enrolled.
 4. Migrate the VMs (template 9000 is built from `template/proxmox.nix` and
    boot-tested since 2026-10-13; see
    `docs/plans/2026-10-12-homelab-backup-plan.md`, phase 6).
