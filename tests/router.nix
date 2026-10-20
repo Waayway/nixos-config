@@ -96,8 +96,14 @@ assert http.serversTransports.insecure-backend.insecureSkipVerify;
 assert !(http.routers ? backrest-public);
 assert http.services.backrest.loadBalancer.servers == [ { url = "http://100.92.102.84:9898"; } ];
 assert !(http.services.backrest.loadBalancer ? serversTransport);
-# nothing gated yet; the existing routes are unchanged
-assert lib.all (r: !(lib.any (lib.hasSuffix "-gate") r.middlewares)) (lib.attrValues http.routers);
+# only the echo route is gated on router-test; the other routes are unchanged
+assert
+  lib.attrNames (lib.filterAttrs (_: r: lib.any (lib.hasSuffix "-gate") r.middlewares) http.routers)
+  == [
+    "whoami-test-public"
+    "whoami-test-tailnet"
+  ];
+assert http.routers.whoami-test-public.middlewares == [ "whoami-test-gate" ];
 assert http.routers.whoami-test-public.rule == "Host(`whoami-test.vanwaaij.com`)";
 assert http.routers.archipelago-public.middlewares == [ "archipelago-auth" ];
 # a gated route: forwardAuth on oauth2-proxy's proxy endpoint (it redirects to the

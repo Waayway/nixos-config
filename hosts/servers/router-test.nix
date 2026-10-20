@@ -32,8 +32,9 @@
       echo.enable = true;
       # Its identity route and sign-in gate point at the test Kanidm below.
       identityHost = "router-test";
-      # The sign-in gate runs here to try it, before any route is gated.
+      # The sign-in gate runs here; the echo route is behind it (Thijs only).
       gate.enable = true;
+      extraRoutes.whoami-test.auth.gate = true;
     };
     # A test Kanidm (modules/identity/) next to the test router, with a staging
     # certificate; the production one is VM 111 (hosts/servers/identity.nix).
@@ -41,6 +42,10 @@
       enable = true;
       domain = "id-test.vanwaaij.com";
       acmeStaging = true;
+      extraAccess.whoami-test = {
+        members = [ "thijs" ];
+        gate = true;
+      };
     };
   };
 

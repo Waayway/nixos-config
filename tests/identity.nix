@@ -151,6 +151,7 @@ assert
     "backrest-users"
     "traefik-users"
     "truenas-users"
+    "whoami-test-users"
   ];
 # kanidm-policy: tools image, account policy, display name, logo
 assert lib.elem "kanidm-provision.service" policy.after;
