@@ -9,18 +9,24 @@ VM moves to NixOS or a service changes. Migration and backup plans:
 The front-door rebuild (`docs/plans/2026-10-19-homelab-front-door-*.md`) is live: UniFi
 forwards 80/443 to the **router** (since 2026-10-19, about 22:00), which serves the
 internet and the tailnet; **prod** runs Nextcloud, Jellyfin and Immich. Main and media
-are shut down. Details in the sections "100 prod" and "110 router" below; the
+are shut down. **identity** (VM 111, Kanidm at `id.vanwaaij.com`) is the sign-in
+for the apps and the sign-in gate. Details in the sections "100 prod", "110 router"
+and "111 identity" below; the
 2026-10-12 survey sections for the other VMs are updated per VM when it is done.
 
 Open items:
 
-- **Pantry** (custom Nextcloud app 0.37.0) is disabled: its migration `32Date20260908`
-  failed on Nextcloud 32.0.15 (unknown column `delete_on_done_default`).
+- **Pantry** (custom Nextcloud app): its migration broke at the cutover because two
+  `occ upgrade` ran at once; repaired (backup
+  `/store/db-dumps/nextcloud/pantry-before-repair-2026-10-19.sql.gz`). Whether the app
+  is enabled again: unverified. Rule: wait for "Initializing finished" in the container
+  log before `occ` after a restart.
 - **Immich**: Main's old photos (`/store/immich/library`, mounted read-only in the
   container at `/mnt/old-library`) are not yet added as an external library; waiting
   for an API key from the user.
-- **GPU**: the Intel Arc A380 (arrives 2026-10-20) goes to VM 100 (plan Task 4 Step
-  3b, not done); the Radeon Pro WX 7100 leaves the host the same day.
+- **GPU**: the Intel Arc A380 is passed through to prod (q35, `hostpci` mapping
+  `ArcA380`; Jellyfin QSV via `encoding.xml`, Immich ML on OpenVINO). The WX 7100
+  mapping is removed. See "What could be better" for the open findings (#16 to #50).
 - TrueNAS NFS export `/mnt/archive/shares` (id 8) is declared in
   `modules/truenas/homelab.nix` and applied.
 
@@ -59,13 +65,16 @@ Open items:
   gw 10.0.10.1). Tailscale on the host (offers an exit node).
 - Disks:
   - NVMe 465 GB (KIOXIA): `pve` VG: root 96 GB (27% used), swap 8 GB,
-    thin pool `local-lvm` 338 GB (69% used).
+    thin pool `local-lvm` 338 GB (**86% used** on 2026-10-20, alert threshold 80%).
   - `sda` 500 GB = iSCSI LUN from TrueNAS (`iqn.2005-10.org.freenas.ctl:proxmox-vms`)
-    → VG `nfs-vg` → storage `store-lvm` (**97% full**, 15 GB free, thick LVM,
-    `saferemove 0`).
+    → VG `nfs-vg` → storage `store-lvm` (thick LVM, `saferemove 0`). The LUN was
+    grown to **1 TiB** on 2026-10-20 (it was 97% full at 500 GB).
 - PCI passthrough: AMD chipset SATA (02:00.1) and Marvell 88SE9215 SATA (04:00.0)
-  → TrueNAS; Radeon Pro WX 7100 (mapping `WX7100`) still on media's config (media
-  is off; the card leaves 2026-10-20, the Intel Arc A380 goes to prod).
+  → TrueNAS; Intel Arc A380 (mapping `ArcA380`) → prod. `/etc/modprobe.d/vfio-arc.conf`
+  binds the Arc to vfio; it worked at the reboot after it was added, confirm on the
+  next pve reboot. The WX 7100 mapping is removed (also from media's config).
+- Subnet route 10.0.10.0/24: both pve and the router advertise it; after the reboot
+  pve is primary (failover works).
 - Root cron: `/root/update_cert.sh` every 12 h (Tailscale cert for the PVE web UI).
 - Proxmox firewall: disabled. No vzdump/backup jobs. No notification targets.
 - `/var/lib/vz/dump` has only `vzdump-qemu-nixos-template.vma.zst`.
@@ -74,17 +83,18 @@ Open items:
 
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
-| 100 | prod | running, onboot | NixOS (this repo) | 4 / 16 GB | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich (containers); Arc A380 pending |
+| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich (containers) |
 | 101 | router | stopped | NixOS (old attempt) | 2 / 2 GB | 64 GB (store-lvm) | unused, to delete |
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
 | 110 | router | running, onboot | NixOS (this repo) | 2 / 2 GB | 16 GB (local-lvm) | front door: Traefik, split DNS, Tailscale Services |
+| 111 | identity | running (unverified: onboot) | NixOS (this repo) | unverified | unverified (store-lvm) | Kanidm (`id.vanwaaij.com`), sign-in for apps |
 | 118 | vpn (was 110) | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | WireGuard (wg-easy) |
-| 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB + WX7100 | 128 GB (store-lvm) | old Jellyfin/Immich; `hostpci0` mapping WX7100 still set |
+| 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB | 128 GB (store-lvm) | old Jellyfin/Immich (`hostpci` removed) |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
-| 170 | nixos-manager | running | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
-| 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm) | Minecraft + BlueMap |
-| 201 | archipelago | running, **not onboot** | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
+| 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 64 GB disk, RAM unverified (64 GB per the task notes) | 64 GB (store-lvm) | Lodestar server, Linux builder |
+| 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm; move to store-lvm aborted, see below) | Minecraft + BlueMap |
+| 201 | archipelago | running, onboot (set 2026-10-20) | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
 | 230 | router-test | unverified | NixOS (this repo) | 1 / 2 GB | unverified | router's test twin, test Service `test-whoami-test` |
 | 9000 | nixos-26.05-template | template | NixOS | 2 / 2 GB | 4.3 GB (store-lvm) | base image |
 
@@ -92,23 +102,29 @@ The Garage LXC (140) that older notes mention no longer exists; `/store/garage`
 on TrueNAS is empty.
 
 Orphaned disks (referenced as `unusedN` or not referenced at all), not yet
-checked for contents: `local-lvm:vm-105-disk-{0..3}` (4 × 64 GB), `vm-120-disk-0`
-(128 GB), `vm-170-disk-0` (32 GB); VM 200 `unused0` points at a storage
-`local-store` that doesn't exist.
+checked for contents or deleted: `local-lvm:vm-105-disk-0` (`unused0` on 105) and
+`vm-105-disk-1..3` (unreferenced, 3 × 64 GB), `vm-120-disk-0` (`unused0` on 120,
+128 GB), `vm-170-disk-0` (`unused0` on 170, 32 GB); VM 200 `unused0` points at a
+storage `local-store` that doesn't exist. A partial copy `nfs-vg/vm-200-disk-0` of
+Minecraft's disk is left on store-lvm (see "200 minecraft").
 
 ### 100 prod
 
-- NixOS from this repo (`hosts/servers/prod.nix`), `10.0.10.100`, tailnet
+- NixOS from this repo (`hosts/servers/prod.nix`), q35 machine with the Arc A380
+  passed through (`hostpci`, mapping `ArcA380`), `10.0.10.100`, tailnet
   `100.121.0.124` (tags `tag:nixos`, `tag:prod`), Lodestar agent. 4 vCPU, 16 GB, 64 GB
-  on `local-lvm`. Backends only; the router is the only way in from outside.
+  on `local-lvm` (the move to store-lvm is not done yet). Backends only; the router is
+  the only way in from outside. On q35 the NIC is `enp6s18`, not `ens18`: set
+  `homelab.lan.interface` per host (the default is `ens18`).
 - Containers via `virtualisation.oci-containers` (modules `modules/services/{nextcloud,
   jellyfin,immich,docker,updates}.nix`):
   - **Nextcloud 32.0.15** (`nextcloud:32-apache`, track `32-apache`), MariaDB 11.4,
     Redis; **Collabora** at `office.vanwaaij.com`. Backend `http://10.0.10.100:8080`.
     User data on `/store/nextcloud/data`. Pantry is disabled (see open items).
-  - **Jellyfin 10.11**: config `/store/jellyfin/config` (the original media-VM config;
+  - **Jellyfin 10.11**: hardware transcoding (QSV) on the Arc A380, set by editing
+    `encoding.xml` (backup next to it); config `/store/jellyfin/config` (the original media-VM config;
     backup copy `/store/jellyfin-backup-2026-10-19`), library `/archive/jellyfin`.
-  - **Immich v2** (fresh install): media `/store/immich-v2`, Postgres in a container;
+  - **Immich v2** (fresh install, ML on OpenVINO): media `/store/immich-v2`, Postgres in a container;
     Main's old library `/store/immich/library` is mounted read-only at
     `/mnt/old-library` (external library still to be added).
 - Mounts (`modules/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
@@ -189,6 +205,20 @@ Shut down, 2 vCPU, `onboot 0`.
   binary are mounted into Jenkins (root-equivalent on the VM).
 - Being retired; not backed up.
 
+### 111 identity
+
+- NixOS from this repo (`hosts/servers/identity.nix`, modules in `modules/identity/`),
+  `10.0.10.111`, tag `tag:identity`, Lodestar agent. Runs **Kanidm** at
+  `id.vanwaaij.com`: passkey sign-in, OIDC for Nextcloud, Immich and Jellyfin, and the
+  oauth2-proxy **sign-in gate** (`auth.vanwaaij.com`, shown as "Services") that the
+  router puts in front of admin tools and Archipelago. Who may use which app comes from
+  Nix (`modules/identity/access.nix`, `people.nix`); Kanidm group membership is
+  overwritten from Nix on each provisioning run.
+- Online backups go to TrueNAS `store/authentication` (NFS, this VM only, mounted
+  with `RequiresMountsFor`); they are in the restic backups since 2026-10-20.
+- Router entry: Tailscale Services `id` and `auth`; Kanidm is passed through without
+  TLS termination.
+
 ### 118 vpn (was 110)
 
 - `10.0.10.118`; UniFi forwards 51820/udp here (WireGuard, wg-easy, `WG_HOST=server.vanwaaij.com`).
@@ -199,7 +229,7 @@ Shut down, 2 vCPU, `onboot 0`.
 ### 120 media (shut down)
 
 Shut down, `onboot 0`; Jellyfin and Immich now run on prod. The state below is the
-last survey. The `hostpci0` mapping WX7100 is still set on the VM.
+last survey. The `hostpci` mapping to the WX 7100 has been removed.
 
 - Docker compose projects in `/opt`:
   - **Jellyfin** (`jellyfin/jellyfin:latest`), running, :8096 open on the LAN,
@@ -264,17 +294,22 @@ last survey. The `hostpci0` mapping WX7100 is still set on the VM.
 - Lodestar server + agent; state in `/var/lib/lodestar-server/lodestar.db`
   (SQLite) + `mirror.git`. Leftover `/var/lib/fleet-server` from before the
   rename (67 MB).
-- Root disk 64 GB (grown from 32 GB on 2026-10-19 after a full disk during an apply), 8 vCPU; `/var/lib/flatpak` (1.3 GB) and
+- Root disk 64 GB (grown from 32 GB on 2026-10-19 after a full disk during an apply), 8 vCPU, onboot 1 (set 2026-10-20); `/var/lib/flatpak` (1.3 GB) and
   `interception-tools` run on it although it's a server.
 
 ### 200 minecraft (stopped)
 
 - Rocky 10.1, 128 GB disk on local-lvm. Serves BlueMap on :8100 when running.
   Not inspected (VM is off).
+- Disk move to store-lvm **aborted** during the GPU shutdown: the config still points
+  at local-lvm, and a partial copy `nfs-vg/vm-200-disk-0` remains on store-lvm
+  (remove it, then retry the move).
 
 ### 201 archipelago (`ap.vanwaaij.com`)
 
-- 2 vCPU. Routed by the router (`archipelago`, behind the sign-in gate).
+- 2 vCPU, onboot 1 (set 2026-10-20). Routed by the router (`archipelago`, behind the
+  sign-in gate), but **still reachable directly on `10.0.10.201:8080` without the
+  gate** (finding #31).
 
 - Docker compose in `/opt/archipelago/deploy`: nginx (10.0.10.201:8080) + web +
   multiworld, image `archipelago-base` built from `/opt/archipelago/src`.
@@ -337,23 +372,71 @@ Total: about 3.9 TiB, of which 3.26 TiB is `archive/shares`.
 
 ## What could be better, and the fix
 
-Ordered roughly by risk. "Plan" refers to the phases and steps in
-`docs/plans/2026-10-12-homelab-backup-plan.md`.
+Ordered roughly by risk within each group. "Plan" refers to the phases and steps in
+`docs/plans/2026-10-12-homelab-backup-plan.md`; rows 16 and up come from the front-door
+and identity work (2026-10-19/20) and have no plan step yet. Status: open, partly
+done, fixed (with date).
 
-| # | Problem | Fix | Plan |
-|---|---|---|---|
-| 1 | **No backups at all**, on-site or off-site. A failed pool, a bad TrueNAS beta update or ransomware loses Nextcloud and photos. | Nightly encrypted restic backups of every ZFS dataset + DB dumps to the Storage Box; Storage Box snapshots; repo passwords in 1Password; local ZFS snapshots for fast restores; Backrest for browsing. | 0, 2–4 |
-| 2 | **Production storage on TrueNAS 26.0.0-BETA.2.** | Export the config, switch the update train to stable, upgrade to 26.0 stable when it ships; no further betas. | 5.11 |
-| 3 | **Circular storage dependency**: five VM disks on an iSCSI LUN served by a VM on the same host. | New NixOS VMs go on `local-lvm` (stateless, ~32 GB each); move nixos-manager's disk now; drop the iSCSI storage and zvol once the last Rocky VM is gone. | 5.3, 6, 7.1 |
-| 4 | **`store-lvm` 97% full**, about 450 GB of orphaned disks on `local-lvm`. | Delete VM 101 and stale orphaned disks; move the template to `local-lvm`. | 5.1, 5.2 |
-| 5 | **NFS exported to `*`** with `sec=sys`; SMB permissions unchecked. | Exports per client IP, read-only where possible; review SMB users/ACLs. | 5.10 |
-| 6 | **Secrets in plain text** (`.env`, `config.yaml`). | Now: `chmod 600`, tighten the Cloudflare token to DNS-edit on `vanwaaij.com` only. Migration: everything into the 1Password Homelab vault, delivered by opnix (replaces sops-nix); rotate each secret as it moves. | 1, 5.6, 6 |
-| 7 | **Manual patching**: 222 pending on pve, no automatic updates on Rocky, `:latest` images, MariaDB 10.7 EOL. | NixOS: weekly `flake.lock` bump on `unstable` → promote → Lodestar apply. Until then `dnf-automatic` (security) on the Rocky VMs and MariaDB to 10.11 LTS. pve: monthly `apt full-upgrade`, update notifications. | 5.7, 5.8, 5.12, 7.3 |
-| 8 | **Firewalls inconsistent**: PVE firewall off, none on media, Jellyfin open on the LAN, Docker bypasses firewalld. | NixOS hosts already enable `networking.firewall` with SSH-only defaults; each service module opens only its own ports, backends accept only Main's IP. PVE firewall on for the host (22, 8006 from LAN + tailnet). | 6, 7.4 |
-| 9 | **Dead routes and stopped services** (Immich, BlueMap, jellyfetch, voice-memo). | Decide Immich/downloads; remove dead routes and voice-memo. | 5.5 |
-| 10 | **SSH**: pve root allows passwords, one shared RSA key, vpn/TrueNAS unreachable. | `PermitRootLogin prohibit-password` on pve; new ed25519 key for VMs, keys managed in the repo; TrueNAS key-only admin; vpn either NixOS or gone. | 5.9, 7.2 |
-| 11 | **No monitoring or alerting.** | One ntfy channel for everything: PVE notifications, TrueNAS alerts, restic failures, Gatus uptime checks for the public URLs, disk/SMART alerts. | 7.5 |
-| 12 | **HTTP-01 everywhere** although a DNS-01 wildcard resolver exists. | Routers to the `cloudflare` resolver (one wildcard cert, no port-80 dependency, tailnet-only hosts possible). | 5.6, 6 |
-| 13 | **nixos-manager** runs workstation bits, has a leftover `/var/lib/fleet-server`, disk 83% full. | Gate Flatpak/interception-tools on `!isServer`, delete the leftover, grow the disk. | 2.5 |
-| 14 | **Archipelago isn't `onboot`.** | `qm set 201 --onboot 1`. | 5.4 |
-| 15 | **Hairpin NAT** worked around with `extra_hosts` in Nextcloud. | Split DNS: `*.vanwaaij.com` → 10.0.10.100 on the LAN resolver (router), or `networking.hosts` on the NixOS hosts. | 7.6 |
+| # | Problem | Fix | Plan | Status |
+|---|---|---|---|---|
+| 1 | **No backups at all**, on-site or off-site. A failed pool, a bad TrueNAS beta update or ransomware loses Nextcloud and photos. | Nightly encrypted restic backups of every ZFS dataset + DB dumps to the Storage Box; Storage Box snapshots; repo passwords in 1Password; local ZFS snapshots for fast restores; Backrest for browsing. | 0, 2–4 | Fixed 2026-10-13 (see "Backups today") |
+| 2 | **Production storage on TrueNAS 26.0.0-BETA.2.** | Export the config, switch the update train to stable, upgrade to 26.0 stable when it ships; no further betas. | 5.11 | Open |
+| 3 | **Circular storage dependency**: VM disks on an iSCSI LUN served by a VM on the same host. | New NixOS VMs go on `local-lvm` (stateless, ~32 GB each); drop the iSCSI storage and zvol once the last Rocky VM is gone. Note: identity (111) and nixos-manager (170) are on store-lvm; prod's move to store-lvm and Minecraft's (partial) move go the other way, so decide one direction. | 5.3, 6, 7.1 | Open |
+| 4 | **Disk space**: `local-lvm` at 86% (threshold 80%) and orphaned disks; `store-lvm` was 97% full. | store-lvm LUN grown to 1 TiB (2026-10-20). Inspect and delete the orphaned disks (105-disk-0..3, 120-disk-0, 170-disk-0), VM 101, the partial `nfs-vg/vm-200-disk-0`; move the template to `local-lvm`. | 5.1, 5.2 | Partly done: store-lvm fixed; orphans not deleted |
+| 5 | **NFS exported to `*`** with `sec=sys`; SMB permissions unchecked. | Exports per client IP, read-only where possible; review SMB users/ACLs. (`store/authentication` is already limited to 10.0.10.111.) | 5.10 | Open |
+| 6 | **Secrets in plain text** (`.env`, `config.yaml`). | Now: `chmod 600`, tighten the Cloudflare token to DNS-edit on `vanwaaij.com` only. Migration: everything into the 1Password Homelab vault, delivered by opnix (replaces sops-nix); rotate each secret as it moves. | 1, 5.6, 6 | Partly done: NixOS hosts use opnix; Rocky VMs open |
+| 7 | **Manual patching**: 222 pending on pve, no automatic updates on Rocky, `:latest` images. | NixOS: weekly `flake.lock` bump on `unstable` → promote → Lodestar apply. Until then `dnf-automatic` (security) on the Rocky VMs. pve: monthly `apt full-upgrade`, update notifications. (MariaDB 10.7 on Main is gone with the cutover: prod runs 11.4.) | 5.7, 5.8, 5.12, 7.3 | Partly done: prod containers have a weekly pull + Renovate |
+| 8 | **Firewalls inconsistent**: PVE firewall off, Docker bypasses firewalld. | NixOS hosts enable `networking.firewall` with SSH-only defaults; each service module opens only its own ports, backends accept only the router's IP (10.0.10.110). PVE firewall on for the host (22, 8006 from LAN + tailnet). Archipelago: see #31. | 6, 7.4 | Partly done |
+| 9 | **Dead routes and stopped services** (BlueMap, jellyfetch, voice-memo). | Remove dead routes and voice-memo; delete Main (108), media (120). | 5.5 | Partly done: Main/media shut down, not deleted |
+| 10 | **SSH**: pve root allows passwords, one shared RSA key, vpn/TrueNAS unreachable. | `PermitRootLogin prohibit-password` on pve; new ed25519 key for VMs, keys managed in the repo; TrueNAS key-only admin; vpn either NixOS or gone. | 5.9, 7.2 | Open |
+| 11 | **No monitoring or alerting.** | One ntfy channel for everything: PVE notifications, TrueNAS alerts, restic failures, Gatus uptime checks for the public URLs, disk/SMART alerts (would have caught local-lvm at 86%). | 7.5 | Open (Lodestar Services tab checks HTTP only) |
+| 12 | **HTTP-01 everywhere** although a DNS-01 wildcard resolver exists. | Routers to the `cloudflare` resolver. | 5.6, 6 | Fixed 2026-10-19: the router uses one DNS-01 wildcard cert |
+| 13 | **nixos-manager** runs workstation bits, has a leftover `/var/lib/fleet-server`, disk was 83% full. | Gate Flatpak/interception-tools on `!isServer`, delete the leftover, grow the disk. | 2.5 | Partly done: disk grown to 64 GB; rest unverified |
+| 14 | **Archipelago isn't `onboot`.** | `qm set 201 --onboot 1`. | 5.4 | Fixed 2026-10-20 (also nixos-manager 170) |
+| 15 | **Hairpin NAT** worked around with `extra_hosts` in Nextcloud. | Split DNS `vanwaaij.com` to the router. | 7.6 | Fixed 2026-10-19 (split DNS on the router) |
+| 16 | **Apollo**: the Lodestar apply fails with "activate failed (exit 1)" since before this work (also on 42f68c8d). The Mac is offline, so the cause is unknown. | Read the activation log when apollo is online. | - | Open |
+| 17 | **deploy-box (105)** is shut down with `onboot 0`; its disks are orphaned. | Retire it with the other Rocky leftovers (final cleanup). | - | Open |
+| 18 | **Minecraft (200) disk move** to store-lvm aborted during the GPU shutdown; the config is on local-lvm and a partial copy `nfs-vg/vm-200-disk-0` takes space on store-lvm. | Remove the partial copy, retry the move (or leave it on local-lvm, see #3). prod (100) is also still on local-lvm. | - | Open |
+| 19 | **Arc A380 passthrough** depends on `/etc/modprobe.d/vfio-arc.conf` on pve (not in this repo). | Confirmed once after a reboot (prod has the GPU); confirm on the next pve reboot. | - | Fixed, re-check on next reboot |
+| 20 | **Subnet route**: pve, not the router, is primary for 10.0.10.0/24 after the reboot (both advertise). | None needed (failover works); decide whether the router should be primary. | - | Open (cosmetic) |
+| 21 | **Tailscale re-login** (new node key) leaves CoreDNS, `tailscale-serve` and `tailscaled-set` stale until a reboot; no restart on address change. | Restart these units when the Tailscale address changes. | - | Open |
+| 22 | **Tailscale Services**: after creating or renaming a Service, the host needs `tailscale serve drain svc:X` + `tailscale serve advertise svc:X` before the Service IP is routed (seen for `test-whoami-test` and `auth`). | Do it in the router module or the runbook. | - | Open |
+| 23 | **tailscaled-autoconnect** fails when the prefs differ after a logout ("`tailscale up` requires --reset"). | Manual `--reset`; make the unit reset by itself. | - | Open |
+| 24 | **opnix trust credential** (`tag:nixos`) may assign its own tag or tags it owns, not a mix. That is why `tag:nixos` owns itself and every server tag in the policy. | Keep in mind when adding tags; document in `docs/lodestar.md`. | - | Open (documentation) |
+| 25 | **Tailscale policy** has no SSH rule for `tag:identity` (health warning). | Add the rule (policy edits are via the API). | - | Open |
+| 26 | **CoreDNS host zones capture subdomains** (forwarded to MagicDNS, NXDOMAIN); duplicate route hosts would break the Corefile and nothing asserts against it. | Add an assertion for duplicate hosts; handle subdomains in the zones. | - | Open |
+| 27 | **Router module**: middleware order is the alphabetical key order of a route's middlewares; reserved names (`maintenance`, `auth`) can collide through `//`; the gate route is outside the name/host clash checks. | Explicit middleware ordering; include the gate route in the clash checks. | - | Open |
+| 28 | **router-test (230)** serves the real routes and holds the live Cloudflare token; disk was down to 3.1 GB. | Strip the real routes and the token from the test twin; grow the disk (unverified). | - | Open |
+| 29 | **Tailnet clients all look like 127.0.0.1** to backends (Tailscale Serve): Nextcloud brute-force throttling sees one IP for every tailnet client, and in Jellyfin every client looks like LAN. | Set Jellyfin "Known proxies" to 10.0.10.110; review Nextcloud trusted proxies / throttling. | - | Open |
+| 30 | **`X-Homelab-Via` can be forged** by going straight to a backend. | Consumers trust it only from 10.0.10.110; firewall the backends to the router. | - | Open |
+| 31 | **Archipelago (201)** is reachable directly on `10.0.10.201:8080`, bypassing the sign-in gate. | Allow only 10.0.10.110 (firewalld + DOCKER-USER on the Rocky VM; not managed by this repo). | - | Open |
+| 32 | **Containers on NFS** on prod don't recover if TrueNAS is late at boot (`RequiresMountsFor` fails, no retry). | Retry the mounts / restart the containers once the mount is up. | - | Open |
+| 33 | **Immich machine-learning** sometimes hangs at start (unhealthy). | Automatic restart on unhealthy. | - | Open |
+| 34 | **`homelab.lan.interface`** defaults to `ens18`, wrong for q35 VMs (prod: `enp6s18`); the NixOS firewall lines for container ports are cosmetic (Docker publishes past the firewall; exposure is limited by binding to the LAN address). | Set the interface per host, or detect it (make generic). | - | Open |
+| 35 | **DB dumps** on `/store/db-dumps` (and Kanidm's online backups, 0666) are readable by squashed root (uid 65534) on other NFS clients. Kanidm's backups contain hashes and OAuth2 secrets. | Dedicated dataset/share per consumer (done for `authentication`, export to 10.0.10.111 only) or encrypt; question for the user for the other dumps. | - | Partly done |
+| 36 | **Weekly update**: a container without a healthcheck counts as healthy as soon as it runs; the "not running, skipped" log line is inaccurate for exited containers. | Add healthchecks; fix the log message. | - | Open |
+| 37 | **Renovate**: the floating list in `renovate.json` is maintained by hand; the Immich group would put a PostgreSQL major in the same PR as an Immich major. | Sync the list with the modules; check upstream's compose before merging such a PR. | - | Open |
+| 38 | **Nextcloud Pantry app**: migration broke at the cutover because two `occ upgrade` ran at once (repaired). | Rule: wait for "Initializing finished" before `occ` after a restart; never run two `occ upgrade` at once. | - | Repaired, rule documented |
+| 39 | **Circles app** logs a background-job error every 5 minutes in Nextcloud (upgrade noise, harmless). | Disable the app or wait it out. | - | Open (cosmetic) |
+| 40 | **Kanidm backup dataset** `store/authentication`: root `65534:65534 0700` set by hand, not declared. | Declare it in `modules/truenas/` (share id 9 is declared; give it the `[nix] authentication` comment so a reconcile doesn't duplicate it, switch the manager together). | - | Open |
+| 41 | **Kanidm depends on TrueNAS at start** (backup mount `RequiresMountsFor`); login doesn't start if TrueNAS is down at boot. | Make the mount non-blocking for the IdP. | - | Open |
+| 42 | **Kanidm sees the router's address** for all clients (passthrough without PROXY protocol). | Enable PROXY protocol or accept. | - | Open |
+| 43 | **Gate cookie** `.vanwaaij.com` is sent to every subdomain (HttpOnly, Secure, SameSite=lax). | Accept or scope per host; also `--trusted-proxy-ip=127.0.0.1/32` was suggested for oauth2-proxy. | - | Open |
+| 44 | **Removing an app from access** keeps its Kanidm group, client and scope map (`--no-auto-remove`). | Delete by hand when an app is retired. | - | Open (by design) |
+| 45 | **Identity's system** includes neovim and moonlight-qt (some app modules are not gated off on servers). | Gate those app modules on `!isServer`. | - | Open |
+| 46 | **Kanidm upgrades** must go one minor at a time. | Renovate PR per minor; run `kanidmd domain upgrade-check` first. | - | Open (process) |
+| 47 | **Kanidm backup schedule**: the next backup after an ACME reload runs a day later (skipped day). | Re-trigger the backup after a cert reload. | - | Open |
+| 48 | **Identity module code**: the `withAccess` filter is duplicated in `accessFrom.nix` and `accessProblems.nix`; policy passwords went via `docker -e` (visible in container config while running; should go via stdin); `/store/kanidm` is a hard dependency of the IdP; failure tests don't check the message; the test Kanidm gets all prod clients. | Deduplicate; pass secrets on stdin; the rest are minor. Whether the stdin and comment items from Task 2 were done: unverified. | - | Open (minor) |
+| 49 | **Jellyfin config** edited by hand (`encoding.xml`). | Keep the backup next to it; consider declaring it. | - | Open (minor) |
+| 50 | **Kanidm look**: default icons, "Sign-in gate" name, credential page CSS, reset links using the IP. | App icons, the client shown as "Services", a centred credential card, reset links on `id.vanwaaij.com`. | - | Fixed 2026-10-20 (commits `b26199c`, `a8c4830`, `09f7869`, `d5b2c8c`) |
+
+## Open plan items
+
+- Identity plan: Task 8 (Nextcloud, Immich, Jellyfin OIDC), Task 9 (Proxmox realm),
+  Task 10 (docs).
+- Lodestar plan (`lodestar.vanwaaij.com`, OIDC, actions only from the tailnet): not
+  started.
+- Final cleanup: delete Main (108), media (120), deploy-box (105), VM 101, the orphaned
+  disks and the partial `nfs-vg/vm-200-disk-0`.
+- WireGuard (vpn 118): move to a shared Tailscale exit node later (the other users
+  still use WireGuard).
