@@ -191,7 +191,7 @@ lodestar` here.
   everything with `RequiresMountsFor` is stopped with it (prod, 2026-10-19; fixed in
   `modules/homelab/storage.nix`).
 - **The opnix trust credential is `tag:nixos`.** In the Tailscale policy `tag:nixos`
-  owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet` are owned by
+  owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity` are owned by
   `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
   or the host cannot join.
 - **NixOS maps a machine's own hostname to `127.0.0.2`** in `/etc/hosts`.

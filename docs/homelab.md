@@ -153,14 +153,19 @@ Minecraft's disk is left on store-lvm (see "200 minecraft").
 - The **front door** for the internet (UniFi forwards 80/443 here) and for the tailnet:
   Traefik with one `*.vanwaaij.com` wildcard certificate (Let's Encrypt DNS-01 via
   Cloudflare; token in 1Password `cloudflare-dns-token`), a maintenance page, Tailscale
-  Services `nextcloud`, `jellyfin`, `immich`, `office`, `archipelago`, `traefik`
+  Services `nextcloud`, `jellyfin`, `immich`, `office`, `archipelago`, `traefik`, `id`,
+  `auth`, `truenas`, `backrest`
   (split DNS `vanwaaij.com` to the router; CoreDNS resolves names through
   `<name>.tail41ca60.ts.net`), subnet route and exit node.
 - Routes come from the `homelab.routes` of every host in this flake (prod's modules
   declare `nextcloud`, `office`, `jellyfin`, `immich`) plus `homelab.router.extraRoutes`
-  for backends outside it (`modules/homelab/routes.nix`: `archipelago`, `traefik`);
+  for backends outside it (`modules/homelab/routes.nix`: `archipelago`, `traefik`,
+  `truenas`, `backrest`);
   unknown hosts get 404. The `tailnet` entrypoint sets
   `X-Homelab-Via: tailnet`, the `public` entrypoint strips it.
+- **The sign-in gate**: the router runs Docker and oauth2-proxy (`router/gate.nix`), a
+  Kanidm client; routes with `auth.gate` (archipelago, backrest, traefik, truenas) ask it
+  through Traefik forwardAuth. See `docs/identity.md`.
 - **router-test (230, `10.0.10.230`)** is its test twin (test Service
   `test-whoami-test`), kept for tests.
 - Rollback to the old setup: Main (108) is intact but shut down and its Traefik was
@@ -436,7 +441,7 @@ done, fixed (with date).
 | 54 | **Nextcloud `allow_local_remote_servers`** is on (SSRF guard off instance-wide) so it can reach Kanidm; a member named like a local account (such as `admin`) would link to it. | Egress filter; an assertion against such names. | - | Open |
 | 55 | **Proxmox users** are created by hand (`pveum user add <name>@kanidm` + acl); there is no group sync. `root@pam` stays the emergency login. | Accept for one admin. | - | Open (by design) |
 | 56 | **Kanidm restore** is documented but not rehearsed. | Rehearse once on router-test's Kanidm. | - | Open |
-| 57 | **Kanidm CLI in the secret script** runs with `verify_ca=false`. | Confirm it only talks to localhost in the container. | - | Open (minor) |
+| 57 | **Kanidm CLI in the secret script** runs with `verify_ca=false`. | Checked: `KANIDM_URL` is the VM's own LAN address with the tools container on the host network, so it never leaves the VM. | - | Closed |
 | 58 | **Immich OAuth** settings were written to the database directly; **Arie** needs an Immich account (`arie@vanwaaij.com`) before SSO links. | Create it in Immich. | - | Open (user) |
 
 ## Open plan items

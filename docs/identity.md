@@ -14,8 +14,10 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
   a Kanidm client shown as "Services" at `auth.vanwaaij.com` (Tailscale Service `auth`).
   A route with `auth.gate = true` (`modules/homelab/routes.nix`) asks it through
   Traefik's forwardAuth; without a session you are sent to Kanidm. One sign-in covers
-  every gated site (cookie on `.vanwaaij.com`). If Kanidm or the proxy is down, gated
-  sites fail closed; the other sites are unaffected.
+  every gated site (cookie on `.vanwaaij.com`). The session is refreshed against Kanidm
+  every 10 minutes (`--cookie-refresh`; the tokens live 15). If Kanidm or the proxy is
+  down, new sign-ins fail closed (an existing session works until its next refresh);
+  the other sites are unaffected.
 - **Who may use what** is declared in Nix, not clicked together in Kanidm:
   - People: `modules/identity/people.nix` (`thijs` is admin, `arie`).
   - Apps with their own login: `homelab.access.<app>` in the app's module
@@ -34,7 +36,7 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 |---|---|---|
 | Nextcloud | Kanidm (OIDC, `user_oidc`) | `usernames` maps thijs to the old account `Waayway`, arie to `Arie` |
 | Immich | Kanidm (OIDC) | accounts are not created by login; email links the login to the account |
-| Jellyfin | Kanidm (SSO-Auth plugin, provider `kanidm`) | a first login creates a non-admin user |
+| Jellyfin | Kanidm (SSO-Auth plugin, provider `kanidm`) | a first login creates the user; people with `admin = true` in `people.nix` become Jellyfin administrators (plugin `AdminRoles`), and everyone gets all libraries |
 | Proxmox | Kanidm (realm `kanidm`, OpenID) | users are created by hand, see below |
 | Archipelago, Traefik dashboard, TrueNAS, Backrest | the gate | TrueNAS still has its own login behind it |
 
@@ -62,7 +64,7 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
    - **Immich**: create the account first (Administration, Users) with the same email
      as in `people.nix` (autoRegister is off). Arie: `arie@vanwaaij.com`. Until it
      exists the login says no account. Phone app: it signs in through the same button.
-   - **Jellyfin**: nothing; the first SSO login creates the user (not an admin).
+   - **Jellyfin**: nothing; the first SSO login creates the user (an administrator only if the person has `admin = true`). A person whose short name equals an existing Jellyfin user logs into that user.
    - **Nextcloud**: nothing for a name that exists; `usernames` links a person to an
      existing account, otherwise a new account is created at first login.
    - **Proxmox**: Kanidm only decides who can get a token; Proxmox has no group sync
@@ -71,7 +73,8 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
      `pveum acl modify / --users <name>@kanidm --roles <Role>`. User names are the
      short ones (`thijs@kanidm`, `preferShortUsername`).
 6. Remove someone: take them out of `members` and apply (they lose the group, so no new
-   token and no gate access). Existing app sessions and accounts stay; remove those in
+   token and no gate access; an existing gate session ends at its next refresh, within
+   about 10 minutes). Existing app sessions and accounts stay; remove those in
    the app too.
 
 ## Add a new app
@@ -127,7 +130,7 @@ Single sign-on must never be the only way in:
 | Immich | password login (still enabled) |
 | Proxmox | `root@pam` |
 | Kanidm itself | `admin` / `idm_admin` via `recover-account` on VM 111 |
-| Gated tools (Traefik, Backrest, Archipelago) | SSH to the VM or tailnet to the backend (Archipelago also answers on `10.0.10.201:8080`, finding 31); TrueNAS has its own login but is only reachable through the gate |
+| Gated tools (Traefik, Backrest, Archipelago) | SSH to the VM or tailnet to the backend (Archipelago also answers on `10.0.10.201:8080`, finding 31); TrueNAS has its own login and its UI answers on `https://10.0.10.130` from the LAN (or the subnet route) |
 
 Recover a Kanidm account (prints a new password; run on VM 111, `ssh -J pve
 identity@10.0.10.111` with `~/.ssh/proxmox_vms_rsa`):
@@ -137,8 +140,11 @@ docker exec kanidm /sbin/kanidmd scripting recover-account -c /data/server.toml 
 ```
 
 Provisioning does this for `idm_admin` on every run, so no admin password is stored.
-If the gate or Kanidm is broken, disable one site with `auth.gate = false` on its route
-(Archipelago: also close its direct port) and apply to the router.
+If the gate or Kanidm is broken, do not just set `auth.gate = false`: that leaves the
+site without any login. Archipelago: restore `basicAuth.usersFile` from the 1Password
+item `archipelago-basic-auth` (see the comment in `modules/homelab/routes.nix`), then
+apply to the router. Backrest, Traefik and TrueNAS have their own access (SSH, tailnet
+backend, LAN UI).
 
 ## Upgrades
 
@@ -186,7 +192,7 @@ hand with the Administrator role on `/`.
   the tailnet), which turns off Nextcloud's SSRF guard instance-wide. A follow-up could
   add an egress filter. Also: the username groups survive removing a member, and a
   member whose name equals a local account (such as `admin`) would link to it; do not
-  name a person like a local account.
+  name a person like a local account. The same goes for Jellyfin users (finding 54).
 - **Public wifi**: `id` and `auth` were reported unreachable from public wifi (public DNS
   answers with the WAN IP and both answer from outside). Cause unknown, waiting for
   details (device, Tailscale state, error).

@@ -274,7 +274,9 @@ lib.optionalAttrs hostPlatform.isLinux {
     # --unique-uid=0 and --mapping-uid=nextcloud_username. The accounts from Main are
     # `Waayway` and `Arie`; `usernames` sends those names, so the first login links the
     # Kanidm person to the existing account (user_oidc's soft auto-provisioning).
-    # Password login stays (allow_multiple_user_backends).
+    # Password login stays (allow_multiple_user_backends). Also set by hand:
+    # allow_local_remote_servers (Kanidm is reached over the tailnet), which needs the
+    # Tailscale grant tag:prod -> svc:id.
     homelab.access.nextcloud = {
       members = [
         "thijs"
