@@ -99,6 +99,11 @@ lib.optionalAttrs hostPlatform.isLinux {
         "--cookie-name=_oauth2_proxy${lib.replaceStrings [ "-" ] [ "_" ] suffix}"
         "--cookie-domain=.${parentDomain}"
         "--cookie-secure=true"
+        # Kanidm's ID tokens live 15 minutes and oauth2-proxy ends the session with
+        # them; refreshing (Kanidm always issues a refresh token) keeps SPAs behind
+        # the gate working. Must stay below 15m. A refresh re-checks the scope map,
+        # so removing someone takes effect within ~10 minutes.
+        "--cookie-refresh=10m"
         "--cookie-samesite=lax"
         "--whitelist-domain=.${parentDomain}"
         # forwardAuth only; nothing is proxied.
