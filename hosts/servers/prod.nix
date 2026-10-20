@@ -20,6 +20,9 @@
 
   options = {
     homelab.storage.enable = true;
+    # q35 (for the Arc's PCIe passthrough) puts virtio-net on the PCIe bridge:
+    # the NIC is enp6s18, not the template's ens18.
+    homelab.lan.interface = "enp6s18";
     # Live since the cutover (2026-10-19): the router sends the internet here.
     homelab.nextcloud = {
       enable = true;
