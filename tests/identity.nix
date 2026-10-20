@@ -145,6 +145,13 @@ assert state.systems.oauth2.proxmox.originLanding == "https://pve.tail41ca60.ts.
 assert lib.all (lib.hasSuffix "/") state.systems.oauth2.proxmox.originUrl;
 assert
   state.systems.oauth2.oauth2-proxy.originUrl == [ "https://auth-test.vanwaaij.com/oauth2/callback" ];
+# the gate's client: "Services" in the app list, landing on Lodestar's Services tab, with icons
+assert state.systems.oauth2.oauth2-proxy.displayName == "Services";
+assert state.systems.oauth2.oauth2-proxy.originLanding == "http://nixos-manager:8080/#/services";
+assert lib.hasSuffix "-services.svg" state.systems.oauth2.oauth2-proxy.imageFile;
+assert lib.hasSuffix "-proxmox.svg" state.systems.oauth2.proxmox.imageFile;
+# reset links on the domain, not the address the CLI talks to
+assert lib.any (p: (p.name or "") == "kanidm-reset-link") cfg.environment.systemPackages;
 assert
   lib.attrNames state.systems.oauth2.oauth2-proxy.scopeMaps == [
     "archipelago-users"
