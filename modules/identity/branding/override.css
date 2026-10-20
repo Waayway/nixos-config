@@ -1,26 +1,289 @@
-/* vanwaaij.com branding on top of Kanidm's default UI (mounted over /hpkg/override.css) */
-:root, [data-bs-theme=dark] {
-  --bs-body-bg: #0f1720;
-  --bs-body-color: #e6edf3;
-  --bs-primary: #2f9e6e;
-  --bs-primary-rgb: 47, 158, 110;
-  --bs-link-color: #4cc38a;
-  --bs-border-radius: 14px;
+/*
+ * vanwaaij.com on top of Kanidm's UI (mounted over /hpkg/override.css, loaded after
+ * Bootstrap 5.3 and Kanidm's style.css). A plain, shadcn/ui-like look: the neutral
+ * zinc palette, light and dark. Kanidm's style.js sets data-bs-theme on <html> from
+ * prefers-color-scheme; without JS the media query below does the same. Colours are
+ * tokens (--vw-*) per mode, mapped once onto Bootstrap's variables, so every page
+ * (login, apps list, settings) follows. Fonts: Inter if installed, else the system's;
+ * nothing is loaded from elsewhere.
+ */
+
+/* --- tokens ------------------------------------------------------------------ */
+:root,
+[data-bs-theme="light"] {
+  --vw-bg: #ffffff;
+  --vw-bg-rgb: 255, 255, 255;
+  --vw-fg: #09090b; /* zinc-950 */
+  --vw-fg-rgb: 9, 9, 11;
+  --vw-muted: #f4f4f5; /* zinc-100 */
+  --vw-muted-rgb: 244, 244, 245;
+  --vw-muted-fg: #71717a; /* zinc-500 */
+  --vw-muted-fg-rgb: 113, 113, 122;
+  --vw-border: #e4e4e7; /* zinc-200 */
+  --vw-input: #e4e4e7;
+  --vw-ring: #a1a1aa; /* zinc-400 */
+  --vw-primary: #18181b; /* zinc-900 */
+  --vw-primary-rgb: 24, 24, 27;
+  --vw-primary-hover: #27272a; /* zinc-800 */
+  --vw-primary-fg: #fafafa; /* zinc-50 */
+  --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fafafa'/%3e%3c/svg%3e");
+  color-scheme: light;
 }
+
+[data-bs-theme="dark"] {
+  --vw-bg: #09090b; /* zinc-950 */
+  --vw-bg-rgb: 9, 9, 11;
+  --vw-fg: #fafafa; /* zinc-50 */
+  --vw-fg-rgb: 250, 250, 250;
+  --vw-muted: #27272a; /* zinc-800 */
+  --vw-muted-rgb: 39, 39, 42;
+  --vw-muted-fg: #a1a1aa; /* zinc-400 */
+  --vw-muted-fg-rgb: 161, 161, 170;
+  --vw-border: #27272a; /* zinc-800 */
+  --vw-input: #27272a;
+  --vw-ring: #52525b; /* zinc-600 */
+  --vw-primary: #fafafa;
+  --vw-primary-rgb: 250, 250, 250;
+  --vw-primary-hover: #e4e4e7; /* zinc-200 */
+  --vw-primary-fg: #18181b; /* zinc-900 */
+  --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2318181b'/%3e%3c/svg%3e");
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-bs-theme]) {
+    --vw-bg: #09090b;
+    --vw-bg-rgb: 9, 9, 11;
+    --vw-fg: #fafafa;
+    --vw-fg-rgb: 250, 250, 250;
+    --vw-muted: #27272a;
+    --vw-muted-rgb: 39, 39, 42;
+    --vw-muted-fg: #a1a1aa;
+    --vw-muted-fg-rgb: 161, 161, 170;
+    --vw-border: #27272a;
+    --vw-input: #27272a;
+    --vw-ring: #52525b;
+    --vw-primary: #fafafa;
+    --vw-primary-rgb: 250, 250, 250;
+    --vw-primary-hover: #e4e4e7;
+    --vw-primary-fg: #18181b;
+    --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2318181b'/%3e%3c/svg%3e");
+    color-scheme: dark;
+  }
+}
+
+/* --- Bootstrap's variables from the tokens ----------------------------------- */
+:root,
+[data-bs-theme] {
+  --bs-font-sans-serif: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bs-body-font-family: var(--bs-font-sans-serif);
+  --bs-body-font-size: 0.875rem;
+  --bs-body-line-height: 1.5;
+  --bs-body-bg: var(--vw-bg);
+  --bs-body-bg-rgb: var(--vw-bg-rgb);
+  --bs-body-color: var(--vw-fg);
+  --bs-body-color-rgb: var(--vw-fg-rgb);
+  --bs-emphasis-color: var(--vw-fg);
+  --bs-emphasis-color-rgb: var(--vw-fg-rgb);
+  --bs-heading-color: var(--vw-fg);
+  --bs-secondary-color: var(--vw-muted-fg);
+  --bs-secondary-color-rgb: var(--vw-muted-fg-rgb);
+  --bs-tertiary-color: var(--vw-muted-fg);
+  --bs-secondary-bg: var(--vw-muted);
+  --bs-secondary-bg-rgb: var(--vw-muted-rgb);
+  --bs-tertiary-bg: var(--vw-muted);
+  --bs-tertiary-bg-rgb: var(--vw-muted-rgb);
+  --bs-border-color: var(--vw-border);
+  --bs-border-color-translucent: var(--vw-border);
+  --bs-border-radius: 6px;
+  --bs-border-radius-sm: 4px;
+  --bs-border-radius-lg: 8px;
+  --bs-primary: var(--vw-primary);
+  --bs-primary-rgb: var(--vw-primary-rgb);
+  --bs-link-color: var(--vw-fg);
+  --bs-link-color-rgb: var(--vw-fg-rgb);
+  --bs-link-hover-color: var(--vw-fg);
+  --bs-link-hover-color-rgb: var(--vw-fg-rgb);
+  --bs-focus-ring-color: color-mix(in srgb, var(--vw-ring) 50%, transparent);
+  --bs-card-bg: var(--vw-bg);
+}
+
 body {
-  background: radial-gradient(1200px 600px at 50% -10%, #1f3b2f 0%, #0f1720 60%) fixed;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: var(--vw-bg);
+  color: var(--vw-fg);
+  font-family: var(--bs-font-sans-serif);
+  -webkit-font-smoothing: antialiased;
 }
-main, .container, form { max-width: 380px; margin-inline: auto; }
-form {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 18px;
-  padding: 28px 24px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+
+a {
+  text-underline-offset: 3px;
 }
-.btn-primary { background: #2f9e6e; border-color: #2f9e6e; border-radius: 10px; padding: .5rem 1.4rem; }
-.btn-primary:hover { background: #268559; border-color: #268559; }
-.form-control { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.15); color: #e6edf3; }
-h1, h2, h3, .h3 { font-weight: 650; letter-spacing: -.01em; }
-footer { opacity: .5; }
+
+h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* --- the login card ------------------------------------------------------------ */
+.form-signin {
+  width: calc(100% - 2rem);
+  max-width: 360px;
+  padding: 1.5rem;
+  border: 1px solid var(--vw-border);
+  border-radius: 8px;
+  background: var(--vw-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.form-signin > * {
+  width: 100%;
+}
+
+.form-signin > h3 {
+  font-size: 1.125rem;
+  text-align: center;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.kanidm_logo {
+  width: 40px;
+  height: 40px;
+}
+
+.form-signin > .kanidm_logo {
+  width: 40px;
+}
+
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+}
+
+/* --- inputs and buttons -------------------------------------------------------- */
+.form-control,
+.form-select {
+  background-color: transparent;
+  border-color: var(--vw-input);
+  border-radius: 6px;
+  padding: 0.4375rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--vw-fg);
+}
+
+.input-group > .form-control {
+  border-radius: 6px;
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.btn:focus-visible {
+  border-color: var(--vw-ring);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vw-ring) 35%, transparent);
+}
+
+.btn {
+  --bs-btn-font-size: 0.875rem;
+  --bs-btn-font-weight: 500;
+  --bs-btn-padding-y: 0.4375rem;
+  --bs-btn-padding-x: 1rem;
+  --bs-btn-border-radius: 6px;
+  --bs-btn-focus-box-shadow: 0 0 0 3px color-mix(in srgb, var(--vw-ring) 35%, transparent);
+}
+
+.btn-primary {
+  --bs-btn-color: var(--vw-primary-fg);
+  --bs-btn-bg: var(--vw-primary);
+  --bs-btn-border-color: var(--vw-primary);
+  --bs-btn-hover-color: var(--vw-primary-fg);
+  --bs-btn-hover-bg: var(--vw-primary-hover);
+  --bs-btn-hover-border-color: var(--vw-primary-hover);
+  --bs-btn-active-color: var(--vw-primary-fg);
+  --bs-btn-active-bg: var(--vw-primary-hover);
+  --bs-btn-active-border-color: var(--vw-primary-hover);
+  --bs-btn-disabled-color: var(--vw-primary-fg);
+  --bs-btn-disabled-bg: var(--vw-primary);
+  --bs-btn-disabled-border-color: var(--vw-primary);
+}
+
+.btn-secondary,
+.btn-outline-secondary,
+.btn-outline-primary {
+  --bs-btn-color: var(--vw-fg);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--vw-border);
+  --bs-btn-hover-color: var(--vw-fg);
+  --bs-btn-hover-bg: var(--vw-muted);
+  --bs-btn-hover-border-color: var(--vw-border);
+  --bs-btn-active-color: var(--vw-fg);
+  --bs-btn-active-bg: var(--vw-muted);
+  --bs-btn-active-border-color: var(--vw-border);
+}
+
+/* The login form's submit button spans the card. */
+.form-signin form .btn {
+  width: 100%;
+}
+
+/* No margin under the card's last row (Bootstrap's mb-3). */
+.form-signin form > :last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Switches and checkboxes in the primary colour. */
+.form-check-input {
+  border-color: var(--vw-input);
+  background-color: transparent;
+}
+
+.form-check-input:checked {
+  background-color: var(--vw-primary);
+  border-color: var(--vw-primary);
+}
+
+.form-switch .form-check-input:focus {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23a1a1aa'/%3e%3c/svg%3e");
+}
+
+.form-switch .form-check-input:checked {
+  --bs-form-switch-bg: var(--vw-knob-on);
+}
+
+.form-check-label {
+  color: var(--vw-muted-fg);
+}
+
+/* --- cards, alerts, navigation (the pages after login) ------------------------- */
+.card {
+  --bs-card-border-color: var(--vw-border);
+  --bs-card-border-radius: 8px;
+  --bs-card-inner-border-radius: 7px;
+  --bs-card-bg: var(--vw-bg);
+}
+
+.alert {
+  --bs-alert-border-radius: 8px;
+}
+
+.navbar,
+.bg-body-tertiary {
+  background-color: var(--vw-bg) !important;
+}
+
+.navbar {
+  border-bottom: 1px solid var(--vw-border);
+}
+
+/* --- footer -------------------------------------------------------------------- */
+.footer {
+  font-size: 0.75rem;
+  padding-block: 1rem !important;
+  text-align: center !important;
+}
+
+.footer,
+.footer a {
+  color: var(--vw-muted-fg) !important;
+}
