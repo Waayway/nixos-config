@@ -135,6 +135,12 @@ assert failedAssertions cfg == [ ];
 # oauth2-proxy: official image, pinned, loopback only, secrets from files
 assert lib.hasPrefix "quay.io/oauth2-proxy/oauth2-proxy:v7." gate.image;
 assert has "@sha256:" gate.image;
+# the container fails (so opnix starts it later) rather than being skipped while
+# the secret files are missing
+assert has "test -f /var/lib/opnix/secrets/oauth2ProxyClientSecret" (
+  lib.head cfg.systemd.services.docker-oauth2-proxy.serviceConfig.ExecStartPre
+);
+assert !(cfg.systemd.services.docker-oauth2-proxy.unitConfig ? ConditionPathExists);
 assert lib.elem "--network=host" gate.extraOptions;
 assert lib.elem "--add-host=id-test.vanwaaij.com:127.0.0.1" gate.extraOptions;
 assert lib.all (f: lib.elem f gate.cmd) [

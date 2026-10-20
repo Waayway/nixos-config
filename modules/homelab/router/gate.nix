@@ -13,12 +13,14 @@
 #
 # The client secret (copied out of Kanidm by scripts/kanidm-oauth2-secret.sh) and the
 # cookie secret come from 1Password (`kanidm-oauth2-oauth2-proxy[-test]`,
-# `oauth2-proxy-cookie[-test]`); the container starts once both files exist. While
+# `oauth2-proxy-cookie[-test]`); the container fails until both files exist and
+# opnix starts it once they do. While
 # it's down, gated routes fail closed (forwardAuth errors) and others are unaffected.
 # NixOS only.
 {
   config,
   lib,
+  pkgs,
   hostPlatform,
   ...
 }:
@@ -105,11 +107,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       ++ lib.optional id.acmeStaging "--ssl-insecure-skip-verify=true";
     };
 
-    # Without the files Docker would create directories in their place; wait for
-    # opnix instead (it restarts the container once it has written them).
-    systemd.services.docker-oauth2-proxy.unitConfig.ConditionPathExists = [
-      secrets.oauth2ProxyClientSecret
-      secrets.oauth2ProxyCookieSecret
+    # Without the files Docker would create directories in their place, so the unit
+    # fails until opnix has written them. Failing (not a ConditionPathExists skip)
+    # matters: opnix only try-restarts units on a secret change, a no-op for an
+    # inactive unit, but starts *failed* ones after a successful run.
+    systemd.services.docker-oauth2-proxy.serviceConfig.ExecStartPre = lib.mkBefore [
+      "${pkgs.coreutils}/bin/test -f ${secrets.oauth2ProxyClientSecret} -a -f ${secrets.oauth2ProxyCookieSecret}"
     ];
   };
 }
