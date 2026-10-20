@@ -8,7 +8,8 @@
   ...
 }:
 # Kanidm (`homelab.identity`) from its official image, kanidm/server, with the
-# homelab's branding: override.css mounted over the image's /hpkg/override.css, and
+# homelab's branding (Lodestar's look): override.css mounted over the image's
+# /hpkg/override.css, IBM Plex (latin subsets, woff2) beside it in /hpkg/fonts, and
 # the display name and logo set through the CLI (kanidm/tools image).
 #
 # Who exists and who may use what is Nix: `homelab.people` and every configuration's
@@ -54,6 +55,29 @@ let
   backupDir = if cfg.backupNfs == null then "/store/kanidm" else "/var/lib/identity/backup";
   certDir = "/var/lib/acme/${cfg.domain}";
   url = "https://${lan.address}:8443";
+
+  # Lodestar's faces for override.css (served at /pkg/fonts/): IBM Plex Sans 400/500/600
+  # and Serif 500/600/600 italic from nixpkgs, cut to Latin like Lodestar's @fontsource
+  # files. Same origin, so Kanidm's CSP (default-src 'self') allows them.
+  brandingFonts =
+    pkgs.runCommand "kanidm-branding-fonts"
+      {
+        nativeBuildInputs = [
+          (pkgs.python3.withPackages (ps: [
+            ps.fonttools
+            ps.brotli
+          ]))
+        ];
+      }
+      ''
+        mkdir $out
+        for f in IBMPlexSans-Regular IBMPlexSans-Medium IBMPlexSans-SemiBold \
+          IBMPlexSerif-Medium IBMPlexSerif-SemiBold IBMPlexSerif-SemiBoldItalic; do
+          python -m fontTools.subset ${pkgs.ibm-plex}/share/fonts/truetype/$f.ttf \
+            --unicodes="U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD" \
+            --layout-features='*' --flavor=woff2 --output-file=$out/$f.woff2
+        done
+      '';
   defaultScopes = [
     "openid"
     "email"
@@ -377,6 +401,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           "${backupDir}:/backup"
           "${certDir}:${certDir}:ro"
           "${./branding/override.css}:/hpkg/override.css:ro"
+          "${brandingFonts}:/hpkg/fonts:ro"
         ];
       };
 

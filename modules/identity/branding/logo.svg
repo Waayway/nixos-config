@@ -1,16 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- vanwaaij.com monogram: a rounded square in the foreground colour (zinc-900, or
-       zinc-50 in dark mode) with "vw" in the background colour. -->
+  <!-- vanwaaij.com monogram in Lodestar's mark: a disc in ink (#17233d, or the night
+       watch's #ebe3cd in dark mode) with "vw" in the serif italic of its wordmark, in
+       the paper colour. -->
   <style>
-    .mark { color: #18181b; }
-    .ink { fill: #fafafa; }
+    .mark { color: #17233d; }
+    .ink { fill: #f3eee1; }
     @media (prefers-color-scheme: dark) {
-      .mark { color: #fafafa; }
-      .ink { fill: #18181b; }
+      .mark { color: #ebe3cd; }
+      .ink { fill: #0e1626; }
     }
   </style>
   <g class="mark">
-    <rect width="64" height="64" rx="14" fill="currentColor"/>
-    <text class="ink" x="32" y="41" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif" font-size="28" font-weight="600" letter-spacing="-1">vw</text>
+    <circle cx="32" cy="32" r="32" fill="currentColor"/>
+    <text class="ink" x="31" y="41" text-anchor="middle" font-family="'IBM Plex Serif', Georgia, 'Times New Roman', serif" font-size="27" font-style="italic" font-weight="600" letter-spacing="0.5">vw</text>
   </g>
 </svg>

@@ -50,6 +50,7 @@ assert lib.any (v: lib.hasSuffix "-kanidm-server.toml:/data/server.toml:ro" v) c
 assert lib.any (
   v: lib.hasSuffix "override.css:/hpkg/override.css:ro" v && lib.hasPrefix "/nix/store/" v
 ) c.volumes;
+assert lib.any (v: lib.hasSuffix "-kanidm-branding-fonts:/hpkg/fonts:ro" v) c.volumes;
 assert lib.elem "/store/kanidm" cfg.systemd.services.docker-kanidm.unitConfig.RequiresMountsFor;
 assert !(cfg.fileSystems ? "/var/lib/identity/backup");
 # production (identity): backups on their own NFS share, mounted on first access

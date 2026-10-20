@@ -1,73 +1,155 @@
 /*
  * vanwaaij.com on top of Kanidm's UI (mounted over /hpkg/override.css, loaded after
- * Bootstrap 5.3 and Kanidm's style.css). A plain, shadcn/ui-like look: the neutral
- * zinc palette, light and dark. Kanidm's style.js sets data-bs-theme on <html> from
- * prefers-color-scheme; without JS the media query below does the same. Colours are
- * tokens (--vw-*) per mode, mapped once onto Bootstrap's variables, so every page
- * (login, apps list, settings) follows. Fonts: Inter if installed, else the system's;
- * nothing is loaded from elsewhere.
+ * Bootstrap 5.3 and Kanidm's style.css), in Lodestar's look: the "Nautical chart" of
+ * ~/lodestar (web/src/styles/tokens.css, docs/style-guide.md). Paper and ink in
+ * daylight, a dimmed chart table at night; one accent (the chart's red-brown) for focus;
+ * hairline rules, 4 px corners, no shadows. Kanidm's style.js sets data-bs-theme on
+ * <html> from prefers-color-scheme; without JS the media query below does the same.
+ * Colours are Lodestar's tokens (--ls-*, same names and values), mapped once onto
+ * Bootstrap's variables, so every page (login, apps, profile, credentials) follows.
+ * Fonts: IBM Plex Sans and Serif, Latin subsets served beside this file (/pkg/fonts,
+ * kanidm.nix); nothing is loaded from elsewhere.
  */
 
-/* --- tokens ------------------------------------------------------------------ */
+/* --- fonts (kanidm.nix: brandingFonts) ---------------------------------------- */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/IBMPlexSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/IBMPlexSans-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/IBMPlexSerif-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/IBMPlexSerif-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/IBMPlexSerif-SemiBoldItalic.woff2") format("woff2");
+}
+
+/* --- tokens: the chart (light) ------------------------------------------------ */
 :root,
 [data-bs-theme="light"] {
-  --vw-bg: #ffffff;
-  --vw-bg-rgb: 255, 255, 255;
-  --vw-fg: #09090b; /* zinc-950 */
-  --vw-fg-rgb: 9, 9, 11;
-  --vw-muted: #f4f4f5; /* zinc-100 */
-  --vw-muted-rgb: 244, 244, 245;
-  --vw-muted-fg: #71717a; /* zinc-500 */
-  --vw-muted-fg-rgb: 113, 113, 122;
-  --vw-border: #e4e4e7; /* zinc-200 */
-  --vw-input: #e4e4e7;
-  --vw-ring: #a1a1aa; /* zinc-400 */
-  --vw-primary: #18181b; /* zinc-900 */
-  --vw-primary-rgb: 24, 24, 27;
-  --vw-primary-hover: #27272a; /* zinc-800 */
-  --vw-primary-fg: #fafafa; /* zinc-50 */
-  --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fafafa'/%3e%3c/svg%3e");
+  --ls-bg: #f3eee1;
+  --ls-bg-rgb: 243, 238, 225;
+  --ls-panel: #fbf8f0;
+  --ls-chip: #ebe4d2;
+  --ls-chip-rgb: 235, 228, 210;
+  --ls-fg: #17233d;
+  --ls-fg-rgb: 23, 35, 61;
+  --ls-muted: #5d6577;
+  --ls-muted-rgb: 93, 101, 119;
+  --ls-line: #cfc5ad;
+  --ls-line-soft: #e3dcc8;
+  --ls-accent: #a8324a;
+  --ls-ok: #1f6e5b;
+  --ls-ok-rgb: 31, 110, 91;
+  --ls-warn: #8a5a00;
+  --ls-warn-rgb: 138, 90, 0;
+  --ls-bad: #a8261d;
+  --ls-bad-rgb: 168, 38, 29;
+  --ls-info: #1f4f8f;
+  --ls-info-rgb: 31, 79, 143;
+  --ls-btn-bg: #17233d;
+  --ls-btn-bg-rgb: 23, 35, 61;
+  --ls-btn-fg: #fbf8f0;
+  --ls-grid: rgba(23, 35, 61, 0.06);
+  --ls-overlay: rgba(23, 35, 61, 0.45);
+  /* Switch knobs (data URIs can't read variables): muted when off, btn-fg when on. */
+  --ls-knob-off: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%235d6577'/%3e%3c/svg%3e");
+  --ls-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fbf8f0'/%3e%3c/svg%3e");
   color-scheme: light;
 }
 
+/* --- tokens: the night watch (dark), twice so either way of choosing it works -- */
 [data-bs-theme="dark"] {
-  --vw-bg: #09090b; /* zinc-950 */
-  --vw-bg-rgb: 9, 9, 11;
-  --vw-fg: #fafafa; /* zinc-50 */
-  --vw-fg-rgb: 250, 250, 250;
-  --vw-muted: #27272a; /* zinc-800 */
-  --vw-muted-rgb: 39, 39, 42;
-  --vw-muted-fg: #a1a1aa; /* zinc-400 */
-  --vw-muted-fg-rgb: 161, 161, 170;
-  --vw-border: #27272a; /* zinc-800 */
-  --vw-input: #27272a;
-  --vw-ring: #52525b; /* zinc-600 */
-  --vw-primary: #fafafa;
-  --vw-primary-rgb: 250, 250, 250;
-  --vw-primary-hover: #e4e4e7; /* zinc-200 */
-  --vw-primary-fg: #18181b; /* zinc-900 */
-  --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2318181b'/%3e%3c/svg%3e");
+  --ls-bg: #0e1626;
+  --ls-bg-rgb: 14, 22, 38;
+  --ls-panel: #142035;
+  --ls-chip: #1c2a45;
+  --ls-chip-rgb: 28, 42, 69;
+  --ls-fg: #ebe3cd;
+  --ls-fg-rgb: 235, 227, 205;
+  --ls-muted: #a69e88;
+  --ls-muted-rgb: 166, 158, 136;
+  --ls-line: #2d3b58;
+  --ls-line-soft: #1f2c46;
+  --ls-accent: #e07a8c;
+  --ls-ok: #63c9a8;
+  --ls-ok-rgb: 99, 201, 168;
+  --ls-warn: #e2b25a;
+  --ls-warn-rgb: 226, 178, 90;
+  --ls-bad: #f07468;
+  --ls-bad-rgb: 240, 116, 104;
+  --ls-info: #86aee8;
+  --ls-info-rgb: 134, 174, 232;
+  --ls-btn-bg: #ebe3cd;
+  --ls-btn-bg-rgb: 235, 227, 205;
+  --ls-btn-fg: #0e1626;
+  --ls-grid: rgba(235, 227, 205, 0.045);
+  --ls-overlay: rgba(5, 9, 18, 0.6);
+  --ls-knob-off: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23a69e88'/%3e%3c/svg%3e");
+  --ls-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%230e1626'/%3e%3c/svg%3e");
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-bs-theme]) {
-    --vw-bg: #09090b;
-    --vw-bg-rgb: 9, 9, 11;
-    --vw-fg: #fafafa;
-    --vw-fg-rgb: 250, 250, 250;
-    --vw-muted: #27272a;
-    --vw-muted-rgb: 39, 39, 42;
-    --vw-muted-fg: #a1a1aa;
-    --vw-muted-fg-rgb: 161, 161, 170;
-    --vw-border: #27272a;
-    --vw-input: #27272a;
-    --vw-ring: #52525b;
-    --vw-primary: #fafafa;
-    --vw-primary-rgb: 250, 250, 250;
-    --vw-primary-hover: #e4e4e7;
-    --vw-primary-fg: #18181b;
-    --vw-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2318181b'/%3e%3c/svg%3e");
+    --ls-bg: #0e1626;
+    --ls-bg-rgb: 14, 22, 38;
+    --ls-panel: #142035;
+    --ls-chip: #1c2a45;
+    --ls-chip-rgb: 28, 42, 69;
+    --ls-fg: #ebe3cd;
+    --ls-fg-rgb: 235, 227, 205;
+    --ls-muted: #a69e88;
+    --ls-muted-rgb: 166, 158, 136;
+    --ls-line: #2d3b58;
+    --ls-line-soft: #1f2c46;
+    --ls-accent: #e07a8c;
+    --ls-ok: #63c9a8;
+    --ls-ok-rgb: 99, 201, 168;
+    --ls-warn: #e2b25a;
+    --ls-warn-rgb: 226, 178, 90;
+    --ls-bad: #f07468;
+    --ls-bad-rgb: 240, 116, 104;
+    --ls-info: #86aee8;
+    --ls-info-rgb: 134, 174, 232;
+    --ls-btn-bg: #ebe3cd;
+    --ls-btn-bg-rgb: 235, 227, 205;
+    --ls-btn-fg: #0e1626;
+    --ls-grid: rgba(235, 227, 205, 0.045);
+    --ls-overlay: rgba(5, 9, 18, 0.6);
+    --ls-knob-off: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23a69e88'/%3e%3c/svg%3e");
+    --ls-knob-on: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%230e1626'/%3e%3c/svg%3e");
     color-scheme: dark;
   }
 }
@@ -75,44 +157,103 @@
 /* --- Bootstrap's variables from the tokens ----------------------------------- */
 :root,
 [data-bs-theme] {
-  --bs-font-sans-serif: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-  --bs-body-font-family: var(--bs-font-sans-serif);
+  --ls-font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ls-display: "IBM Plex Serif", Georgia, serif;
+  --ls-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --ls-r: 4px;
+  --ls-r-sm: 3px;
+
+  --bs-font-sans-serif: var(--ls-font);
+  --bs-font-monospace: var(--ls-mono);
+  --bs-body-font-family: var(--ls-font);
   --bs-body-font-size: 0.875rem;
-  --bs-body-line-height: 1.5;
-  --bs-body-bg: var(--vw-bg);
-  --bs-body-bg-rgb: var(--vw-bg-rgb);
-  --bs-body-color: var(--vw-fg);
-  --bs-body-color-rgb: var(--vw-fg-rgb);
-  --bs-emphasis-color: var(--vw-fg);
-  --bs-emphasis-color-rgb: var(--vw-fg-rgb);
-  --bs-heading-color: var(--vw-fg);
-  --bs-secondary-color: var(--vw-muted-fg);
-  --bs-secondary-color-rgb: var(--vw-muted-fg-rgb);
-  --bs-tertiary-color: var(--vw-muted-fg);
-  --bs-secondary-bg: var(--vw-muted);
-  --bs-secondary-bg-rgb: var(--vw-muted-rgb);
-  --bs-tertiary-bg: var(--vw-muted);
-  --bs-tertiary-bg-rgb: var(--vw-muted-rgb);
-  --bs-border-color: var(--vw-border);
-  --bs-border-color-translucent: var(--vw-border);
-  --bs-border-radius: 6px;
-  --bs-border-radius-sm: 4px;
-  --bs-border-radius-lg: 8px;
-  --bs-primary: var(--vw-primary);
-  --bs-primary-rgb: var(--vw-primary-rgb);
-  --bs-link-color: var(--vw-fg);
-  --bs-link-color-rgb: var(--vw-fg-rgb);
-  --bs-link-hover-color: var(--vw-fg);
-  --bs-link-hover-color-rgb: var(--vw-fg-rgb);
-  --bs-focus-ring-color: color-mix(in srgb, var(--vw-ring) 50%, transparent);
-  --bs-card-bg: var(--vw-bg);
+  --bs-body-line-height: 1.45;
+  --bs-body-bg: var(--ls-bg);
+  --bs-body-bg-rgb: var(--ls-bg-rgb);
+  --bs-body-color: var(--ls-fg);
+  --bs-body-color-rgb: var(--ls-fg-rgb);
+  --bs-emphasis-color: var(--ls-fg);
+  --bs-emphasis-color-rgb: var(--ls-fg-rgb);
+  --bs-heading-color: var(--ls-fg);
+  --bs-secondary-color: var(--ls-muted);
+  --bs-secondary-color-rgb: var(--ls-muted-rgb);
+  --bs-tertiary-color: var(--ls-muted);
+  --bs-tertiary-color-rgb: var(--ls-muted-rgb);
+  --bs-secondary-bg: var(--ls-chip);
+  --bs-secondary-bg-rgb: var(--ls-chip-rgb);
+  --bs-tertiary-bg: var(--ls-chip);
+  --bs-tertiary-bg-rgb: var(--ls-chip-rgb);
+  --bs-border-color: var(--ls-line);
+  --bs-border-color-translucent: var(--ls-line);
+  --bs-border-radius: var(--ls-r);
+  --bs-border-radius-sm: var(--ls-r-sm);
+  --bs-border-radius-lg: var(--ls-r);
+  --bs-border-radius-xl: var(--ls-r);
+  --bs-border-radius-xxl: var(--ls-r);
+  --bs-box-shadow: none;
+  --bs-box-shadow-sm: none;
+  --bs-box-shadow-lg: none;
+  --bs-primary: var(--ls-btn-bg);
+  --bs-primary-rgb: var(--ls-btn-bg-rgb);
+  --bs-success: var(--ls-ok);
+  --bs-success-rgb: var(--ls-ok-rgb);
+  --bs-warning: var(--ls-warn);
+  --bs-warning-rgb: var(--ls-warn-rgb);
+  --bs-danger: var(--ls-bad);
+  --bs-danger-rgb: var(--ls-bad-rgb);
+  --bs-info: var(--ls-info);
+  --bs-info-rgb: var(--ls-info-rgb);
+  /* Alerts and subtle backgrounds: the tone on its wash, opaque over the panel (the
+   * chart grid never runs under text). */
+  --bs-primary-text-emphasis: var(--ls-fg);
+  --bs-primary-bg-subtle: var(--ls-chip);
+  --bs-primary-border-subtle: var(--ls-line);
+  --bs-secondary-text-emphasis: var(--ls-fg);
+  --bs-secondary-bg-subtle: var(--ls-chip);
+  --bs-secondary-border-subtle: var(--ls-line);
+  --bs-light-bg-subtle: var(--ls-panel);
+  --bs-dark-bg-subtle: var(--ls-chip);
+  --bs-success-text-emphasis: var(--ls-ok);
+  --bs-success-bg-subtle: color-mix(in srgb, var(--ls-ok) 12%, var(--ls-panel));
+  --bs-success-border-subtle: color-mix(in srgb, var(--ls-ok) 40%, var(--ls-panel));
+  --bs-warning-text-emphasis: var(--ls-warn);
+  --bs-warning-bg-subtle: color-mix(in srgb, var(--ls-warn) 16%, var(--ls-panel));
+  --bs-warning-border-subtle: color-mix(in srgb, var(--ls-warn) 40%, var(--ls-panel));
+  --bs-danger-text-emphasis: var(--ls-bad);
+  --bs-danger-bg-subtle: color-mix(in srgb, var(--ls-bad) 11%, var(--ls-panel));
+  --bs-danger-border-subtle: color-mix(in srgb, var(--ls-bad) 40%, var(--ls-panel));
+  --bs-info-text-emphasis: var(--ls-info);
+  --bs-info-bg-subtle: color-mix(in srgb, var(--ls-info) 11%, var(--ls-panel));
+  --bs-info-border-subtle: color-mix(in srgb, var(--ls-info) 40%, var(--ls-panel));
+  --bs-form-valid-color: var(--ls-ok);
+  --bs-form-valid-border-color: var(--ls-ok);
+  --bs-form-invalid-color: var(--ls-bad);
+  --bs-form-invalid-border-color: var(--ls-bad);
+  --bs-link-color: var(--ls-fg);
+  --bs-link-color-rgb: var(--ls-fg-rgb);
+  --bs-link-hover-color: var(--ls-accent);
+  --bs-link-hover-color-rgb: var(--ls-fg-rgb);
+  --bs-code-color: var(--ls-fg);
+  --bs-focus-ring-color: var(--ls-accent);
+  --bs-card-bg: var(--ls-panel);
+}
+
+/* The chart grid: 1 px lines every 32 px on <html>, so it covers the whole canvas.
+ * Panels sit on it opaque. */
+html {
+  background-color: var(--ls-bg);
+  background-image:
+    linear-gradient(var(--ls-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ls-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 body {
-  background: var(--vw-bg);
-  color: var(--vw-fg);
-  font-family: var(--bs-font-sans-serif);
+  background: transparent;
+  color: var(--ls-fg);
+  font-family: var(--ls-font);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -120,30 +261,70 @@ a {
   text-underline-offset: 3px;
 }
 
-h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
+/* Focus: 2 px accent outline, 2 px offset, everywhere (Lodestar's one rule). */
+:focus-visible,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.btn:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+h1, h2, h3, h4, h5, .h1, .h2, .h3, .h4, .h5 {
   font-weight: 600;
-  letter-spacing: -0.015em;
+}
+
+code, kbd, pre, samp {
+  font-feature-settings: "zero" 1;
+}
+
+/* Page headings (Applications, Profile, Credentials, …): a small-caps serif label with
+ * a rule running to the right edge, like Lodestar's section headings; the <hr> Kanidm
+ * puts under them is that rule now. */
+:is(main.container-lg, #settings-window) > div > h2:only-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--ls-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ls-muted);
+}
+
+:is(main.container-lg, #settings-window) > div > h2:only-child::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--ls-line);
+}
+
+:is(main.container-lg, #settings-window) > div:has(> h2:only-child) + hr {
+  visibility: hidden;
+  margin: 0.75rem 0;
+}
+
+hr {
+  border-color: var(--ls-line);
+  opacity: 1;
 }
 
 /* --- the login card ------------------------------------------------------------ */
+/* A panel on the chart: hairline border, panel fill, 4 px corners, no shadow. */
 .form-signin {
   width: calc(100% - 2rem);
-  max-width: 360px;
+  max-width: 380px;
   padding: 1.5rem;
-  border: 1px solid var(--vw-border);
-  border-radius: 8px;
-  background: var(--vw-bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--ls-line);
+  border-radius: var(--ls-r);
+  background: var(--ls-panel);
 }
 
 .form-signin > * {
   width: 100%;
-}
-
-.form-signin > h3 {
-  font-size: 1.125rem;
-  text-align: center;
-  margin: 0.5rem 0 1.25rem;
 }
 
 .kanidm_logo {
@@ -151,75 +332,165 @@ h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
   height: 40px;
 }
 
-.form-signin > .kanidm_logo {
+/* Logo and name side by side, like Lodestar's star disc and wordmark; the form under a
+ * rule. Only on the sign-in steps (logo, h3, form). */
+.form-signin:has(> .kanidm_logo + h3) {
+  display: grid !important;
+  grid-template-columns: 1fr 40px auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.form-signin:has(> .kanidm_logo + h3) > .kanidm_logo {
+  grid-column: 2;
   width: 40px;
 }
 
+.form-signin:has(> .kanidm_logo + h3) > h3 {
+  grid-column: 3;
+  width: auto;
+}
+
+.form-signin:has(> .kanidm_logo + h3) > :not(.kanidm_logo, h3) {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+}
+
+.form-signin:has(> .kanidm_logo + h3) > h3 + * {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--ls-line);
+}
+
+/* The domain's name in Lodestar's wordmark: serif italic 600. */
+.form-signin > h3,
+.form-signin center > h2 {
+  margin: 0;
+  font-family: var(--ls-display);
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.form-signin center > h3 {
+  margin: 1rem 0;
+  font-size: 15px;
+}
+
+/* Field labels as Lodestar's table headers: serif, small caps, muted. */
 .form-label {
-  font-weight: 500;
   margin-bottom: 0.375rem;
+  font-family: var(--ls-display);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ls-muted);
 }
 
 /* --- inputs and buttons -------------------------------------------------------- */
 .form-control,
 .form-select {
-  background-color: transparent;
-  border-color: var(--vw-input);
-  border-radius: 6px;
-  padding: 0.4375rem 0.75rem;
-  font-size: 0.875rem;
-  color: var(--vw-fg);
-}
-
-.input-group > .form-control:only-child {
-  border-radius: 6px;
+  min-height: 40px;
+  padding: 0.5rem 0.75rem;
+  border-color: var(--ls-line);
+  border-radius: var(--ls-r-sm);
+  background-color: var(--ls-bg);
+  color: var(--ls-fg);
+  font-size: 14px;
 }
 
 .form-control:focus,
-.form-select:focus,
-.form-check-input:focus,
-.btn:focus-visible {
-  border-color: var(--vw-ring);
-  outline: 0;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vw-ring) 35%, transparent);
+.form-select:focus {
+  border-color: var(--ls-line);
+  background-color: var(--ls-bg);
+  color: var(--ls-fg);
 }
 
+.form-control::placeholder {
+  color: var(--ls-muted);
+}
+
+.input-group > .form-control:only-child {
+  border-radius: var(--ls-r-sm);
+}
+
+/* Buttons: square-ish corners, 600 weight, 13 px, at least 40 px high. */
 .btn {
-  --bs-btn-font-size: 0.875rem;
-  --bs-btn-font-weight: 500;
-  --bs-btn-padding-y: 0.4375rem;
-  --bs-btn-padding-x: 1rem;
-  --bs-btn-border-radius: 6px;
-  --bs-btn-focus-box-shadow: 0 0 0 3px color-mix(in srgb, var(--vw-ring) 35%, transparent);
+  --bs-btn-font-family: var(--ls-font);
+  --bs-btn-font-size: 13px;
+  --bs-btn-font-weight: 600;
+  --bs-btn-line-height: 1.4;
+  --bs-btn-padding-y: 0.5rem;
+  --bs-btn-padding-x: 0.875rem;
+  --bs-btn-border-radius: var(--ls-r-sm);
+  --bs-btn-focus-box-shadow: none;
+  --bs-btn-disabled-opacity: 0.5;
+  min-height: 40px;
 }
 
-.btn-primary {
-  --bs-btn-color: var(--vw-primary-fg);
-  --bs-btn-bg: var(--vw-primary);
-  --bs-btn-border-color: var(--vw-primary);
-  --bs-btn-hover-color: var(--vw-primary-fg);
-  --bs-btn-hover-bg: var(--vw-primary-hover);
-  --bs-btn-hover-border-color: var(--vw-primary-hover);
-  --bs-btn-active-color: var(--vw-primary-fg);
-  --bs-btn-active-bg: var(--vw-primary-hover);
-  --bs-btn-active-border-color: var(--vw-primary-hover);
-  --bs-btn-disabled-color: var(--vw-primary-fg);
-  --bs-btn-disabled-bg: var(--vw-primary);
-  --bs-btn-disabled-border-color: var(--vw-primary);
+.btn-sm,
+.btn-tiny {
+  --bs-btn-font-size: 12.5px;
+  min-height: 0;
 }
 
+/* The solid ink button, for the one action (Kanidm's "Save Changes" is btn-success). */
+.btn-primary,
+.btn-success {
+  --bs-btn-color: var(--ls-btn-fg);
+  --bs-btn-bg: var(--ls-btn-bg);
+  --bs-btn-border-color: var(--ls-btn-bg);
+  --bs-btn-hover-color: var(--ls-btn-fg);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--ls-btn-bg) 90%, var(--ls-panel));
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--ls-btn-bg) 90%, var(--ls-panel));
+  --bs-btn-active-color: var(--ls-btn-fg);
+  --bs-btn-active-bg: color-mix(in srgb, var(--ls-btn-bg) 90%, var(--ls-panel));
+  --bs-btn-active-border-color: color-mix(in srgb, var(--ls-btn-bg) 90%, var(--ls-panel));
+  --bs-btn-disabled-color: var(--ls-btn-fg);
+  --bs-btn-disabled-bg: var(--ls-btn-bg);
+  --bs-btn-disabled-border-color: var(--ls-btn-bg);
+}
+
+/* Outlined beside it: hairline border, chip fill on hover (Kanidm's yellow "Add
+ * Password" too: Lodestar keeps state colours for states). */
 .btn-secondary,
 .btn-outline-secondary,
-.btn-outline-primary {
-  --bs-btn-color: var(--vw-fg);
+.btn-outline-primary,
+.btn-light,
+.btn-warning,
+.btn-outline-warning,
+.btn-outline-success,
+.btn-outline-dark,
+.btn-outline-light {
+  --bs-btn-color: var(--ls-fg);
   --bs-btn-bg: transparent;
-  --bs-btn-border-color: var(--vw-border);
-  --bs-btn-hover-color: var(--vw-fg);
-  --bs-btn-hover-bg: var(--vw-muted);
-  --bs-btn-hover-border-color: var(--vw-border);
-  --bs-btn-active-color: var(--vw-fg);
-  --bs-btn-active-bg: var(--vw-muted);
-  --bs-btn-active-border-color: var(--vw-border);
+  --bs-btn-border-color: var(--ls-line);
+  --bs-btn-hover-color: var(--ls-fg);
+  --bs-btn-hover-bg: var(--ls-chip);
+  --bs-btn-hover-border-color: var(--ls-line);
+  --bs-btn-active-color: var(--ls-fg);
+  --bs-btn-active-bg: var(--ls-chip);
+  --bs-btn-active-border-color: var(--ls-line);
+  --bs-btn-disabled-color: var(--ls-fg);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--ls-line);
+}
+
+.btn-danger,
+.btn-outline-danger {
+  --bs-btn-color: var(--ls-bad);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: color-mix(in srgb, var(--ls-bad) 45%, var(--ls-panel));
+  --bs-btn-hover-color: var(--ls-bad);
+  --bs-btn-hover-bg: var(--bs-danger-bg-subtle);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--ls-bad) 45%, var(--ls-panel));
+  --bs-btn-active-color: var(--ls-bad);
+  --bs-btn-active-bg: var(--bs-danger-bg-subtle);
+  --bs-btn-active-border-color: var(--ls-bad);
 }
 
 /* The login form's submit button spans the card. */
@@ -232,76 +503,240 @@ h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
   margin-bottom: 0 !important;
 }
 
-/* Switches and checkboxes in the primary colour. */
+/* Switches and checkboxes in ink. */
 .form-check-input {
-  border-color: var(--vw-input);
-  background-color: transparent;
+  border-color: var(--ls-line);
+  background-color: var(--ls-bg);
 }
 
 .form-check-input:checked {
-  background-color: var(--vw-primary);
-  border-color: var(--vw-primary);
+  border-color: var(--ls-btn-bg);
+  background-color: var(--ls-btn-bg);
 }
 
+.form-switch .form-check-input,
 .form-switch .form-check-input:focus {
-  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23a1a1aa'/%3e%3c/svg%3e");
+  --bs-form-switch-bg: var(--ls-knob-off);
 }
 
 .form-switch .form-check-input:checked {
-  --bs-form-switch-bg: var(--vw-knob-on);
+  --bs-form-switch-bg: var(--ls-knob-on);
 }
 
 .form-check-label {
-  color: var(--vw-muted-fg);
+  color: var(--ls-muted);
 }
 
-/* --- cards, alerts, navigation (the pages after login) ------------------------- */
+/* --- panels: cards, alerts, modals, lists, tables ----------------------------- */
 .card {
-  --bs-card-border-color: var(--vw-border);
-  --bs-card-border-radius: 8px;
-  --bs-card-inner-border-radius: 7px;
-  --bs-card-bg: var(--vw-bg);
+  --bs-card-bg: var(--ls-panel);
+  --bs-card-border-color: var(--ls-line);
+  --bs-card-border-radius: var(--ls-r);
+  --bs-card-inner-border-radius: var(--ls-r-sm);
+  --bs-card-cap-bg: var(--ls-chip);
+}
+
+/* App tiles: the whole card is the link; it takes the chip fill on hover. */
+.card:has(> a.stretched-link) {
+  transition: background-color 0.15s;
+}
+
+.card:has(> a.stretched-link:hover) {
+  --bs-card-bg: var(--ls-chip);
+}
+
+.card > label {
+  padding: 0 0.75rem 0.75rem;
+  font-weight: 600;
 }
 
 .alert {
-  --bs-alert-border-radius: 8px;
+  --bs-alert-border-radius: var(--ls-r);
 }
 
+.modal {
+  --bs-modal-bg: var(--ls-panel);
+  --bs-modal-border-color: var(--ls-line);
+  --bs-modal-border-radius: var(--ls-r);
+  --bs-modal-inner-border-radius: var(--ls-r-sm);
+  --bs-modal-header-border-color: var(--ls-line);
+  --bs-modal-footer-border-color: var(--ls-line);
+  --bs-modal-box-shadow: none;
+}
+
+.modal-backdrop {
+  --bs-backdrop-bg: var(--ls-overlay);
+  --bs-backdrop-opacity: 1;
+}
+
+.modal-title {
+  font-family: var(--ls-display);
+  font-weight: 600;
+}
+
+.dropdown-menu {
+  --bs-dropdown-bg: var(--ls-panel);
+  --bs-dropdown-border-color: var(--ls-line);
+  --bs-dropdown-border-radius: var(--ls-r);
+  --bs-dropdown-link-hover-bg: var(--ls-chip);
+  --bs-dropdown-link-active-bg: var(--ls-chip);
+  --bs-dropdown-link-active-color: var(--ls-fg);
+}
+
+.list-group {
+  --bs-list-group-bg: var(--ls-panel);
+  --bs-list-group-border-color: var(--ls-line);
+  --bs-list-group-border-radius: var(--ls-r);
+  --bs-list-group-action-hover-bg: var(--ls-chip);
+  --bs-list-group-active-bg: var(--ls-chip);
+  --bs-list-group-active-color: var(--ls-fg);
+  --bs-list-group-active-border-color: var(--ls-line);
+}
+
+.table {
+  --bs-table-bg: var(--ls-panel);
+  --bs-table-border-color: var(--ls-line-soft);
+}
+
+.badge {
+  --bs-badge-border-radius: var(--ls-r-sm);
+  --bs-badge-font-weight: 600;
+}
+
+/* --- navigation (the pages after sign-in) ------------------------------------- */
+/* Lodestar's header: the logo and wordmark, the page tabs on a row under them, a rule
+ * under the tabs (from 768 px; below, Kanidm's collapsed menu). Straight on the chart,
+ * no bar. */
 .navbar,
-nav.bg-body-tertiary,
-footer.bg-body-tertiary {
-  background-color: var(--vw-bg) !important;
+nav.bg-body-tertiary {
+  --bs-navbar-color: var(--ls-muted);
+  --bs-navbar-hover-color: var(--ls-fg);
+  --bs-navbar-active-color: var(--ls-fg);
+  --bs-navbar-brand-color: var(--ls-fg);
+  --bs-navbar-brand-hover-color: var(--ls-fg);
+  background-color: transparent !important;
+  padding-top: 28px;
 }
 
-.navbar {
-  border-bottom: 1px solid var(--vw-border);
+nav a.navbar-brand {
+  color: var(--ls-fg);
+}
+
+.navbar-brand {
+  font-family: var(--ls-display);
+  font-size: 24px;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.navbar-brand > .ps-2 {
+  padding-left: 12px !important;
+}
+
+.navbar .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The tabs' icons (Lucide, as in Lodestar): layout-grid, user-round, log-out. */
+.navbar .nav-link::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: var(--ls-tab-icon) center / contain no-repeat;
+  mask: var(--ls-tab-icon) center / contain no-repeat;
+}
+
+.navbar .nav-link:not([href="/ui/apps"], [href="/ui/profile"], [data-bs-target="#signoutModal"])::before {
+  content: none;
+}
+
+.navbar .nav-link[href="/ui/apps"] {
+  --ls-tab-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3crect width='7' height='7' x='3' y='3' rx='1'/%3e%3crect width='7' height='7' x='14' y='3' rx='1'/%3e%3crect width='7' height='7' x='14' y='14' rx='1'/%3e%3crect width='7' height='7' x='3' y='14' rx='1'/%3e%3c/svg%3e");
+}
+
+.navbar .nav-link[href="/ui/profile"] {
+  --ls-tab-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3ccircle cx='12' cy='8' r='5'/%3e%3cpath d='M20 21a8 8 0 0 0-16 0'/%3e%3c/svg%3e");
+}
+
+.navbar .nav-link[data-bs-target="#signoutModal"] {
+  --ls-tab-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m16 17 5-5-5-5'/%3e%3cpath d='M21 12H9'/%3e%3cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3e%3c/svg%3e");
+}
+
+@media (min-width: 768px) {
+  .navbar > .container-lg {
+    flex-wrap: wrap;
+    row-gap: 16px;
+  }
+
+  .navbar-expand-md .navbar-collapse {
+    flex-basis: 100%;
+    align-self: stretch;
+    border-bottom: 1px solid var(--ls-line);
+  }
+
+  .navbar-expand-md .navbar-nav .nav-link {
+    margin-bottom: -1px;
+    padding: 8px 12px;
+    border-bottom: 2px solid transparent;
+  }
+
+  /* The current tab: ink underline on the rule. Kanidm marks no link as current, so it
+   * is read from the page: the settings window means Profile, else Applications. */
+  body:has(#settings-window) .navbar .nav-link[href="/ui/profile"],
+  body:not(:has(#settings-window)) .navbar .nav-link[href="/ui/apps"] {
+    border-bottom-color: var(--ls-fg);
+    color: var(--ls-fg);
+  }
+
+  .navbar {
+    padding-bottom: 0;
+  }
+}
+
+/* The profile pages' side menu: chip fill for hover and the current item. */
+.side-menu-item {
+  border-radius: var(--ls-r-sm) !important;
+  color: var(--ls-fg);
+}
+
+.side-menu-item.active {
+  box-shadow: inset 2px 0 0 var(--ls-fg);
 }
 
 /* --- footer -------------------------------------------------------------------- */
 .footer {
-  font-size: 0.75rem;
+  font-size: 12px;
   padding-block: 1rem !important;
   text-align: center !important;
+  background-color: transparent !important;
 }
 
 .footer,
 .footer a {
-  color: var(--vw-muted-fg) !important;
+  color: var(--ls-muted) !important;
 }
 
 /* --- credential reset (/ui/reset with a token: credentials_reset.html) ---------- */
 /* Kanidm puts this page in a full-width container with the form padded left, so it
- * sits against the left edge under a centred heading. Here it's one centred card like
+ * sits against the left edge under a centred heading. Here it's one centred panel like
  * the login. Scoped by the form it holds; the settings page's Credentials tab (same
  * form, in #settings-window) and the apps page are untouched. */
 body > main.container-lg:has(> div > #credentialUpdateDynamicSection) {
   width: calc(100% - 2rem);
   max-width: 560px;
   padding: 1.5rem;
-  border: 1px solid var(--vw-border);
-  border-radius: 8px;
-  background: var(--vw-bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--ls-line);
+  border-radius: var(--ls-r);
+  background: var(--ls-panel);
 }
 
 body > main.container-lg:has(> div > #credentialUpdateDynamicSection) > div:has(> #credentialUpdateDynamicSection) {
@@ -313,8 +748,33 @@ body > main.container-lg:has(> div > #credentialUpdateDynamicSection) #credentia
   padding-bottom: 0 !important;
 }
 
+/* Its heading in the wordmark's serif italic. */
+body > main.container-lg:has(> div > #credentialUpdateDynamicSection) > .text-center > h3 {
+  font-family: var(--ls-display);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
 /* The save bar: Kanidm hard-codes a white background (wrong in dark mode). */
 #cred-update-commit-bar {
-  background: var(--vw-bg);
-  border-color: var(--vw-border);
+  background: var(--ls-panel);
+  border-color: var(--ls-line);
+}
+
+/* Its black save icon, light on the night watch. */
+[data-bs-theme="dark"] #cred-update-commit-bar img {
+  filter: invert(0.9);
+}
+
+/* The TOTP box's neumorphic shadow is white on white; flat chip here. */
+.totp-display-container {
+  border-radius: var(--ls-r);
+  background-color: var(--ls-chip);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:has(> a.stretched-link) {
+    transition: none;
+  }
 }

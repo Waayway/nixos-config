@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Services (Lodestar's Services tab): a 2x2 grid in the zinc style of logo.svg, a
-       rounded square in the foreground colour (zinc-900, or zinc-50 in dark mode) with
-       the grid in the background colour. -->
+  <!-- Services (Lodestar's Services tab): its Lucide layout-grid icon in the paper
+       colour on a rounded square in ink (#17233d, or the night watch's #ebe3cd in dark
+       mode), the colours of logo.svg. -->
   <style>
-    .mark { color: #18181b; }
-    .ink { fill: #fafafa; }
+    .mark { color: #17233d; }
+    .ink { stroke: #f3eee1; }
     @media (prefers-color-scheme: dark) {
-      .mark { color: #fafafa; }
-      .ink { fill: #18181b; }
+      .mark { color: #ebe3cd; }
+      .ink { stroke: #0e1626; }
     }
   </style>
   <g class="mark">
     <rect width="64" height="64" rx="14" fill="currentColor"/>
-    <g class="ink">
-      <rect x="17" y="17" width="13" height="13" rx="3"/>
-      <rect x="34" y="17" width="13" height="13" rx="3"/>
-      <rect x="17" y="34" width="13" height="13" rx="3"/>
-      <rect x="34" y="34" width="13" height="13" rx="3"/>
+    <g class="ink" transform="translate(14 14) scale(1.5)" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="7" height="7" x="3" y="3" rx="1"/>
+      <rect width="7" height="7" x="14" y="3" rx="1"/>
+      <rect width="7" height="7" x="14" y="14" rx="1"/>
+      <rect width="7" height="7" x="3" y="14" rx="1"/>
     </g>
   </g>
 </svg>
