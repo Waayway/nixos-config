@@ -29,10 +29,13 @@
       enable = true;
       live = true;
       configDir = "/store/jellyfin/config";
+      # Intel Arc A380 passed through from pve (mapping ArcA380, q35).
+      gpu = true;
     };
     homelab.immich = {
       enable = true;
       live = true;
+      gpu = true;
     };
   };
 
