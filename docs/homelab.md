@@ -237,6 +237,7 @@ last survey. The `hostpci0` mapping WX7100 is still set on the VM.
   |---|---|---|---|
   | `archive/internal` | 96 KiB | NFS | empty |
   | `archive/shares` | 3.26 TiB | SMB `archive` + NFS (`jellyfin` subfolder) | incl. `jellyfin` (3.3 TB media library) |
+  | `store/authentication` | empty | NFS, 10.0.10.111 only | Kanidm's online backups (root `65534:65534 0700`, root squashed) |
   | `store/internal` | 299.6 GiB | NFS | `nextcloud` 248 GB, `immich` 52 GB, `jellyfin` config 152 MB, `garage` empty, `db-dumps/` |
   | `store/proxmox-vms` (zvol) | 74.6 GiB | iSCSI | VM disks behind `store-lvm` (not backed up) |
   | `store/shares` | 300.2 GiB | SMB `store` | SMB shares |

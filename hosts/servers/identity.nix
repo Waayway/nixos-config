@@ -18,12 +18,13 @@
 
   fleet = true;
 
-  # Kanidm at id.vanwaaij.com (modules/identity/); online backups to /store/kanidm.
+  # Kanidm at id.vanwaaij.com (modules/identity/); online backups to TrueNAS
+  # store/authentication, exported to this VM only (modules/truenas/homelab.nix).
   options = {
-    homelab.storage.enable = true;
     homelab.identity = {
       enable = true;
       domain = "id.vanwaaij.com";
+      backupNfs = "10.0.10.130:/mnt/store/authentication";
     };
   };
 

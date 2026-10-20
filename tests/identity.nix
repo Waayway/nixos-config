@@ -1,6 +1,7 @@
 # Evaluation check of the identity module (modules/identity/kanidm.nix) on router-test
 # (`homelab.identity = { enable = true; domain = "id-test.vanwaaij.com"; acmeStaging = true; }`):
-# the Kanidm container and its server.toml, the provisioning and policy oneshots, the
+# the Kanidm container and its server.toml, the backups (/store/kanidm here, their own
+# NFS share on identity), the provisioning and policy oneshots, the
 # rendered kanidm-provision state, the ACME certificate, and evaluation failing for a
 # member missing from `homelab.people` and for an app in both the flake and extraAccess.
 {
@@ -14,6 +15,8 @@ let
   id = cfg.homelab.identity;
   domain = "id-test.vanwaaij.com";
   c = cfg.virtualisation.oci-containers.containers.kanidm;
+  prod = nixosConfigurations.identity.config;
+  pc = prod.virtualisation.oci-containers.containers.kanidm;
   s = id.serverSettings;
   state = id.provisionState;
   provision = cfg.systemd.services.kanidm-provision;
@@ -48,6 +51,25 @@ assert lib.any (
   v: lib.hasSuffix "override.css:/hpkg/override.css:ro" v && lib.hasPrefix "/nix/store/" v
 ) c.volumes;
 assert lib.elem "/store/kanidm" cfg.systemd.services.docker-kanidm.unitConfig.RequiresMountsFor;
+assert !(cfg.fileSystems ? "/var/lib/identity/backup");
+# production (identity): backups on their own NFS share, mounted on first access
+assert lib.elem "/var/lib/identity/backup:/backup" pc.volumes;
+assert !(lib.any (lib.hasPrefix "/store/") pc.volumes);
+assert lib.elem "/var/lib/identity/backup"
+  prod.systemd.services.docker-kanidm.unitConfig.RequiresMountsFor;
+assert
+  prod.fileSystems."/var/lib/identity/backup".device == "10.0.10.130:/mnt/store/authentication";
+assert prod.fileSystems."/var/lib/identity/backup".fsType == "nfs";
+assert lib.all (o: lib.elem o prod.fileSystems."/var/lib/identity/backup".options) [
+  "_netdev"
+  "x-systemd.automount"
+];
+assert
+  !(lib.any (lib.hasPrefix "x-systemd.idle-timeout")
+    prod.fileSystems."/var/lib/identity/backup".options
+  );
+assert lib.elem "nfs" (lib.attrNames (lib.filterAttrs (_: v: v) prod.boot.supportedFilesystems));
+assert prod.homelab.identity.serverSettings.online_backup.path == "/backup";
 # server.toml
 assert s.version == "2";
 assert s.domain == domain;

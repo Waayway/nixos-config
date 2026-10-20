@@ -55,6 +55,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       # share, open to the LAN.
       nfsShares.archive-shares.path = "/mnt/archive/shares";
 
+      # Kanidm's online backups (modules/identity/kanidm.nix, `backupNfs`), for the
+      # identity VM only; root squashed, the dataset's root is 65534:65534 0700.
+      nfsShares.authentication = {
+        path = "/mnt/store/authentication";
+        hosts = [ "10.0.10.111" ];
+      };
+
       # TrueNAS 26 has no SMART test schedules of its own. Errors go out by mail.
       cronJobs = {
         smart-short = {

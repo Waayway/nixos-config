@@ -34,7 +34,11 @@
 # Provisioning talks to the LAN address with `--accept-invalid-certs`: the traffic
 # never leaves the host, and on a test VM the certificate is from Let's Encrypt
 # staging (untrusted). Data: /var/lib/identity/kanidm; online backups (daily, 7
-# kept) to /store/kanidm. Upgrades go one minor at a time (renovate.json).
+# kept) to /store/kanidm, or with `backupNfs` to an NFS share of their own mounted at
+# /var/lib/identity/backup (production: TrueNAS store/authentication, exported to
+# this VM only). Either way root is squashed on TrueNAS, so the backups are written
+# as 65534 and the directory must be that user's. Upgrades go one minor at a time
+# (renovate.json).
 let
   cfg = config.homelab.identity;
   lan = config.homelab.lan;
@@ -45,7 +49,7 @@ let
   toolsImage = "kanidm/tools:1.11.2@sha256:144783fc589ac9611f6149f54f95d0d9472c1bf6078e7ed5781be441bcca7d24";
 
   dataDir = "/var/lib/identity/kanidm";
-  backupDir = "/store/kanidm";
+  backupDir = if cfg.backupNfs == null then "/store/kanidm" else "/var/lib/identity/backup";
   certDir = "/var/lib/acme/${cfg.domain}";
   url = "https://${lan.address}:8443";
   defaultScopes = [
@@ -257,6 +261,17 @@ lib.optionalAttrs hostPlatform.isLinux {
       description = "Host of the router's sign-in gate (oauth2-proxy); its callback is the `oauth2-proxy` client's redirect.";
     };
 
+    backupNfs = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "10.0.10.130:/mnt/store/authentication";
+      description = ''
+        NFS export for the online backups, mounted at /var/lib/identity/backup; null
+        keeps them in /store/kanidm (needs `homelab.storage.enable`). The export's root
+        must be writable by 65534 (root is squashed).
+      '';
+    };
+
     extraAccess = lib.mkOption {
       type = lib.types.attrsOf accessType;
       default = { };
@@ -321,6 +336,22 @@ lib.optionalAttrs hostPlatform.isLinux {
         # The certificate (self-signed until Let's Encrypt's arrives) must exist.
         wants = [ "acme-${cfg.domain}.service" ];
         after = [ "acme-${cfg.domain}.service" ];
+        # /store/… gets this from modules/services/docker.nix.
+        unitConfig.RequiresMountsFor = lib.mkIf (cfg.backupNfs != null) [ backupDir ];
+      };
+
+      # Mounted on first access, like modules/homelab/storage.nix, and for the same
+      # reason without x-systemd.idle-timeout (the container's bind mount looks idle
+      # to the host; an expired mount would stop the container).
+      boot.supportedFilesystems = lib.mkIf (cfg.backupNfs != null) [ "nfs" ];
+      fileSystems."/var/lib/identity/backup" = lib.mkIf (cfg.backupNfs != null) {
+        device = cfg.backupNfs;
+        fsType = "nfs";
+        options = [
+          "_netdev"
+          "nofail"
+          "x-systemd.automount"
+        ];
       };
 
       systemd.tmpfiles.settings.identity.${dataDir}.d = {
