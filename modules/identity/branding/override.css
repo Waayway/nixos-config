@@ -171,7 +171,7 @@ h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
   color: var(--vw-fg);
 }
 
-.input-group > .form-control {
+.input-group > .form-control:only-child {
   border-radius: 6px;
 }
 
@@ -268,7 +268,8 @@ h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
 }
 
 .navbar,
-.bg-body-tertiary {
+nav.bg-body-tertiary,
+footer.bg-body-tertiary {
   background-color: var(--vw-bg) !important;
 }
 
