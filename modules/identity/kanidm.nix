@@ -16,13 +16,14 @@
 # NixOS, modules/identity/access.nix) are rendered into a kanidm-provision state
 # (`provisionState`): every person, a group `admins` and a group `<app>-users` per
 # app, an OAuth2 client per app with `oidc`, and `oauth2-proxy` (the router's sign-in
-# gate) whose scope maps admit every gated app's group. `kanidm-provision` applies it
-# after every start of the container and on every change; `--no-auto-remove`, so
-# what exists only in Kanidm is never deleted. Two consequences: the members of
-# `admins` and every `<app>-users` group are overwritten from Nix on every run
-# (kanidm-provision's `overwriteMembers` default; members added in Kanidm by hand are
-# removed), and an app removed from access keeps its group, OAuth2 client and scope
-# map in Kanidm until deleted there by hand.
+# gate, "Services" in the app list, landing on `servicesUrl`) whose scope maps admit
+# every gated app's group. `kanidm-provision` applies it after every start of the
+# container and on every change; `--no-auto-remove`, so what exists only in Kanidm is
+# never deleted. Two consequences: the members of `admins` and every `<app>-users`
+# group are overwritten from Nix on every run (kanidm-provision's `overwriteMembers`
+# default; members added in Kanidm by hand are removed), and an app removed from
+# access keeps its group, OAuth2 client and scope map in Kanidm until deleted there by
+# hand.
 #
 # No admin password is stored anywhere: each run gets a fresh one from the container
 # (`kanidmd scripting recover-account`, over its admin socket) and passes it on in
@@ -112,10 +113,12 @@ let
         scopeMaps."${app}-users" = a.oidc.scopes;
       }) (lib.filterAttrs (_: a: a.oidc != null) access)
       // {
+        # The gate has no page of its own; its tile in the app list opens Lodestar's
+        # service overview. The redirect stays the gate's callback.
         oauth2-proxy = {
-          displayName = "Sign-in gate";
+          displayName = "Services";
           originUrl = [ "https://${cfg.gateHost}/oauth2/callback" ];
-          originLanding = "https://${cfg.gateHost}/";
+          originLanding = withSlash cfg.servicesUrl;
           scopeMaps = lib.mapAttrs' (app: _: lib.nameValuePair "${app}-users" defaultScopes) (
             lib.filterAttrs (_: a: a.gate) access
           );
@@ -259,6 +262,16 @@ lib.optionalAttrs hostPlatform.isLinux {
           "auth${lib.optionalString (lib.elemAt m 0 != null) (lib.elemAt m 0)}.${lib.elemAt m 1}";
       defaultText = lib.literalMD "`auth.vanwaaij.com` for `id.vanwaaij.com`, `auth-test.…` for `id-test.…`";
       description = "Host of the router's sign-in gate (oauth2-proxy); its callback is the `oauth2-proxy` client's redirect.";
+    };
+
+    servicesUrl = lib.mkOption {
+      type = lib.types.str;
+      default = "http://nixos-manager:8080/#/services";
+      description = ''
+        Where the "Services" tile in Kanidm's app list (the `oauth2-proxy` client's
+        landing) goes: Lodestar's Services tab. Over the tailnet until Lodestar has a
+        public name.
+      '';
     };
 
     backupNfs = lib.mkOption {
