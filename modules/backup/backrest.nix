@@ -167,11 +167,12 @@ lib.optionalAttrs hostPlatform.isLinux {
     networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cfg.port ];
 
     # On the front door as backrest.vanwaaij.com, tailnet only (the router reaches it
-    # over the tailnet).
+    # over the tailnet), behind the sign-in gate (Backrest's own login stays behind it).
     homelab.routes.backrest = {
       host = "backrest.vanwaaij.com";
       backend = "http://${cfg.listenAddress}:${toString cfg.port}";
       public = false;
+      auth.gate = true;
     };
 
     environment.systemPackages = [ index ];

@@ -274,7 +274,7 @@ last survey. The `hostpci0` mapping WX7100 is still set on the VM.
 
 ### 201 archipelago (`ap.vanwaaij.com`)
 
-- 2 vCPU. Routed by the router (`archipelago`, basic auth).
+- 2 vCPU. Routed by the router (`archipelago`, behind the sign-in gate).
 
 - Docker compose in `/opt/archipelago/deploy`: nginx (10.0.10.201:8080) + web +
   multiworld, image `archipelago-base` built from `/opt/archipelago/src`.
