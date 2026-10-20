@@ -149,11 +149,37 @@ lib.optionalAttrs hostPlatform.isLinux {
       maintenance = !cfg.live;
     };
 
-    # Who may sign in (Kanidm group immich-users); OIDC comes with the app's login.
-    homelab.access.immich.members = [
-      "thijs"
-      "arie"
-    ];
+    # Who may sign in (Kanidm group immich-users) and "Log in with vanwaaij.com".
+    # Immich's OAuth settings live in its database (system_metadata `system-config`,
+    # key `oauth`), not here: Immich keeps every setting in one place, and a config
+    # file (IMMICH_CONFIG_FILE) would take all of them out of the admin UI. Set once:
+    # issuer https://id.vanwaaij.com/oauth2/openid/immich, client `immich`, the secret
+    # from 1Password Homelab `kanidm-oauth2-immich` (scripts/kanidm-oauth2-secret.sh),
+    # signing algorithm ES256 (Kanidm's), autoRegister off. Immich links a login to
+    # the account with the token's email (Kanidm's address of the person), so only
+    # people with an Immich account can sign in. PKCE: Immich sends S256. The phone
+    # app's redirect is the custom scheme app.immich:///oauth-callback; the web's are
+    # /auth/login and /user-settings (linking an account from the settings page).
+    homelab.access.immich = {
+      members = [
+        "thijs"
+        "arie"
+      ];
+      oidc = {
+        originUrls = [
+          "https://${host}/auth/login"
+          "https://${host}/user-settings"
+          "app.immich:///oauth-callback"
+        ];
+        originLanding = "https://${host}/";
+        icon = ../identity/branding/icons/immich.svg;
+        scopes = [
+          "openid"
+          "email"
+          "profile"
+        ];
+      };
+    };
 
     lodestar.links.immich = {
       title = "Immich";
