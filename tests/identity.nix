@@ -128,9 +128,11 @@ assert lib.all (app: state.groups."${app}-users".members == everyone) [
   "immich"
   "jellyfin"
 ];
-# the apps on prod come from its configuration (tools.accessFrom), without OIDC yet
+# the apps on prod come from its configuration (tools.accessFrom), with their OIDC clients
 assert id.access.nextcloud.declaredBy == "prod";
-assert id.access.jellyfin.oidc == null;
+assert lib.elem "https://jellyfin.vanwaaij.com/sso/OID/redirect/kanidm"
+  state.systems.oauth2.jellyfin.originUrl;
+assert state.systems.oauth2.jellyfin.preferShortUsername;
 assert
   state.systems.oauth2.proxmox.scopeMaps == {
     proxmox-users = [

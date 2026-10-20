@@ -89,11 +89,32 @@ lib.optionalAttrs hostPlatform.isLinux {
       maintenance = !cfg.live;
     };
 
-    # Who may sign in (Kanidm group jellyfin-users); OIDC comes with the app's login.
-    homelab.access.jellyfin.members = [
-      "thijs"
-      "arie"
-    ];
+    # Who may sign in (Kanidm group jellyfin-users), and "Log in with vanwaaij.com" in
+    # the browser through the SSO plugin (9p4/jellyfin-plugin-sso, provider `kanidm`).
+    # The plugin and its configuration are Jellyfin state, not Nix: installed by hand
+    # into ${cfg.configDir}/plugins/SSO-Auth_<version>, configured in
+    # plugins/configurations/SSO-Auth.xml (issuer https://id.vanwaaij.com/oauth2/openid/jellyfin,
+    # client `jellyfin`, secret from 1Password `kanidm-oauth2-jellyfin`, user name
+    # `preferred_username`, roles from `groups`: admins → administrator), the login
+    # link in config/branding.xml (LoginDisclaimer). Existing Jellyfin users are tied
+    # to Kanidm names by the plugin's CanonicalLinks (thijs → Thijs). TV and phone apps
+    # keep password and Quick Connect. The plugin's start path `/sso/OID/start/kanidm`
+    # redirects back to `/redirect/`; the legacy `/p/` to `/r/`.
+    homelab.access.jellyfin = {
+      members = [
+        "thijs"
+        "arie"
+      ];
+      oidc = {
+        originUrls = [
+          "https://${host}/sso/OID/redirect/kanidm"
+          "https://${host}/sso/OID/r/kanidm"
+        ];
+        originLanding = "https://${host}/";
+        icon = ../identity/branding/icons/jellyfin.svg;
+        preferShortUsername = true;
+      };
+    };
 
     lodestar.links.jellyfin = {
       title = "Jellyfin";
