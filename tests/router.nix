@@ -153,6 +153,7 @@ assert lib.all (f: lib.elem f gate.cmd) [
   "--code-challenge-method=S256"
   "--redirect-url=https://auth-test.vanwaaij.com/oauth2/callback"
   "--reverse-proxy=true"
+  "--trusted-proxy-ip=127.0.0.1/32"
   "--set-xauthrequest=true"
   "--cookie-domain=.vanwaaij.com"
   "--whitelist-domain=.vanwaaij.com"

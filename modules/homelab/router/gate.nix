@@ -93,6 +93,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         "--email-domain=*"
         "--redirect-url=https://${id.gateHost}/oauth2/callback"
         "--reverse-proxy=true"
+        "--trusted-proxy-ip=127.0.0.1/32"
         "--set-xauthrequest=true"
         "--skip-provider-button=true"
         "--cookie-name=_oauth2_proxy${lib.replaceStrings [ "-" ] [ "_" ] suffix}"
