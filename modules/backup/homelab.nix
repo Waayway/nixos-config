@@ -23,6 +23,8 @@ lib.optionalAttrs hostPlatform.isLinux {
           "store/internal"
           "store/shares"
           "archive/internal"
+          # Kanidm's online backups (modules/identity/kanidm.nix).
+          "store/authentication"
           # TrueNAS's configuration database and the key that decrypts its secrets.
           "/data/freenas-v1.db"
           "/data/pwenc_secret"
