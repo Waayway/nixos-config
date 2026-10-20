@@ -116,10 +116,12 @@ to `/var/lib/opnix/secrets/kanidmOauth2Lodestar` (owner `lodestar-server`, mode 
 The server reads the file at each login, so a rotated secret needs no restart. Groups
 come from the ID token at login: a membership change applies at the next login.
 
-Policy grants: the server fetches Kanidm's discovery document and keys from
-`id.vanwaaij.com`; if that name resolves to the tailnet Service on nixos-manager,
-`tag:manager` needs a grant to `svc:id` on tcp:443 like `tag:prod` has. The router
-reaches the listener over the LAN: no grant. Check at rollout. The Services link of
+Policy grants (set 2026-10-20): nixos-manager uses MagicDNS, so `id.vanwaaij.com` resolves
+to the tailnet Service `svc:id`. The host `nixos-manager` (it carries `tag:server`, not
+`tag:manager`, see open item 2) has grants to the router on port 53 (split DNS) and to
+`svc:id` on tcp:443. The Tailscale Service `lodestar` is granted to the same sources as
+the other Services and auto-approved for `tag:router`. The router reaches the listener
+over the LAN: no grant. The Services link of
 this dashboard and Kanidm's "Services" tile (`homelab.identity.servicesUrl`) point to
 `https://lodestar.vanwaaij.com`.
 

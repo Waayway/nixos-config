@@ -443,6 +443,8 @@ done, fixed (with date).
 | 56 | **Kanidm restore** is documented but not rehearsed. | Rehearse once on router-test's Kanidm. | - | Open |
 | 57 | **Kanidm CLI in the secret script** runs with `verify_ca=false`. | Checked: `KANIDM_URL` is the VM's own LAN address with the tools container on the host network, so it never leaves the VM. | - | Closed |
 | 58 | **Immich OAuth** settings were written to the database directly; **Arie** needs an Immich account (`arie@vanwaaij.com`) before SSO links. | Create it in Immich. | - | Open (user) |
+| 59 | **2 GB VMs run out of memory building themselves**: Lodestar applies on router and identity were OOM-killed (2026-10-20). | Build on nixos-manager and switch with `--target-host` (as done), or let the agent use the manager as a remote builder. | - | Open |
+| 60 | **`lodestar promote` fails** with "Host key verification failed" (no deploy key yet, lodestar.md open item 1). | Promote by pushing the same commit to `stable` until the deploy key exists. | - | Open |
 
 ## Open plan items
 
