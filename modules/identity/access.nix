@@ -34,6 +34,8 @@ lib.optionalAttrs hostPlatform.isLinux {
             ];
             originLanding = "https://pve.tail41ca60.ts.net:8006";
             icon = ./branding/icons/proxmox.svg;
+            # Proxmox user names are `<name>@kanidm`; the long form would add a second `@`.
+            preferShortUsername = true;
           };
         };
       };
