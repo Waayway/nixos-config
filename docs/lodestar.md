@@ -106,6 +106,15 @@ The tailnet uses an explicit grants policy (no allow-all) with these rules:
 `nixos-manager` for remote builds. Laptops you use yourself stay untagged: a
 tag replaces the device's user identity.
 
+Identity additions (2026-10-20, edited through the API): `tag:identity` (owned by
+`autogroup:admin` and `tag:nixos`, like every server tag); `tag:identity` → `tag:router`
+on port 53; `nixos-manager` → `tag:identity` on tcp:7461; Tailscale Services `id` and
+`auth` (plus `truenas`, `backrest`), advertised by the router; `tag:prod` → `svc:id` on
+tcp:443 so Nextcloud, Immich and Jellyfin can reach Kanidm. A new host that runs an
+OIDC app needs the same grant to `svc:id`. After creating a Service, run
+`tailscale serve drain svc:X` and `advertise svc:X` on the router. There is no SSH rule
+for `tag:identity` yet (homelab.md finding 25). See `docs/identity.md`.
+
 ## Open items
 
 1. Write deploy key for promote: put a GitHub deploy key (write access) in

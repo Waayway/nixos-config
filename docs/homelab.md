@@ -209,7 +209,7 @@ Shut down, 2 vCPU, `onboot 0`.
 
 - NixOS from this repo (`hosts/servers/identity.nix`, modules in `modules/identity/`),
   `10.0.10.111`, tag `tag:identity`, Lodestar agent. Runs **Kanidm** at
-  `id.vanwaaij.com`: passkey sign-in, OIDC for Nextcloud, Immich and Jellyfin, and the
+  `id.vanwaaij.com`: passkey sign-in, OIDC for Nextcloud, Immich, Jellyfin and Proxmox, and the
   oauth2-proxy **sign-in gate** (`auth.vanwaaij.com`, shown as "Services") that the
   router puts in front of admin tools and Archipelago. Who may use which app comes from
   Nix (`modules/identity/access.nix`, `people.nix`); Kanidm group membership is
@@ -217,7 +217,7 @@ Shut down, 2 vCPU, `onboot 0`.
 - Online backups go to TrueNAS `store/authentication` (NFS, this VM only, mounted
   with `RequiresMountsFor`); they are in the restic backups since 2026-10-20.
 - Router entry: Tailscale Services `id` and `auth`; Kanidm is passed through without
-  TLS termination.
+  TLS termination. How-to (people, apps, recovery, upgrades, backup): `docs/identity.md`.
 
 ### 118 vpn (was 110)
 
@@ -430,10 +430,18 @@ done, fixed (with date).
 | 49 | **Jellyfin config** edited by hand (`encoding.xml`). | Keep the backup next to it; consider declaring it. | - | Open (minor) |
 | 50 | **Kanidm look**: default icons, "Sign-in gate" name, credential page CSS, reset links using the IP. | App icons, the client shown as "Services", a centred credential card, reset links on `id.vanwaaij.com`. | - | Fixed 2026-10-20 (commits `b26199c`, `a8c4830`, `09f7869`, `d5b2c8c`) |
 
+| 51 | **LAN devices without Tailscale** could not reach any `*.vanwaaij.com`: UniFi DNS returned the WAN IP and there is no hairpin NAT. | UniFi local DNS record `*.vanwaaij.com` to `10.0.10.110`. | - | Fixed 2026-10-20 |
+| 52 | **Public wifi**: `id` and `auth` reported unreachable from public wifi; public DNS gives the WAN IP (no AAAA) and both answer over it. | Needs details from the user (device, Tailscale state, error). | - | Open |
+| 53 | **Kanidm client secrets** for Immich and Jellyfin live in app state (Immich DB `system_metadata`, Jellyfin `SSO-Auth.xml`), Proxmox in `domains.cfg`, Nextcloud in its `oidc` provider; rotating a secret in Kanidm means updating each by hand. | Accept, or script the updates. | - | Open (by design) |
+| 54 | **Nextcloud `allow_local_remote_servers`** is on (SSRF guard off instance-wide) so it can reach Kanidm; a member named like a local account (such as `admin`) would link to it. | Egress filter; an assertion against such names. | - | Open |
+| 55 | **Proxmox users** are created by hand (`pveum user add <name>@kanidm` + acl); there is no group sync. `root@pam` stays the emergency login. | Accept for one admin. | - | Open (by design) |
+| 56 | **Kanidm restore** is documented but not rehearsed. | Rehearse once on router-test's Kanidm. | - | Open |
+| 57 | **Kanidm CLI in the secret script** runs with `verify_ca=false`. | Confirm it only talks to localhost in the container. | - | Open (minor) |
+| 58 | **Immich OAuth** settings were written to the database directly; **Arie** needs an Immich account (`arie@vanwaaij.com`) before SSO links. | Create it in Immich. | - | Open (user) |
+
 ## Open plan items
 
-- Identity plan: Task 8 (Nextcloud, Immich, Jellyfin OIDC), Task 9 (Proxmox realm),
-  Task 10 (docs).
+- Identity plan: done (Tasks 8 to 10); docs in `docs/identity.md`.
 - Lodestar plan (`lodestar.vanwaaij.com`, OIDC, actions only from the tailnet): not
   started.
 - Final cleanup: delete Main (108), media (120), deploy-box (105), VM 101, the orphaned

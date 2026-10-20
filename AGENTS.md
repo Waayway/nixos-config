@@ -15,6 +15,7 @@ at `~/.flake` on each machine. Read this before changing anything.
 | router | Proxmox VM 110, the front door (Traefik, split DNS, Tailscale Services) | x86_64-linux | router | servers |
 | router-test | Proxmox VM 230, the router's test twin | x86_64-linux | router-test (unverified) | servers |
 | prod | Proxmox VM 100, Nextcloud + Jellyfin + Immich (containers) | x86_64-linux | prod | servers |
+| identity | Proxmox VM 111, Kanidm (`id.vanwaaij.com`), sign-in for apps and the router's gate (`docs/identity.md`) | x86_64-linux | identity | servers |
 | nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
