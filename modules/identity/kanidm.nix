@@ -98,6 +98,11 @@ let
   unknownExtra = lib.filterAttrs (_: ms: ms != [ ]) (
     lib.mapAttrs (_: a: lib.filter (m: !(config.homelab.people ? ${m})) a.members) cfg.extraAccess
   );
+  strayUsernames = lib.filterAttrs (_: ms: ms != [ ]) (
+    lib.mapAttrs (
+      _: a: lib.optionals (a.oidc != null) (lib.subtractLists a.members (lib.attrNames a.oidc.usernames))
+    ) access'
+  );
   access =
     assert lib.assertMsg (overlap == [ ])
       "homelab.identity: apps in both homelab.access and homelab.identity.extraAccess: ${toString overlap}";
@@ -105,6 +110,12 @@ let
       "homelab.identity.extraAccess: members missing from homelab.people: ${
         lib.concatStringsSep "; " (
           lib.mapAttrsToList (n: ms: "app '${n}' lists ${toString ms}") unknownExtra
+        )
+      }";
+    assert lib.assertMsg (strayUsernames == { })
+      "homelab.access.<app>.oidc.usernames: not members of the app: ${
+        lib.concatStringsSep "; " (
+          lib.mapAttrsToList (n: ms: "app '${n}' names ${toString ms}") strayUsernames
         )
       }";
     assert lib.assertMsg (
@@ -119,16 +130,27 @@ let
   # compares strings, so without it every run would "update" the origin again.
   withSlash = u: if builtins.match "[a-z]+://[^/]+" u != null then u + "/" else u;
   people = config.homelab.people;
+  # `oidc.usernames`: a one-person group per member, the claim `<app>_username` by group.
+  usernameGroup = app: m: "${app}-username-${m}";
+  usernameMembers = a: lib.optionals (a.oidc != null && a.oidc.usernames != { }) a.members;
   provisionState = {
     persons = lib.mapAttrs (_: p: {
       inherit (p) displayName;
       mailAddresses = [ p.email ];
     }) people;
 
-    groups = {
-      admins.members = lib.attrNames (lib.filterAttrs (_: p: p.admin) people);
-    }
-    // lib.mapAttrs' (app: a: lib.nameValuePair "${app}-users" { inherit (a) members; }) access;
+    groups = lib.mergeAttrsList (
+      [
+        { admins.members = lib.attrNames (lib.filterAttrs (_: p: p.admin) people); }
+        (lib.mapAttrs' (app: a: lib.nameValuePair "${app}-users" { inherit (a) members; }) access)
+      ]
+      ++ lib.mapAttrsToList (
+        app: a:
+        lib.listToAttrs (
+          map (m: lib.nameValuePair (usernameGroup app m) { members = [ m ]; }) (usernameMembers a)
+        )
+      ) access
+    );
 
     systems.oauth2 =
       lib.mapAttrs (
@@ -138,6 +160,17 @@ let
           originUrl = map withSlash a.oidc.originUrls;
           originLanding = withSlash a.oidc.originLanding;
           scopeMaps."${app}-users" = a.oidc.scopes;
+          inherit (a.oidc) preferShortUsername;
+        }
+        // lib.optionalAttrs (a.oidc.usernames != { }) {
+          claimMaps."${app}_username" = {
+            joinType = "ssv";
+            valuesByGroup = lib.listToAttrs (
+              map (m: lib.nameValuePair (usernameGroup app m) [ (a.oidc.usernames.${m} or m) ]) (
+                usernameMembers a
+              )
+            );
+          };
         }
         // lib.optionalAttrs (a.oidc.icon != null) { imageFile = "${a.oidc.icon}"; }
       ) (lib.filterAttrs (_: a: a.oidc != null) access)

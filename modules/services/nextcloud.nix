@@ -265,11 +265,32 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
     };
 
-    # Who may sign in (Kanidm group nextcloud-users); OIDC comes with the app's login.
-    homelab.access.nextcloud.members = [
-      "thijs"
-      "arie"
-    ];
+    # Who may sign in (Kanidm group nextcloud-users) and the OAuth2 client behind the
+    # login page's "vanwaaij.com" button. The Nextcloud side is state in its database,
+    # set once with occ: app user_oidc (custom_apps), provider `vanwaaij.com` with
+    # client `nextcloud`, the secret from 1Password Homelab `kanidm-oauth2-nextcloud`
+    # (scripts/kanidm-oauth2-secret.sh), discovery
+    # https://id.vanwaaij.com/oauth2/openid/nextcloud/.well-known/openid-configuration,
+    # --unique-uid=0 and --mapping-uid=nextcloud_username. The accounts from Main are
+    # `Waayway` and `Arie`; `usernames` sends those names, so the first login links the
+    # Kanidm person to the existing account (user_oidc's soft auto-provisioning).
+    # Password login stays (allow_multiple_user_backends).
+    homelab.access.nextcloud = {
+      members = [
+        "thijs"
+        "arie"
+      ];
+      oidc = {
+        originUrls = [ "https://${host}/apps/user_oidc/code" ];
+        originLanding = "https://${host}/";
+        icon = ../identity/branding/icons/nextcloud.svg;
+        preferShortUsername = true;
+        usernames = {
+          thijs = "Waayway";
+          arie = "Arie";
+        };
+      };
+    };
 
     lodestar.links.nextcloud = {
       title = "Nextcloud";

@@ -43,6 +43,28 @@ lib.types.submodule {
               ];
               description = "Scopes granted to members.";
             };
+            preferShortUsername = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = ''
+                Send the short name (`thijs`) as `preferred_username` instead of Kanidm's
+                spn (`thijs@id.vanwaaij.com`).
+              '';
+            };
+            usernames = lib.mkOption {
+              type = lib.types.attrsOf lib.types.str;
+              default = { };
+              example = {
+                thijs = "Waayway";
+              };
+              description = ''
+                Members' user names in the app where they differ from their Kanidm name
+                (accounts that predate Kanidm). Non-empty: every member's name in the app
+                (this value, else the Kanidm name) is sent in the claim `<app>_username`,
+                which the app maps to its user ID. Kanidm sets claims by group, so each
+                member gets a one-person group `<app>-username-<member>`.
+              '';
+            };
           };
         }
       );
