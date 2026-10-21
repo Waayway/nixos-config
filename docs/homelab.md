@@ -313,8 +313,9 @@ last survey. The `hostpci` mapping to the WX 7100 has been removed.
 ### 201 archipelago (`ap.vanwaaij.com`)
 
 - 2 vCPU, onboot 1 (set 2026-10-20). Routed by the router (`archipelago`, behind the
-  sign-in gate), but **still reachable directly on `10.0.10.201:8080` without the
-  gate** (finding #31).
+  sign-in gate). Port 8080 accepts only the router (10.0.10.110): a `DOCKER-USER` drop
+  rule from `/usr/local/sbin/archipelago-router-only`, applied by
+  `archipelago-router-only.service` after Docker (finding #31). SSH as `archipelago`.
 
 - Docker compose in `/opt/archipelago/deploy`: nginx (10.0.10.201:8080) + web +
   multiworld, image `archipelago-base` built from `/opt/archipelago/src`.
@@ -414,7 +415,7 @@ done, fixed (with date).
 | 28 | **router-test (230)** serves the real routes and holds the live Cloudflare token; disk was down to 3.1 GB. | Strip the real routes and the token from the test twin; grow the disk (unverified). | - | Open |
 | 29 | **Tailnet clients all look like 127.0.0.1** to backends (Tailscale Serve): Nextcloud brute-force throttling sees one IP for every tailnet client, and in Jellyfin every client looks like LAN. | Set Jellyfin "Known proxies" to 10.0.10.110; review Nextcloud trusted proxies / throttling. | - | Open |
 | 30 | **`X-Homelab-Via` can be forged** by going straight to a backend. | Consumers trust it only from 10.0.10.110; firewall the backends to the router. | - | Open |
-| 31 | **Archipelago (201)** is reachable directly on `10.0.10.201:8080`, bypassing the sign-in gate. | Allow only 10.0.10.110 (firewalld + DOCKER-USER on the Rocky VM; not managed by this repo). | - | Open |
+| 31 | **Archipelago (201)** is reachable directly on `10.0.10.201:8080`, bypassing the sign-in gate. | Allow only 10.0.10.110: `DOCKER-USER` drop rule from `/usr/local/sbin/archipelago-router-only`, applied by `archipelago-router-only.service` after Docker (on the VM, not in this repo). | - | Fixed 2026-10-21 |
 | 32 | **Containers on NFS** on prod don't recover if TrueNAS is late at boot (`RequiresMountsFor` fails, no retry). | Retry the mounts / restart the containers once the mount is up. | - | Open |
 | 33 | **Immich machine-learning** sometimes hangs at start (unhealthy). | Automatic restart on unhealthy. | - | Open |
 | 34 | **`homelab.lan.interface`** defaults to `ens18`, wrong for q35 VMs (prod: `enp6s18`); the NixOS firewall lines for container ports are cosmetic (Docker publishes past the firewall; exposure is limited by binding to the LAN address). | Set the interface per host, or detect it (make generic). | - | Open |
@@ -436,7 +437,7 @@ done, fixed (with date).
 | 50 | **Kanidm look**: default icons, "Sign-in gate" name, credential page CSS, reset links using the IP. | App icons, the client shown as "Services", a centred credential card, reset links on `id.vanwaaij.com`. | - | Fixed 2026-10-20 (commits `b26199c`, `a8c4830`, `09f7869`, `d5b2c8c`) |
 
 | 51 | **LAN devices without Tailscale** could not reach any `*.vanwaaij.com`: UniFi DNS returned the WAN IP and there is no hairpin NAT. | UniFi local DNS record `*.vanwaaij.com` to `10.0.10.110`. | - | Fixed 2026-10-20 |
-| 52 | **Public wifi**: `id` and `auth` reported unreachable from public wifi; public DNS gives the WAN IP (no AAAA) and both answer over it. | Needs details from the user (device, Tailscale state, error). | - | Open |
+| 52 | **Public wifi**: `id` and `auth` reported unreachable from public wifi; public DNS gives the WAN IP (no AAAA) and both answer over it. | Works again (user, 2026-10-21); likely fixed by the later router and DNS changes. | - | Closed |
 | 53 | **Kanidm client secrets** for Immich and Jellyfin live in app state (Immich DB `system_metadata`, Jellyfin `SSO-Auth.xml`), Proxmox in `domains.cfg`, Nextcloud in its `oidc` provider; rotating a secret in Kanidm means updating each by hand. | Accept, or script the updates. | - | Open (by design) |
 | 54 | **Nextcloud `allow_local_remote_servers`** is on (SSRF guard off instance-wide) so it can reach Kanidm; a member named like a local account (such as `admin`) would link to it. | Egress filter; an assertion against such names. | - | Open |
 | 55 | **Proxmox users** are created by hand (`pveum user add <name>@kanidm` + acl); there is no group sync. `root@pam` stays the emergency login. | Accept for one admin. | - | Open (by design) |
