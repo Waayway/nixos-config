@@ -149,8 +149,8 @@ assert exp.pve.listenAddress == "127.0.0.1";
 assert exp.pve.port == 9221;
 assert exp.pve.environmentFile == secrets.pveEnv;
 assert units.services.prometheus-pve-exporter.environment.PVE_VERIFY_SSL == "false";
-# graphite_exporter: web on loopback only (a repeatable flag would add a listener), the
-# Graphite input's last --graphite.listen-address (single value flag) is 0.0.0.0:2003
+# graphite_exporter: exactly one of each listen flag (kingpin rejects a repeat), both on
+# the monitor's LAN address; metrics port 9108 is not opened in the firewall
 assert
   let
     start = units.services.prometheus-graphite-exporter.serviceConfig.ExecStart;
@@ -162,12 +162,10 @@ assert
       map (i: builtins.elemAt words (i + 1)) (
         lib.filter (i: builtins.elemAt words i == flag) (lib.range 0 (lib.length words - 2))
       );
-    effectiveGraphite = lib.last (valuesOf "--graphite.listen-address");
   in
-  valuesOf "--web.listen-address" == [ "127.0.0.1:9108" ]
-  && !(has "0.0.0.0:9108" start)
-  && lib.length (lib.filter (w: has "9108" w) words) == 1
-  && effectiveGraphite == "0.0.0.0:2003";
+  valuesOf "--web.listen-address" == [ "10.0.10.140:9108" ]
+  && valuesOf "--graphite.listen-address" == [ "10.0.10.140:2003" ]
+  && !(has "0.0.0.0" start);
 assert (job "pve").metrics_path == "/pve";
 assert (job "pve").params.module == [ "default" ];
 assert targetsOf "pve" == [ "10.0.10.50" ];
@@ -179,7 +177,9 @@ assert exp.graphite.enable;
 assert exp.graphite.graphitePort == 2003;
 assert exp.graphite.mappingSettings == mapping;
 assert mapping.mappings != [ ];
-assert targetsOf "truenas" == [ "127.0.0.1:9108" ];
+assert targetsOf "truenas" == [ "10.0.10.140:9108" ];
+assert !(lib.elem 9108 monitor.networking.firewall.allowedTCPPorts);
+assert !(has "--dport 9108" monitor.networking.firewall.extraCommands);
 assert has "-s 10.0.10.130" monitor.networking.firewall.extraCommands;
 assert has "--dport 2003" monitor.networking.firewall.extraCommands;
 assert !(lib.elem 2003 monitor.networking.firewall.allowedTCPPorts);
@@ -192,6 +192,7 @@ assert lib.elem "d /run/healthchecks-sd 0755 root root -" units.tmpfiles.rules;
 assert
   has "chmod 0640" (builtins.readFile ../modules/server/monitoring/exporters.nix)
   && has "chgrp prometheus" (builtins.readFile ../modules/server/monitoring/exporters.nix);
+assert has "ExecStartPre" (builtins.toJSON (lib.attrNames units.services.prometheus.serviceConfig));
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
 assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
 assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";

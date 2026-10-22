@@ -4,7 +4,7 @@
 #   pve          prometheus-pve-exporter (127.0.0.1:9221) asked about the Proxmox host
 #                10.0.10.50 with the API token from `secrets.pveEnv`. (`pve.enable`)
 #   truenas      graphite_exporter: TrueNAS's Graphite exporter pushes to port 2003
-#                (open to 10.0.10.130 only); metrics on 127.0.0.1:9108, renamed by
+#                (open to 10.0.10.130 only); metrics on 10.0.10.140:9108 (not opened in the firewall), renamed by
 #                graphite-mapping.yaml. Plus the `truenas-pools` timer: pool health over
 #                SSH (truenas-pools.sh) as the textfile metric `truenas_pool_healthy`.
 #                (`truenas.enable`)
@@ -172,14 +172,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       (lib.mkIf cfg.truenas.enable {
         services.prometheus.exporters.graphite = {
           enable = true;
-          # Web (metrics) on loopback. The module derives both listeners from this
-          # address (--web.listen-address is repeatable, so a second flag would add a
-          # listener, not replace it); the Graphite input is therefore overridden below.
-          listenAddress = "127.0.0.1";
+          # The module binds both the metrics (9108) and the Graphite input (2003) to this
+          # one address, and graphite_exporter rejects a repeated flag, so no extraFlags.
+          # The LAN address, since TrueNAS must reach 2003; the firewall opens 2003 for
+          # TrueNAS only and not 9108 at all.
+          listenAddress = config.homelab.lan.address;
           graphitePort = 2003;
           mappingSettings = mapping;
-          # --graphite.listen-address is a plain string flag: the last one wins.
-          extraFlags = [ "--graphite.listen-address=0.0.0.0:2003" ];
         };
         # Port 2003 is privileged.
         systemd.services.prometheus-graphite-exporter.serviceConfig = {
@@ -189,7 +188,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         services.prometheus.scrapeConfigs = [
           {
             job_name = "truenas";
-            static_configs = [ { targets = [ "127.0.0.1:9108" ]; } ];
+            static_configs = [ { targets = [ "${config.homelab.lan.address}:9108" ]; } ];
           }
         ];
         networking.firewall.extraCommands = graphiteRules "-A";
