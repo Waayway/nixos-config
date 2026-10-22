@@ -143,10 +143,10 @@ Deviation from the spec, decided here: TrueNAS pool health is read with `sudo mi
 **Interfaces:**
 - Consumes: `server.hosts` (addresses for the firewall, names for tenants, `logBudgetMB`).
 - Produces: Loki on `:3100`, `auth_enabled: true`, `limits_config.multi_tenant_queries_enabled: true`, `retention_period: 336h`, `ingestion_rate_mb: 1`, `ingestion_burst_size_mb: 4`, `runtime_config.file = /var/lib/monitoring/loki/runtime.yaml`, `period: 10s`; Prometheus job `loki` scraping `127.0.0.1:3100`. Textfile metric on the monitor: `loki_budget_exceeded{tenant="<host>"} 0|1` in `/var/lib/node-exporter-textfile/loki-budget.prom`.
-- `loki-budget.sh` contract — env: `PROM_URL`, `BUDGETS` (JSON `{ "<host>": <MB> }`), `RUNTIME_FILE`, `TEXTFILE`. Queries `sum by (tenant) (increase(loki_distributor_bytes_received_total[24h]))`; for each host over `MB × 1024²` writes `overrides.<host>: { ingestion_rate_mb: 0.0001, ingestion_burst_size_mb: 0.0001 }`; writes both files atomically (temp + `mv`).
+- `loki-budget.sh` contract — env: `PROM_URL`, `BUDGETS` (JSON `{ "<host>": <MB> }`), `RUNTIME_FILE`, `TEXTFILE`. Queries `sum by (tenant) (increase(loki_distributor_bytes_received_total[24h]))`; for each host over `MB × 1024²` writes `overrides.<host>: { ingestion_rate_mb: 0, ingestion_burst_size_mb: 0 }` (zero rate and burst reject every push; 0.0001 let ~100-byte lines through, found by the Task 9 VM test); writes both files atomically (temp + `mv`).
 
 - [ ] **Step 1: Failing shell test** `tests/loki-budget.sh`, using a tiny `python3 -m http.server`-free stub: a fake `curl` on `PATH` that prints a fixture JSON. Cases:
-  - router at 250 MB with budget 200 → runtime file has `overrides:` with `router:` and `ingestion_rate_mb: 0.0001`; textfile has `loki_budget_exceeded{tenant="router"} 1` and `{tenant="prod"} 0`.
+  - router at 250 MB with budget 200 → runtime file has `overrides:` with `router:` and `ingestion_rate_mb: 0`; textfile has `loki_budget_exceeded{tenant="router"} 1` and `{tenant="prod"} 0`.
   - everyone under budget → runtime file has `overrides: {}`; all textfile values `0`.
   - curl fails (exit 7) or returns `"status":"error"` or an empty `result` while the file holds a block → the script exits non-zero and **both files are unchanged** (Review Focus 3).
 - [ ] **Step 2: Run** `bash tests/loki-budget.sh` → fails (script missing).
