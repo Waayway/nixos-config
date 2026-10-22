@@ -149,7 +149,25 @@ assert exp.pve.listenAddress == "127.0.0.1";
 assert exp.pve.port == 9221;
 assert exp.pve.environmentFile == secrets.pveEnv;
 assert units.services.prometheus-pve-exporter.environment.PVE_VERIFY_SSL == "false";
-assert lib.elem "--web.listen-address=127.0.0.1:9108" exp.graphite.extraFlags;
+# graphite_exporter: web on loopback only (a repeatable flag would add a listener), the
+# Graphite input's last --graphite.listen-address (single value flag) is 0.0.0.0:2003
+assert
+  let
+    start = units.services.prometheus-graphite-exporter.serviceConfig.ExecStart;
+    words = lib.filter (w: w != "") (
+      lib.splitString " " (lib.replaceStrings [ "\n" "\\" "=" ] [ " " " " " " ] start)
+    );
+    valuesOf =
+      flag:
+      map (i: builtins.elemAt words (i + 1)) (
+        lib.filter (i: builtins.elemAt words i == flag) (lib.range 0 (lib.length words - 2))
+      );
+    effectiveGraphite = lib.last (valuesOf "--graphite.listen-address");
+  in
+  valuesOf "--web.listen-address" == [ "127.0.0.1:9108" ]
+  && !(has "0.0.0.0:9108" start)
+  && lib.length (lib.filter (w: has "9108" w) words) == 1
+  && effectiveGraphite == "0.0.0.0:2003";
 assert (job "pve").metrics_path == "/pve";
 assert (job "pve").params.module == [ "default" ];
 assert targetsOf "pve" == [ "10.0.10.50" ];
@@ -171,7 +189,9 @@ assert
     lib.splitString "\n" monitor.networking.firewall.extraCommands
   ));
 assert lib.elem "d /run/healthchecks-sd 0755 root root -" units.tmpfiles.rules;
-assert has "chmod 0640" (builtins.readFile ../modules/server/monitoring/exporters.nix);
+assert
+  has "chmod 0640" (builtins.readFile ../modules/server/monitoring/exporters.nix)
+  && has "chgrp prometheus" (builtins.readFile ../modules/server/monitoring/exporters.nix);
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
 assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
 assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";

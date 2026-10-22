@@ -172,12 +172,14 @@ lib.optionalAttrs hostPlatform.isLinux {
       (lib.mkIf cfg.truenas.enable {
         services.prometheus.exporters.graphite = {
           enable = true;
-          listenAddress = "0.0.0.0";
+          # Web (metrics) on loopback. The module derives both listeners from this
+          # address (--web.listen-address is repeatable, so a second flag would add a
+          # listener, not replace it); the Graphite input is therefore overridden below.
+          listenAddress = "127.0.0.1";
           graphitePort = 2003;
           mappingSettings = mapping;
-          # Metrics on loopback only; the module binds both ports to listenAddress (the
-          # last --web.listen-address wins).
-          extraFlags = [ "--web.listen-address=127.0.0.1:9108" ];
+          # --graphite.listen-address is a plain string flag: the last one wins.
+          extraFlags = [ "--graphite.listen-address=0.0.0.0:2003" ];
         };
         # Port 2003 is privileged.
         systemd.services.prometheus-graphite-exporter.serviceConfig = {
