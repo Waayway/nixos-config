@@ -88,8 +88,8 @@ lib.optionalAttrs hostPlatform.isLinux {
           file = runtimeFile;
           period = "10s";
         };
-        # A top-level key in Loki's config, not part of limits_config.
-        multi_tenant_queries_enabled = true;
+        # Queries across tenants (Grafana's all-tenants view); Loki 3.x spells it so.
+        tenant_federation.enabled = true;
         analytics.reporting_enabled = false;
       };
     };

@@ -97,7 +97,7 @@ assert !(lib.elem 9090 monitor.networking.firewall.allowedTCPPorts);
 # Loki: multi-tenant, retention and limits, runtime config, budget timer, firewall
 assert loki.enable;
 assert loki.configuration.auth_enabled;
-assert loki.configuration.multi_tenant_queries_enabled;
+assert loki.configuration.tenant_federation.enabled;
 assert loki.configuration.limits_config.retention_period == "336h";
 assert loki.configuration.limits_config.ingestion_rate_mb == 1;
 assert loki.configuration.limits_config.ingestion_burst_size_mb == 4;
