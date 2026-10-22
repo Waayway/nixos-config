@@ -5,7 +5,7 @@
 { inputs }:
 let
   inherit (inputs.nixpkgs) lib;
-  tools = import ./lib { inherit lib; };
+  tools = import ./tools { inherit lib; };
   # Base image for new Proxmox VMs (template/proxmox.nix).
   proxmoxTemplate = inputs.nixos-generators.nixosGenerate {
     system = "x86_64-linux";

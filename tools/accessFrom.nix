@@ -6,7 +6,7 @@
 # attrNames) on an app declared by more than one configuration (naming them) and on a
 # member missing from the declaring configuration's `homelab.people` (naming member
 # and app); the checks live in `tools.accessProblems`. Used as `tools.accessFrom`
-# (`lib/default.nix` imports the file as-is, so call it as
+# (`tools/default.nix` imports the file as-is, so call it as
 # `tools.accessFrom { inherit lib; } { … }`).
 { lib }:
 {

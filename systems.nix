@@ -9,11 +9,12 @@ let
   version = "26.05";
   overlays = [ ];
 
-  # Our helper functions (lib/), keyed by file name.
-  tools = import ./lib { inherit lib; };
+  # System builders (lib/) and helpers for modules (tools/), keyed by file name.
+  builders = import ./lib { inherit lib; };
+  tools = import ./tools { inherit lib; };
 
   # name -> host attrs (system, user, type, options, config, ...) from hosts/*/
-  hosts = tools.discoverHosts { inherit lib; } ./hosts;
+  hosts = builders.discoverHosts { inherit lib; } ./hosts;
 
   isDarwinHost = host: lib.hasSuffix "darwin" host.system;
   nixosHosts = lib.filterAttrs (_: host: !(isDarwinHost host)) hosts;
@@ -28,11 +29,12 @@ let
       version
       overlays
       tools
+      builders
       ;
   };
-  mkSystem = tools.mkSystem builderArgs;
-  mkDarwin = tools.mkDarwin builderArgs;
-  mkDeployNode = tools.mkDeployNode { inherit inputs; };
+  mkSystem = builders.mkSystem builderArgs;
+  mkDarwin = builders.mkDarwin builderArgs;
+  mkDeployNode = builders.mkDeployNode { inherit inputs; };
 
   nixosConfigurations = lib.mapAttrs mkSystem nixosHosts;
   darwinConfigurations = lib.mapAttrs mkDarwin darwinHosts;

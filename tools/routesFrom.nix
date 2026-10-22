@@ -3,7 +3,7 @@
 # Every configuration's `homelab.routes`, merged into one attrset keyed by route name,
 # each route with an extra `declaredBy` (the configuration's name). Configurations
 # without the option are skipped. Fails on a route name declared twice or a host used
-# by two routes. Used as `tools.routesFrom` (`lib/default.nix` imports the file as-is,
+# by two routes. Used as `tools.routesFrom` (`tools/default.nix` imports the file as-is,
 # so call it as `tools.routesFrom { inherit lib; } { … }`).
 { lib }:
 {

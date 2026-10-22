@@ -4,6 +4,7 @@
   inputs,
   version,
   tools,
+  builders,
 }:
 name: hostAttrs:
 let
@@ -63,14 +64,14 @@ let
     user = user;
 
     inherit tools;
-    umport = tools.umport { lib = upkgs.lib; };
-    importCurDir = tools.importCurDir upkgs.lib;
+    umport = builders.umport { lib = upkgs.lib; };
+    importCurDir = builders.importCurDir upkgs.lib;
   };
 
   systemFunc = inputs.nix-darwin.lib.darwinSystem;
 
   homeManager =
-    (tools.mkHome (
+    (builders.mkHome (
       if machineOptions.options ? home-manager && machineOptions.options.home-manager ? enable then
         machineOptions.options.home-manager.enable
       else
