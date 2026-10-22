@@ -1,0 +1,45 @@
+# graphite_exporter mapping for TrueNAS SCALE's Graphite exporter (reporting exporter,
+# destination = the monitor VM, port 2003). TrueNAS sends netdata-style names:
+# `<prefix>.<hostname>.<chart>.<dimension>`, with prefix `truenas` assumed here.
+#
+# DRAFT: written from netdata's naming conventions, not from live data. Task 10 (rollout)
+# compares it with what TrueNAS actually sends (unmapped names are still exported under
+# their sanitised Graphite name, so `curl 127.0.0.1:9108/metrics | grep ^truenas` on the
+# monitor shows what to map) and adjusts it then.
+#
+# The file is JSON, which is valid YAML: exporters.nix reads it with builtins.fromJSON
+# (dropping these comment lines) to set `mappingSettings`, which NixOS writes out as YAML.
+{
+  "mappings": [
+    {
+      "match": "truenas.*.disk_space.*.*",
+      "name": "truenas_filesystem_bytes",
+      "labels": { "host": "$1", "mount": "$2", "type": "$3" }
+    },
+    {
+      "match": "truenas.*.disk.*.*",
+      "name": "truenas_disk_io_kibibytes_per_second",
+      "labels": { "host": "$1", "disk": "$2", "direction": "$3" }
+    },
+    {
+      "match": "truenas.*.disktemp.*.*",
+      "name": "truenas_disk_temperature_celsius",
+      "labels": { "host": "$1", "disk": "$2" }
+    },
+    {
+      "match": "truenas.*.zfs.arc_size.*",
+      "name": "truenas_zfs_arc_size_bytes",
+      "labels": { "host": "$1", "kind": "$2" }
+    },
+    {
+      "match": "truenas.*.zfs.hits.*",
+      "name": "truenas_zfs_arc_accesses_per_second",
+      "labels": { "host": "$1", "result": "$2" }
+    },
+    {
+      "match": "truenas.*.net.*.*",
+      "name": "truenas_network_kilobits_per_second",
+      "labels": { "host": "$1", "interface": "$2", "direction": "$3" }
+    }
+  ]
+}

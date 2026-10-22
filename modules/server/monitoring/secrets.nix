@@ -4,13 +4,13 @@
 # part that uses it is enabled.
 #
 # Owners are the consuming service's user, or root (0400) when systemd reads the file
-# (`EnvironmentFile`, `LoadCredential`). Declared without `services`: the consuming
-# module adds its unit with `services.onepassword-secrets.secrets.<name>.services`
-# when it exists (Grafana, Task 5/6; pve exporter, healthchecks-sync, truenas-pools,
-# the loki budget timer, Task 5 to 9):
+# (`EnvironmentFile`, `LoadCredential`). `services` lists the units that read a secret
+# (restarted when it changes); units that come with later modules (Grafana,
+# healthchecks-sync) are added there:
 #   grafanaAdminPassword, grafanaOidcSecret  owner `grafana` (read by `$__file{}`)
 #   pveEnv, healthchecksPingEnv              root, as EnvironmentFile
-#   healthchecksApiKey, healthchecksReadonlyKey, healthchecksProject, truenasKey
+#   healthchecksReadonlyKey                  prometheus (credentials_file)
+#   healthchecksApiKey, healthchecksProject, truenasKey
 #                                            root, as LoadCredential / read by a root timer
 {
   config,
@@ -24,7 +24,7 @@ let
   enabled = cfg.enable;
   hc = enabled && cfg.healthchecks.enable;
 
-  # name = { reference, owner, when }
+  # name = { reference, owner, services ? [ ], when }
   defs = {
     grafanaAdminPassword = {
       reference = "op://Homelab/grafana-admin/password";
@@ -39,6 +39,7 @@ let
     pveEnv = {
       reference = "op://Homelab/pve-monitoring-token/env";
       owner = "root";
+      services = [ "prometheus-pve-exporter.service" ];
       when = enabled && cfg.pve.enable;
     };
     healthchecksPingEnv = {
@@ -53,12 +54,15 @@ let
     };
     healthchecksReadonlyKey = {
       reference = "op://Homelab/healthchecks-readonly-key/credential";
-      owner = "root";
+      # Prometheus reads it itself (`authorization.credentials_file`).
+      owner = "prometheus";
+      services = [ "prometheus.service" ];
       when = hc;
     };
     healthchecksProject = {
       reference = "op://Homelab/healthchecks-project/uuid";
       owner = "root";
+      services = [ "prometheus.service" ];
       when = hc;
     };
     # The same 1Password item as truenas-reconcile's `truenasAutomationKey`
@@ -66,6 +70,7 @@ let
     truenasKey = {
       reference = "op://Homelab/truenas-automation/private key?ssh-format=openssh";
       owner = "root";
+      services = [ "truenas-pools.service" ];
       when = enabled && cfg.truenas.enable;
     };
   };
@@ -75,6 +80,7 @@ lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf enabled {
     services.onepassword-secrets.secrets = lib.mapAttrs (_: d: {
       inherit (d) reference owner;
+      services = d.services or [ ];
       mode = "0400";
     }) active;
 

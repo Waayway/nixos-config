@@ -14,7 +14,8 @@ in
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf config.truenas.enable {
     truenas = {
-      hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/L1Q4XFYuZc2E54Rru1kKd3L2wJ44vVybOzvo9M3IY";
+      # Also read by the monitor (modules/server/monitoring/exporters.nix).
+      hostKey = lib.fileContents ./host-key.pub;
 
       # Read by the restic backups (modules/server/backup/homelab.nix) from
       # .zfs/snapshot; kept 3 days for quick local restores too.

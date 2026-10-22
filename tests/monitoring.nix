@@ -25,6 +25,17 @@ let
   labelsOf = n: map (s: s.labels) (job n).static_configs;
   secrets = monitor.homelab.monitoring.server.secrets;
   opn = monitor.services.onepassword-secrets.secrets;
+  exp = monitor.services.prometheus.exporters;
+  bb = builtins.fromJSON (builtins.readFile exp.blackbox.configFile);
+  mapping = builtins.fromJSON (
+    lib.concatStringsSep "\n" (
+      lib.filter (l: !lib.hasPrefix "#" l) (
+        lib.splitString "\n" (builtins.readFile ../modules/server/monitoring/graphite-mapping.yaml)
+      )
+    )
+  );
+  units = monitor.systemd;
+  probes = targetsOf "blackbox";
 in
 assert node.enable;
 assert lib.elem "systemd" node.enabledCollectors;
@@ -132,6 +143,78 @@ assert
   && !(off.config.services.onepassword-secrets.secrets ? truenasKey)
   && !(off.config.services.onepassword-secrets.secrets ? healthchecksApiKey)
   && off.config.homelab.monitoring.server.secrets.pveEnv == null;
+# exporters on the monitor: pve, TrueNAS (Graphite), blackbox, Healthchecks
+assert exp.pve.enable;
+assert exp.pve.listenAddress == "127.0.0.1";
+assert exp.pve.port == 9221;
+assert exp.pve.environmentFile == secrets.pveEnv;
+assert (job "pve").metrics_path == "/pve";
+assert (job "pve").params.module == [ "default" ];
+assert targetsOf "pve" == [ "10.0.10.50" ];
+assert (lib.head (job "pve").relabel_configs).target_label == "__param_target";
+assert lib.any (
+  r: r.target_label or "" == "__address__" && r.replacement == "127.0.0.1:9221"
+) (job "pve").relabel_configs;
+assert exp.graphite.enable;
+assert exp.graphite.graphitePort == 2003;
+assert exp.graphite.mappingSettings == mapping;
+assert mapping.mappings != [ ];
+assert targetsOf "truenas" == [ "127.0.0.1:9108" ];
+assert has "-s 10.0.10.130" monitor.networking.firewall.extraCommands;
+assert has "--dport 2003" monitor.networking.firewall.extraCommands;
+assert !(lib.elem 2003 monitor.networking.firewall.allowedTCPPorts);
+assert !(lib.elem 2003 monitor.networking.firewall.allowedUDPPorts);
+assert
+  !(lib.any (l: has "2003" l && !has "-s 10.0.10.130" l) (
+    lib.splitString "\n" monitor.networking.firewall.extraCommands
+  ));
+assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
+assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
+assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";
+assert units.services.truenas-pools.environment.TRUENAS_KEY == secrets.truenasKey;
+assert
+  units.services.truenas-pools.environment.TEXTFILE
+  == "/var/lib/node-exporter-textfile/truenas-pools.prom";
+assert
+  builtins.readFile units.services.truenas-pools.environment.TRUENAS_KNOWN_HOSTS
+  == "10.0.10.130 ${nixosConfigurations.nixos-manager.config.truenas.hostKey}\n";
+assert exp.blackbox.enable;
+assert exp.blackbox.listenAddress == "127.0.0.1";
+assert bb.modules.http_2xx.prober == "http";
+assert bb.modules.http_2xx.http.follow_redirects;
+assert bb.modules.http_2xx.http.valid_status_codes == [ ];
+assert (job "blackbox").metrics_path == "/probe";
+assert (job "blackbox").params.module == [ "http_2xx" ];
+assert lib.elem "https://nextcloud.vanwaaij.com/" probes;
+assert lib.elem "https://id.vanwaaij.com/" probes;
+assert lib.elem "https://ap.vanwaaij.com/" probes;
+assert lib.elem "https://truenas.vanwaaij.com/" probes;
+assert !(lib.any (t: has "test" t) probes);
+assert lib.elem { route = "archipelago"; } (labelsOf "blackbox");
+assert (job "healthchecks").scrape_interval == "2m";
+assert (job "healthchecks").authorization.credentials_file == secrets.healthchecksReadonlyKey;
+assert (job "healthchecks").scheme == "https";
+assert prom.checkConfig == "syntax-only";
+assert opn.pveEnv.services == [ "prometheus-pve-exporter.service" ];
+assert opn.truenasKey.services == [ "truenas-pools.service" ];
+assert
+  let
+    off = nixosConfigurations.monitor.extendModules {
+      modules = [ { homelab.monitoring.server.truenas.enable = false; } ];
+    };
+    j = lib.findFirst (j: j.job_name == "truenas") null off.config.services.prometheus.scrapeConfigs;
+  in
+  j == null
+  && !(off.config.systemd.timers ? truenas-pools)
+  && !off.config.services.prometheus.exporters.graphite.enable;
+assert
+  let
+    off = nixosConfigurations.monitor.extendModules {
+      modules = [ { homelab.monitoring.server.pve.enable = false; } ];
+    };
+  in
+  !(lib.any (j: j.job_name == "pve") off.config.services.prometheus.scrapeConfigs)
+  && !off.config.services.prometheus.exporters.pve.enable;
 # the monitor is not the monitor on other hosts
 assert !prod.homelab.monitoring.server.enable;
 # darwin: the options exist, nothing else
