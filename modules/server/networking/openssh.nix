@@ -11,6 +11,5 @@ lib.optionalAttrs hostPlatform.isLinux {
         PermitRootLogin = "prohibit-password";
       };
     };
-    environment.enableAllTerminfo = true;
   };
 }

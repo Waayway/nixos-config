@@ -4,6 +4,8 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux ({
-  environment.systemPackages = with pkgs; [ moonlight-qt ];
-})
+lib.optionalAttrs hostPlatform.isLinux {
+  config = lib.mkIf (!hostPlatform.isServer) {
+    environment.systemPackages = with pkgs; [ moonlight-qt ];
+  };
+}

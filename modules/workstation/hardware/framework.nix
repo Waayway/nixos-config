@@ -11,7 +11,9 @@ lib.optionalAttrs hostPlatform.isLinux ({
 
   # hardware.fw-fanctrl already exists. so we dont need to make the option. just enable and set default on enabled
 
-  hardware.fw-fanctrl = {
-    config.defaultStrategy = "medium";
+  config = lib.mkIf (!hostPlatform.isServer) {
+    hardware.fw-fanctrl = {
+      config.defaultStrategy = "medium";
+    };
   };
 })
