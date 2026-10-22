@@ -24,6 +24,7 @@
     };
     hardware = {
       bluetooth.enable = true;
+      amdgpu.extras.enable = true;
       profiles = [ "framework-amd-ai-300-series" ];
     };
     home-manager.enable = true;
@@ -43,8 +44,6 @@
       # Firmware updating service
       services.fwupd.enable = true;
 
-      boot.initrd.kernelModules = [ "amdgpu" ];
-      services.xserver.videoDrivers = [ "amdgpu" ];
       boot.initrd.availableKernelModules = [
         "nvme"
         "xhci_pci"

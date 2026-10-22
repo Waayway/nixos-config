@@ -10,6 +10,7 @@
   options = {
     hardware = {
       bluetooth.enable = true;
+      amdgpu.extras.enable = true;
       profiles = [
         "common-cpu-amd"
         "common-cpu-amd-pstate"

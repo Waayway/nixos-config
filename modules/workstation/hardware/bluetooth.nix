@@ -5,39 +5,30 @@
   hostPlatform,
   ...
 }:
-lib.optionalAttrs hostPlatform.isLinux (
-  with lib;
-  let
-    cfg = config.bluetooth;
-  in
-  {
-    options.bluetooth = {
-      enable = mkEnableOption "bluetooth";
-    };
+lib.optionalAttrs hostPlatform.isLinux {
+  # Applies where the host turns on NixOS's own `hardware.bluetooth.enable`
+  # (host file `options.hardware.bluetooth.enable`); never sets it itself.
+  config = lib.mkIf (!hostPlatform.isServer && config.hardware.bluetooth.enable) {
+    boot.kernelModules = [ "btusb" ];
 
-    config = mkIf cfg.enable {
-      boot.kernelModules = [ "btusb" ];
-
-      hardware.bluetooth = {
-        enable = true;
-        powerOnBoot = true;
-        settings = {
-          General = {
-            #Enable = "Source,Sink,Media,Socket";
-            Experimental = true;
-            FastConnectable = true;
-          };
-          Policy = {
-            AutoEnable = true;
-          };
+    hardware.bluetooth = {
+      powerOnBoot = true;
+      settings = {
+        General = {
+          #Enable = "Source,Sink,Media,Socket";
+          Experimental = true;
+          FastConnectable = true;
+        };
+        Policy = {
+          AutoEnable = true;
         };
       };
-      services.blueman.enable = true;
-
-      systemd.user.services.mpris-proxy = {
-        enable = true;
-      };
-      environment.systemPackages = with pkgs; [ blueman ];
     };
-  }
-)
+    services.blueman.enable = true;
+
+    systemd.user.services.mpris-proxy = {
+      enable = true;
+    };
+    environment.systemPackages = with pkgs; [ blueman ];
+  };
+}
