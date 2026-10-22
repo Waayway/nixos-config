@@ -7,25 +7,25 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 ## What runs
 
 - **Kanidm** on VM 111 (`identity`, `10.0.10.111`) at `https://id.vanwaaij.com`, from the
-  official image (`modules/identity/kanidm.nix`). People sign in with a passkey. The
+  official image (`modules/server/identity/kanidm.nix`). People sign in with a passkey. The
   router passes `id.vanwaaij.com` through to it without terminating TLS (Tailscale
   Service `id`; the VM gets its own Let's Encrypt certificate).
-- **The sign-in gate**: oauth2-proxy on the router (`modules/homelab/router/gate.nix`),
+- **The sign-in gate**: oauth2-proxy on the router (`modules/server/homelab/router/gate.nix`),
   a Kanidm client shown as "Services" at `auth.vanwaaij.com` (Tailscale Service `auth`).
-  A route with `auth.gate = true` (`modules/homelab/routes.nix`) asks it through
+  A route with `auth.gate = true` (`modules/server/homelab/routes.nix`) asks it through
   Traefik's forwardAuth; without a session you are sent to Kanidm. One sign-in covers
   every gated site (cookie on `.vanwaaij.com`). The session is refreshed against Kanidm
   every 10 minutes (`--cookie-refresh`; the tokens live 15). If Kanidm or the proxy is
   down, new sign-ins fail closed (an existing session works until its next refresh);
   the other sites are unaffected.
 - **Who may use what** is declared in Nix, not clicked together in Kanidm:
-  - People: `modules/identity/people.nix` (`thijs` is admin, `arie`).
+  - People: `modules/server/identity/people.nix` (`thijs` is admin, `arie`).
   - Apps with their own login: `homelab.access.<app>` in the app's module
     (`nextcloud`, `immich`, `jellyfin`: thijs and arie).
   - Apps without a module here: `homelab.identity.extraAccess` in
-    `modules/identity/access.nix` (`archipelago`, `traefik`, `truenas`, `backrest` behind
+    `modules/server/identity/access.nix` (`archipelago`, `traefik`, `truenas`, `backrest` behind
     the gate, and `proxmox`; thijs only).
-  - The option type is `lib/accessType.nix`: `members`, `oidc` (OAuth2 client:
+  - The option type is `tools/accessType.nix`: `members`, `oidc` (OAuth2 client:
     redirect URLs, icon, scopes, `usernames`, `preferShortUsername`) and `gate`.
   - Kanidm's provisioning (kanidm-provision) runs on every switch of VM 111 and makes
     Kanidm match: a group `<app>-users` and an OAuth2 client per app. Group membership is
@@ -43,7 +43,7 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 
 ## Give someone access
 
-1. New person: add them to `modules/identity/people.nix` (name, displayName, email), on
+1. New person: add them to `modules/server/identity/people.nix` (name, displayName, email), on
    every host (the value is shared; the file is imported everywhere).
 2. Add the name to `members` of each app they should have (see above).
 3. Format, commit, push `unstable`, promote to `stable`, apply to `identity` and the
@@ -82,9 +82,9 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 
 1. In the app's module, declare `homelab.access.<app>` (`members`, `oidc` with the
    redirect URLs from the app's documentation, a `scopes` list if the default four are
-   too many, and `icon`: SVG under `modules/identity/branding/icons/`). For an app
+   too many, and `icon`: SVG under `modules/server/identity/branding/icons/`). For an app
    without a module here use `homelab.identity.extraAccess.<app>` in
-   `modules/identity/access.nix`. For a gate-only app, set `gate = true` and
+   `modules/server/identity/access.nix`. For a gate-only app, set `gate = true` and
    `auth.gate = true` on its route, no `oidc`.
 2. Apply to VM 111. The client now exists; Kanidm generates its secret (the official
    image can't take a provisioned one).
@@ -144,18 +144,18 @@ docker exec kanidm /sbin/kanidmd scripting recover-account -c /data/server.toml 
 Provisioning does this for `idm_admin` on every run, so no admin password is stored.
 If the gate or Kanidm is broken, do not just set `auth.gate = false`: that leaves the
 site without any login. Archipelago: restore `basicAuth.usersFile` from the 1Password
-item `archipelago-basic-auth` (see the comment in `modules/homelab/routes.nix`), then
+item `archipelago-basic-auth` (see the comment in `modules/server/homelab/routes.nix`), then
 apply to the router. Backrest, Traefik and TrueNAS have their own access (SSH, tailnet
 backend, LAN UI).
 
 ## Upgrades
 
-- Kanidm images are pinned by digest in `modules/identity/kanidm.nix` (`serverImage`,
+- Kanidm images are pinned by digest in `modules/server/identity/kanidm.nix` (`serverImage`,
   `toolsImage`, the same version). Kanidm supports **one minor release at a time**: never
   skip. Before each: read the release notes, take a backup (below), run
   `kanidmd domain upgrade-check` in the container, then bump both images and apply.
   A database migrated by a newer Kanidm cannot go back; roll back from the backup.
-- oauth2-proxy is pinned in `modules/homelab/router/gate.nix`. After upgrading, check
+- oauth2-proxy is pinned in `modules/server/homelab/router/gate.nix`. After upgrading, check
   one gated site signs in.
 - Renovate raises PRs for the images; merge them one minor at a time.
 

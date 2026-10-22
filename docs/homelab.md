@@ -28,7 +28,7 @@ Open items:
   `ArcA380`; Jellyfin QSV via `encoding.xml`, Immich ML on OpenVINO). The WX 7100
   mapping is removed. See "What could be better" for the open findings (#16 to #50).
 - TrueNAS NFS export `/mnt/archive/shares` (id 8) is declared in
-  `modules/truenas/homelab.nix` and applied.
+  `modules/server/truenas/homelab.nix` and applied.
 
 ## Access
 
@@ -115,7 +115,7 @@ VM 101 no longer exists.
   on `local-lvm` (the move to store-lvm is not done yet). Backends only; the router is
   the only way in from outside. On q35 the NIC is `enp6s18`, not `ens18`: set
   `homelab.lan.interface` per host (the default is `ens18`).
-- Containers via `virtualisation.oci-containers` (modules `modules/services/{nextcloud,
+- Containers via `virtualisation.oci-containers` (modules `modules/server/services/{nextcloud,
   jellyfin,immich,docker,updates}.nix`):
   - **Nextcloud 32.0.15** (`nextcloud:32-apache`, track `32-apache`), MariaDB 11.4,
     Redis; **Collabora** at `office.vanwaaij.com`. Backend `http://10.0.10.100:8080`.
@@ -126,7 +126,7 @@ VM 101 no longer exists.
   - **Immich v2** (fresh install, ML on OpenVINO): media `/store/immich-v2`, Postgres in a container;
     Main's old library `/store/immich/library` is mounted read-only at
     `/mnt/old-library` (external library still to be added).
-- Mounts (`modules/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
+- Mounts (`modules/server/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
   `/archive` = `/mnt/archive/shares`, NFS automounts.
 - **Dumps:** nightly 01:30, `<app>-db-dump` timers write
   `/store/db-dumps/<app>/<app>-<date>.sql.gz` (apps `nextcloud` via `mariadb-dump`,
@@ -140,14 +140,14 @@ VM 101 no longer exists.
   timer, Friday 23:00; it reports to Healthchecks (1Password Homelab item
   `healthchecks-prod-updates`). **Renovate** (installed on the GitHub repo, config
   `renovate.json`, Saturdays before 06:00) opens PRs for images in
-  `modules/services/*.nix`; floating tracks get a PR only when the track changes
+  `modules/server/services/*.nix`; floating tracks get a PR only when the track changes
   (minor or major, e.g. Jellyfin 10.11 to 10.12), never for patches or digests.
 - Secrets from 1Password via opnix (`nextcloud-config`, `immich-config`, ...). NFS
   automounts must not have an idle timeout (see AGENTS.md, "Gotchas").
 
 ### 110 router
 
-- NixOS from this repo (`hosts/servers/router.nix`, modules in `modules/homelab/router/`),
+- NixOS from this repo (`hosts/servers/router.nix`, modules in `modules/server/homelab/router/`),
   `10.0.10.110`, tailnet `router` (`100.73.124.104`, tags `tag:nixos`, `tag:router`).
 - The **front door** for the internet (UniFi forwards 80/443 here) and for the tailnet:
   Traefik with one `*.vanwaaij.com` wildcard certificate (Let's Encrypt DNS-01 via
@@ -158,7 +158,7 @@ VM 101 no longer exists.
   `<name>.tail41ca60.ts.net`), subnet route and exit node.
 - Routes come from the `homelab.routes` of every host in this flake (prod's modules
   declare `nextcloud`, `office`, `jellyfin`, `immich`) plus `homelab.router.extraRoutes`
-  for backends outside it (`modules/homelab/routes.nix`: `archipelago`, `traefik`,
+  for backends outside it (`modules/server/homelab/routes.nix`: `archipelago`, `traefik`,
   `truenas`, `backrest`);
   unknown hosts get 404. The `tailnet` entrypoint sets
   `X-Homelab-Via: tailnet`, the `public` entrypoint strips it.
@@ -211,12 +211,12 @@ Shut down, 2 vCPU, `onboot 0`.
 
 ### 111 identity
 
-- NixOS from this repo (`hosts/servers/identity.nix`, modules in `modules/identity/`),
+- NixOS from this repo (`hosts/servers/identity.nix`, modules in `modules/server/identity/`),
   `10.0.10.111`, tag `tag:identity`, Lodestar agent. Runs **Kanidm** at
   `id.vanwaaij.com`: passkey sign-in, OIDC for Nextcloud, Immich, Jellyfin and Proxmox, and the
   oauth2-proxy **sign-in gate** (`auth.vanwaaij.com`, shown as "Services") that the
   router puts in front of admin tools and Archipelago. Who may use which app comes from
-  Nix (`modules/identity/access.nix`, `people.nix`); Kanidm group membership is
+  Nix (`modules/server/identity/access.nix`, `people.nix`); Kanidm group membership is
   overwritten from Nix on each provisioning run.
 - Online backups go to TrueNAS `store/authentication` (NFS, this VM only, mounted
   with `RequiresMountsFor`); they are in the restic backups since 2026-10-20.
@@ -254,7 +254,7 @@ last survey. The `hostpci` mapping to the WX 7100 has been removed.
 
 - TrueNAS 26.0.0-BETA.2 (beta on the storage everything depends on). Two SATA
   controllers passed through; boot disk on `local-lvm`.
-- Managed as code since 2026-10-13: `modules/truenas/` declares snapshot tasks,
+- Managed as code since 2026-10-13: `modules/server/truenas/` declares snapshot tasks,
   dataset properties, cron jobs and NFS shares; `truenas-reconcile` on
   nixos-manager applies them (on switch, daily 05:00; `sudo truenas-reconcile
   check` for a dry run). Pools, datasets and users stay manual.
@@ -330,7 +330,7 @@ Since 2026-10-13: restic from nixos-manager to the Hetzner Storage Box
 02:30: `store/internal`, `store/shares`, `archive/internal`, TrueNAS config
 database, Lodestar DB) and `restic/archive` (Sunday 03:00: `archive/shares`).
 restic runs on TrueNAS against the 02:00 ZFS snapshots; reporting to
-Healthchecks (Homelab/healthchecks.io). Code: `modules/backup/`. Restore:
+Healthchecks (Homelab/healthchecks.io). Code: `modules/server/backup/`. Restore:
 `sudo restic-store snapshots` / `restore` on nixos-manager.
 
 ## Dashboard
@@ -341,9 +341,9 @@ from nixos-manager and the state of the machine it runs on.
 
 - A NixOS service declares its link next to itself, inside its module's `mkIf`:
   `lodestar.links.<id> = { title; url; group; … };` (see
-  `modules/backup/backrest.nix`). `host` defaults to that machine.
+  `modules/server/backup/backrest.nix`). `host` defaults to that machine.
 - Services on machines this flake doesn't manage yet are listed in
-  `modules/homelab/links.nix` with an explicit `host`. When a VM moves to NixOS,
+  `modules/server/homelab/links.nix` with an explicit `host`. When a VM moves to NixOS,
   its entry moves into the service's module.
 - `check.url` probes another address than the link (Main's Traefik isn't
   reachable from the LAN, so Jellyfin and Archipelago are probed on their
@@ -423,7 +423,7 @@ done, fixed (with date).
 | 37 | **Renovate**: the floating list in `renovate.json` is maintained by hand; the Immich group would put a PostgreSQL major in the same PR as an Immich major. | Sync the list with the modules; check upstream's compose before merging such a PR. | - | Open |
 | 38 | **Nextcloud Pantry app**: migration broke at the cutover because two `occ upgrade` ran at once (repaired). | Rule: wait for "Initializing finished" before `occ` after a restart; never run two `occ upgrade` at once. | - | Repaired, rule documented |
 | 39 | **Circles app** logs a background-job error every 5 minutes in Nextcloud (upgrade noise, harmless). | Disable the app or wait it out. | - | Open (cosmetic) |
-| 40 | **Kanidm backup dataset** `store/authentication`: root `65534:65534 0700` set by hand, not declared. | Declare it in `modules/truenas/` (share id 9 is declared; give it the `[nix] authentication` comment so a reconcile doesn't duplicate it, switch the manager together). | - | Open |
+| 40 | **Kanidm backup dataset** `store/authentication`: root `65534:65534 0700` set by hand, not declared. | Declare it in `modules/server/truenas/` (share id 9 is declared; give it the `[nix] authentication` comment so a reconcile doesn't duplicate it, switch the manager together). | - | Open |
 | 41 | **Kanidm depends on TrueNAS at start** (backup mount `RequiresMountsFor`); login doesn't start if TrueNAS is down at boot. | Make the mount non-blocking for the IdP. | - | Open |
 | 42 | **Kanidm sees the router's address** for all clients (passthrough without PROXY protocol). | Enable PROXY protocol or accept. | - | Open |
 | 43 | **Gate cookie** `.vanwaaij.com` is sent to every subdomain (HttpOnly, Secure, SameSite=lax). | Accept or scope per host; also `--trusted-proxy-ip=127.0.0.1/32` was suggested for oauth2-proxy. | - | Open |

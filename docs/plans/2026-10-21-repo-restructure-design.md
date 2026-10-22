@@ -170,3 +170,29 @@ modules/
 - **Docs and plans that reference old paths.** `AGENTS.md`, `docs/modules.md`,
   `docs/lodestar.md` and `docs/homelab.md` are updated; old plans in
   `docs/plans/` stay as written (history).
+
+## Addendum: what changed while building
+
+Differences from the design above, found during the plan's tasks:
+
+- **Bluetooth has no own option.** The `hardware.bluetooth` rename was dropped:
+  `workstation/hardware/bluetooth.nix` is gated on NixOS's own
+  `hardware.bluetooth.enable` (a module option of that name would clash with it).
+- **More darwin renames** (macOS-only options are `darwin.*`):
+  `workstation.homebrew.removeUndeclared` → `darwin.homebrew.removeUndeclared` and
+  `hardware.thermalforge.enable` → `darwin.thermalforge.enable`, besides
+  `workstation.debloat` → `darwin.debloat` and `modules.locale` → `locale`.
+- **`homelab.containers.intelGpu` keeps** `hardware.graphics.enable` (the
+  `common-gpu-intel` profile doesn't set it), the `i915.enable_guc=3` kernel
+  parameter and `libva-utils`; only the userspace driver lines went.
+- **Port 22 left the common firewall.** The servers get it from sshd's
+  `openFirewall`; workstations have no sshd and no open 22.
+- **zsh:** starship is initialised in `programs.zsh.promptInit` (both
+  platforms); on darwin the aliases are also written to `/etc/zshrc`
+  (`config.system.build.setAliases`), because nix-darwin only puts
+  `environment.shellAliases` in `/etc/zprofile`.
+- **Dev toolchains** gated on `!isServer` are go, java, js (node, bun, deno),
+  python, rust and sql (including sql-studio).
+- **Verification method:** a snapshot script dumped the evaluated values of all
+  nine hosts to JSON; after each move the dump had to be identical, after each
+  behaviour change the diff had to be exactly the expected one.

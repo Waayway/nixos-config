@@ -18,11 +18,11 @@ now its own flake. Usage, the CLI, options, the security model and development
   `inputs.lodestar.darwinModules.default` (agent) on every host, next to
   opnix. They also build the `fleet` specialArg
   (`{ member; channel; }`) from the host file.
-- `modules/lodestar/agent.nix`: on every host with `fleet = true`, enables
+- `modules/common/lodestar/agent.nix`: on every host with `fleet = true`, enables
   `services.lodestar-agent` with `user` = the host's user, `channel` = the
   host's channel, `managerHost = "nixos-manager"`,
   `repoUrl = "https://github.com/Waayway/nixos-config"`.
-- `modules/lodestar/server.nix` (NixOS only, active where
+- `modules/server/lodestar/server.nix` (NixOS only, active where
   `services.lodestar-server.enable`): `hosts` from
   `lodestar.lib.hostsFrom` over all our NixOS and darwin configurations,
   `repoUrl`, `pushUrl = "git@github.com:Waayway/nixos-config"`,
@@ -64,10 +64,10 @@ NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#_1password-cli -c \
 
 The agent binary (`/var/lib/lodestar-agent/bin/lodestar-agent`) is signed with
 one certificate for all Macs, so macOS permissions survive updates:
-`modules/lodestar/lodestar-agent-signing.pem` (SHA-1
+`modules/common/lodestar/lodestar-agent-signing.pem` (SHA-1
 `f546f94d49ec2d267e04f47ad78181c70d282d02`). Its private key is the 1Password
 document **Lodestar Agent Signing Key** (vault Homelab, file `key.pem`); opnix
-(`modules/lodestar/agent.nix`) writes it to
+(`modules/common/lodestar/agent.nix`) writes it to
 `/var/lib/lodestar-agent/signing/key.pem` with the `opnix-homelab` token in
 `/etc/opnix-token`. opnix runs as a launchd daemon (log
 `/var/log/opnix-secrets.log`), after the activation that signs, so the first
@@ -89,7 +89,7 @@ nix run github:Waayway/lodestar -- status   # without installing
 
 ## Public URL
 
-`https://lodestar.vanwaaij.com` (route `lodestar` in `modules/lodestar/server.nix`:
+`https://lodestar.vanwaaij.com` (route `lodestar` in `modules/server/lodestar/server.nix`:
 public and on the tailnet, not behind the gate; Lodestar logs in with Kanidm itself).
 The router forwards to nixos-manager's proxy listener `10.0.10.170:8081`, which only the
 router (`10.0.10.110`, `trustedProxies`) can reach: the firewall opens that port for

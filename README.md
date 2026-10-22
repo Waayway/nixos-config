@@ -51,7 +51,7 @@ Checklist, in order. Replace `atlas` with the host name.
    ```sh
    xcode-select --install
    ```
-3. **Start the Xcode download now** (App Store) if the host has `hardware.thermalforge.enable`: the ThermalForge formula compiles from source and needs the full Xcode app, and the download takes a while. You don't have to wait for it — see step 7.
+3. **Start the Xcode download now** (App Store) if the host has `darwin.thermalforge.enable`: the ThermalForge formula compiles from source and needs the full Xcode app, and the download takes a while. You don't have to wait for it — see step 7.
 4. **Nix:** the official multi-user installer (not Determinate Nix — this repo manages `nix.*` itself), then open a new terminal:
    ```sh
    sh <(curl -L https://nixos.org/nix/install)
@@ -63,7 +63,7 @@ Checklist, in order. Replace `atlas` with the host name.
    ```
 7. **Xcode not finished yet?** Turn ThermalForge off for now (don't commit this) so it doesn't stop the switch:
    ```sh
-   sed -i '' 's/hardware.thermalforge.enable = true;/hardware.thermalforge.enable = false;/' ~/.flake/hosts/workstations/atlas.nix
+   sed -i '' 's/darwin.thermalforge.enable = true;/darwin.thermalforge.enable = false;/' ~/.flake/hosts/workstations/atlas.nix
    ```
 
 #### First switch
@@ -74,7 +74,7 @@ Checklist, in order. Replace `atlas` with the host name.
    ```
    - The Homebrew step downloads every cask (~8–10 GB with Microsoft 365 and Android Studio) one after another and takes a long time. `.pkg` installers (Microsoft 365, 1Password, Tailscale, Elgato, OneDrive) ask for your password.
    - Existing dotfiles are kept as `*.before-nix`.
-   - atlas sets `workstation.homebrew.removeUndeclared = "zap"`: casks/brews that aren't declared are removed (with their app data) on every switch. Other Macs default to `"keep"`.
+   - atlas sets `darwin.homebrew.removeUndeclared = "zap"`: casks/brews that aren't declared are removed (with their app data) on every switch. Other Macs default to `"keep"`.
 9. **If the switch stops partway** (e.g. `brew bundle failed!`): fix the cause and run it again. Activation runs system settings → Homebrew → ThermalForge setup → home-manager, so when Homebrew fails, **home-manager never runs**: no zsh config, starship prompt, Ghostty config or `~/.aerospace.toml` until a switch gets through.
 
 #### After the switch
@@ -102,11 +102,11 @@ Checklist, in order. Replace `atlas` with the host name.
 
 #### Host files vs. modules
 
-Host files stay thin: identity, which modules/categories are enabled, and a few per-host values. Apps are grouped in cross-platform categories under `modules/apps/` (`workstation.apps.<category>.enable`); a host can switch single apps off with `workstation.apps.<category>.<app>.enable = false`. macOS settings shared by every Mac live in `modules/darwin/` (`defaults.nix`, `spotlight.nix`, `system.nix`). On every Mac a random picture from `wallpapers/` becomes the desktop on each switch (`darwin.wallpaper` to pin one); macOS asks once to allow controlling System Events.
+Host files stay thin: identity, which modules/categories are enabled, and a few per-host values. Apps are grouped in cross-platform categories under `modules/workstation/apps/` (`workstation.apps.<category>.enable`); a host can switch single apps off with `workstation.apps.<category>.<app>.enable = false`. macOS settings shared by every Mac live in `modules/workstation/darwin/` (`defaults.nix`, `spotlight.nix`, `system.nix`). On every Mac a random picture from `wallpapers/` becomes the desktop on each switch (`darwin.wallpaper` to pin one); macOS asks once to allow controlling System Events.
 
 #### Server secrets
 
-Servers fetch their secrets from the 1Password vault **Homelab** with [opnix](https://github.com/brizzbuzz/opnix) (`modules/secrets/opnix.nix`); nothing secret is in this repo, not even encrypted.
+Servers fetch their secrets from the 1Password vault **Homelab** with [opnix](https://github.com/brizzbuzz/opnix) (`modules/server/secrets/opnix.nix`); nothing secret is in this repo, not even encrypted.
 
 - **New server:** after the first switch, put the service account token on it once (the token is the item "opnix-homelab service account" in the Personal vault):
   ```sh

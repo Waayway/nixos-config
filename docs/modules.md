@@ -1,4 +1,19 @@
-Modules categories are just folders for organization.
+`modules/` has three roots. Folders are structure only: they say who gets a
+module, and the module's own condition has to agree.
+
+- `common/`: every host. No host gate.
+- `workstation/`: laptops, desktop, Macs. Gated on `!hostPlatform.isServer`, a
+  workstation-only enable option, or home-manager (`*_home.nix`).
+- `server/`: the Proxmox VMs. Gated on `hostPlatform.isServer` or a server-only
+  enable option (`homelab.*`, `backup.*`, `truenas.*`, ...).
+
+A module with parts for several roles is split into one file per role, same
+category name under each root. Each file holds only what its role adds. sshd,
+for example:
+
+- `common/networking/openssh.nix`: sshd off (workstations use Tailscale SSH).
+- `server/networking/openssh.nix`: `mkIf isServer`, sshd on and hardened, port
+  22 open.
 
 Every module is always imported on every host (`modules/system.nix`). Never
 leave a module out of the imports per host or platform; the module switches its

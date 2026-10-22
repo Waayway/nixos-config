@@ -34,16 +34,25 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   `programs.nix` (packages: the proxmox template).
 - `hosts/<category>/<name>.nix`: one file per machine. Categories are folders
   (`servers`, `workstations`); a host is `foo.nix` or `foo/default.nix`.
-- `lib/`: helper functions. `lib/default.nix` imports every file there into
-  one attrset keyed by file name (`tools.mkSystem`, `tools.mkAppCategory`, …);
-  `systems.nix` uses it, and every module gets it as the `tools` specialArg
-  (use `tools.<name>`, not a relative import). Files: `discoverHosts.nix`,
-  `mkSystem.nix` (NixOS), `mkDarwin.nix`, `mkHome.nix` (home-manager),
-  `mkAppCategory.nix`, `mkDeployNode.nix` (deploy-rs), `umport.nix`
-  (recursive importer).
-- `modules/<category>/`: all configuration. `*_home.nix` files are
-  home-manager modules; everything else is a system module.
-- `modules/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
+- `lib/`: building systems. `lib/default.nix` imports every file there into
+  one attrset keyed by file name; `systems.nix` uses it as `builders`
+  (`builders.mkSystem`, …). Files: `discoverHosts.nix`, `mkSystem.nix` (NixOS),
+  `mkDarwin.nix`, `mkHome.nix` (home-manager), `mkDeployNode.nix` (deploy-rs),
+  `mkUser.nix`, `umport.nix` (recursive importer), `importCurDir.nix`.
+- `tools/`: helpers that modules, `programs.nix` and `tests/` call. Same
+  `default.nix` pattern; every module gets it as the `tools` specialArg (use
+  `tools.<name>`, not a relative import). Files: `mkAppCategory.nix`,
+  `color.nix`, `routeType.nix`, `routesFrom.nix`, `accessType.nix`,
+  `accessFrom.nix`, `accessProblems.nix`.
+- `modules/`: all configuration, in three roots that say who gets it. `*_home.nix`
+  files are home-manager modules; everything else is a system module.
+  - `common/`: every host. `boot console hardware locale lodestar networking nix
+    packages shell system users` (hardware = nixos-hardware profiles + firmware).
+  - `workstation/`: laptops, desktop, Macs. `apps darwin desktop development
+    gaming hardware shell`.
+  - `server/`: the Proxmox VMs. `backup homelab identity lodestar networking
+    proxmox secrets services truenas users`.
+- `modules/server/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
   (opnix); no secrets live in the repo.
 - `template/proxmox.nix`: base image for new Proxmox VMs.
 - `docs/`: `lodestar.md`, `plans/` (designs and implementation plans, one pair per
@@ -54,6 +63,17 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 - **Every module is always imported.** `modules/system.nix` imports every file
   under `modules/` on every host. Never exclude a module per host or platform in
   the import list. A module switches its own config off by condition.
+- **The folder must match the condition.** A file under `server/` is gated on
+  `isServer` or a server-only enable option; under `workstation/` on
+  `!isServer`, a workstation-only option or home-manager; `common/` has no host
+  gate. A module that has parts for several roles is split into one file per
+  role, same category under each root (`common/networking/openssh.nix` +
+  `server/networking/openssh.nix`), each holding only what its role adds.
+- **SSH:** workstations run no sshd; reach them through Tailscale SSH. Servers
+  run hardened sshd (no passwords, root `prohibit-password`), port 22 open, and
+  carry the break-glass root key (`server/users/`).
+- **macOS-only options are `darwin.*`** (`darwin.debloat`,
+  `darwin.thermalforge.enable`, `darwin.homebrew.removeUndeclared`).
 - **How a module turns itself off:**
   - Platform: `lib.optionalAttrs hostPlatform.isLinux` / `isDarwin` around the
     whole module, not `mkIf` (options that don't exist on the other platform
@@ -76,7 +96,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 - **Never merge attrsets with `//` when both sides can share a top-level key**
   (`users`, `home`, `nix`, `networking`, …): `//` is shallow and silently drops
   the left side. Use `lib.mkMerge`.
-- **Apps** live in cross-platform categories under `modules/apps/`
+- **Apps** live in cross-platform categories under `modules/workstation/apps/`
   (`workstation.apps.<category>.enable`, single apps off with
   `workstation.apps.<category>.<app>.enable = false`); each app maps to nixpkgs
   on Linux and to nixpkgs or a Homebrew cask on darwin.
@@ -148,7 +168,7 @@ Rust builds are slow there (4 cores): minutes, not seconds.
 
 The fleet manager is its own flake, `github:Waayway/lodestar` (input
 `lodestar`; local clone `~/lodestar`). This repo only holds its values:
-`modules/lodestar/` (agent on `fleet = true` hosts, server defaults) and the
+`modules/common/lodestar/` (agent on `fleet = true` hosts) and `modules/server/lodestar/` (server defaults) and the
 nixos-manager host file. See `docs/lodestar.md` (where values live, enrolling a
 host, open items). Rust/frontend work, its dev shell, demo and VM test happen in
 the lodestar repo, not here; after a lodestar change, `nix flake update
@@ -157,11 +177,12 @@ lodestar` here.
 ## Gotchas
 
 - **Servers vs. workstations:** `type = "server"` sets `hostPlatform.isServer`.
-  Desktop, graphics, sound, printing, power-profile and Flatpak modules are
-  gated on `!isServer`; a server that needs a GPU (e.g. the media VM) sets that
-  in its host file.
+  Desktop, sound, printing, power-profile and Flatpak modules are gated on
+  `!isServer`, as are the dev toolchains. GPUs come from nixos-hardware profiles
+  (`hardware.profiles = [ "common-gpu-intel" ]` in prod's host file); the ROCm/LACT
+  extras on hermes and hephaestus are `hardware.amdgpu.extras.enable`.
 - **Proxmox VMs** (`useDefaultHardware = true`) boot BIOS + GRUB from a single
-  ext4 root labelled `nixos` (`modules/vm-specific/proxmox-guest.nix` sets
+  ext4 root labelled `nixos` (`modules/server/proxmox/proxmox-guest.nix` sets
   `bootloader = "grub"`; the repo default is systemd-boot). A host file's
   `netInterface = { ip; prefixLength; }` pins its LAN address via
   systemd-networkd.
@@ -189,7 +210,7 @@ lodestar` here.
   hosts with containers: the host sees the mount as idle (containers hold their own
   bind in their mount namespace), the automount expires, the mount unit stops and
   everything with `RequiresMountsFor` is stopped with it (prod, 2026-10-19; fixed in
-  `modules/homelab/storage.nix`).
+  `modules/server/homelab/storage.nix`).
 - **The opnix trust credential is `tag:nixos`.** In the Tailscale policy `tag:nixos`
   owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity` are owned by
   `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
