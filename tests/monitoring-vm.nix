@@ -109,6 +109,7 @@ in
         # The data disk. qemu-vm replaces `fileSystems` with `virtualisation.fileSystems`,
         # so the module's entry is restated here (same device by label, same options), and
         # an empty second disk gets the `monitor-data` label before the mount waits for it.
+        # Not derived from `config.fileSystems`: that is the VM override itself (circular).
         virtualisation.emptyDiskImages = [ 1024 ];
         virtualisation.fileSystems."/var/lib/monitoring" = {
           device = "/dev/disk/by-label/monitor-data";
@@ -169,6 +170,24 @@ in
               + "localhost:3100/loki/api/v1/query_range"
           )
 
+      def push(tenant, host, line):
+          # HTTP status of a direct push to Loki as `tenant`.
+          body = (
+              "jq -nc --arg ts \"$(date +%s%N)\" "
+              + "'{streams: [{stream: {host: \"HOST\", job: \"budget-probe\"}, values: [[$ts, \"LINE\"]]}]}'"
+          ).replace("HOST", host).replace("LINE", line)
+          return (
+              body
+              + " | curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' "
+              + "-H 'X-Scope-OrgID: " + tenant + "' --data-binary @- localhost:3100/loki/api/v1/push"
+          )
+
+      def prom(q):
+          return (
+              "curl -sfG --data-urlencode " + shlex.quote("query=" + q) + " "
+              + "localhost:9090/api/v1/query"
+          )
+
       start_all()
 
       with subtest("monitor-data disk is mounted by label"):
@@ -189,12 +208,13 @@ in
           monitor.succeed("findmnt -n -o TARGET -T /var/lib/monitoring/prometheus | grep -qx /var/lib/monitoring")
           monitor.succeed("findmnt -n -o TARGET -T /var/lib/monitoring/loki | grep -qx /var/lib/monitoring")
 
-      with subtest("prometheus scrapes the agent"):
-          monitor.wait_until_succeeds(
-              "curl -sfG --data-urlencode 'query=up{host=\"agent\",job=\"node\"}' "
-              + "localhost:9090/api/v1/query | jq -e '.data.result[0].value[1] == \"1\"'",
-              timeout=120,
-          )
+      with subtest("prometheus scrapes the agent and the monitor"):
+          for host in ["agent", "monitor"]:
+              monitor.wait_until_succeeds(
+                  prom('up{host="' + host + '",job="node"}')
+                  + " | jq -e '.data.result[0].value[1] == \"1\"'",
+                  timeout=120,
+              )
 
       with subtest("agent logs reach its loki tenant"):
           agent.succeed("logger -t mtest hello-monitoring")
@@ -236,8 +256,20 @@ in
               "grep -qx 'loki_budget_exceeded{tenant=\"monitor\"} 0' /var/lib/node-exporter-textfile/loki-budget.prom"
           )
           monitor.fail("grep -q '^  monitor:' /var/lib/monitoring/loki/runtime.yaml")
-          # Loki rereads its runtime config every 10s.
-          monitor.sleep(15)
+          # Loki rereads its runtime config every 10s; then it rejects the agent tenant's
+          # pushes (429) and still accepts another tenant's (204).
+          monitor.wait_until_succeeds(push("agent", "agent", "probe-blocked") + " | grep -qx 429", timeout=30)
+          monitor.succeed(push("monitor", "budget-probe", "probe-allowed") + " | grep -qx 204")
+          monitor.wait_until_succeeds(
+              loki('{host="budget-probe"} |= "probe-allowed"', tenant="monitor")
+              + " | jq -e '.data.result | length > 0'",
+              timeout=60,
+          )
+          monitor.wait_until_succeeds(
+              prom('loki_discarded_bytes_total{reason="rate_limited",tenant="agent"} > 0')
+              + " | jq -e '.data.result | length > 0'",
+              timeout=60,
+          )
           agent.succeed("logger -t mtest after-budget")
           monitor.sleep(30)
           monitor.succeed(
@@ -245,7 +277,8 @@ in
           )
 
       with subtest("firewall"):
-          # Prometheus listens on loopback only.
+          # Prometheus listens on loopback only: the bind itself, and from outside.
+          monitor.succeed("test \"$(ss -ltnH 'sport = :9090' | awk '{print $4}' | sort -u)\" = 127.0.0.1:9090")
           agent.fail("curl -sf --max-time 3 http://${monitorIp}:9090/")
           # Exporters: the monitor only.
           monitor.succeed("curl -sf --max-time 3 http://${agentIp}:9100/metrics >/dev/null")
