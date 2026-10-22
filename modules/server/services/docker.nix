@@ -146,6 +146,14 @@ lib.optionalAttrs hostPlatform.isLinux {
         };
         virtualisation.oci-containers.backend = "docker";
 
+        # Per-container metrics for the Grafana "Docker / cAdvisor" dashboard (grafana.com 14282).
+        services.cadvisor = {
+          enable = true;
+          listenAddress = "0.0.0.0";
+          port = 9101;
+        };
+        homelab.monitoring.targets.cadvisor.port = 9101;
+
         systemd.services = lib.mkMerge [
           # Containers create their networks and wait for the TrueNAS paths they bind.
           (lib.mapAttrs' (

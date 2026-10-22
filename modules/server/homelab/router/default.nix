@@ -320,11 +320,16 @@ lib.optionalAttrs hostPlatform.isLinux {
           }
         ];
 
+        homelab.monitoring.targets.traefik.port = 8082;
+
         services.traefik = {
           enable = true;
 
           staticConfigOptions = {
             api.dashboard = true;
+
+            # Request and entrypoint metrics for the Grafana Traefik dashboard (grafana.com 17346).
+            metrics.prometheus.entryPoint = "metrics";
 
             entryPoints = {
               web = {
@@ -341,6 +346,8 @@ lib.optionalAttrs hostPlatform.isLinux {
                   middlewares = [ "strip-marker@file" ];
                 };
               };
+              # Scraped by the monitor only (the agent's firewall rule); not routed.
+              metrics.address = ":8082";
               # Reached only through the Tailscale Services (tcp:443 -> 127.0.0.1:8443).
               tailnet = {
                 address = "127.0.0.1:8443";

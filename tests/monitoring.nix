@@ -10,6 +10,7 @@
 let
   prod = nixosConfigurations.prod.config;
   test = nixosConfigurations.router-test.config;
+  router = nixosConfigurations.router.config;
   atlas = darwinConfigurations.atlas.config;
   node = prod.services.prometheus.exporters.node;
   alloy = prod.environment.etc."alloy/config.alloy".text;
@@ -40,6 +41,17 @@ assert has "-s 10.0.10.140" fw.extraStopCommands;
 assert !(lib.elem 9100 fw.allowedTCPPorts);
 assert lib.all (i: !(lib.elem 9100 i.allowedTCPPorts)) (lib.attrValues fw.interfaces);
 assert !prod.services.prometheus.exporters.node.openFirewall;
+# per-host extras: cAdvisor on prod, Traefik's metrics entrypoint on the router
+assert prod.services.cadvisor.enable;
+assert prod.services.cadvisor.port == 9101;
+assert prod.services.cadvisor.listenAddress == "0.0.0.0";
+assert prod.homelab.monitoring.targets.cadvisor.port == 9101;
+assert has "--dport 9101" fw.extraCommands;
+assert router.services.traefik.staticConfigOptions.metrics.prometheus.entryPoint == "metrics";
+assert router.services.traefik.staticConfigOptions.entryPoints.metrics.address == ":8082";
+assert router.homelab.monitoring.targets.traefik.port == 8082;
+assert has "--dport 8082" router.networking.firewall.extraCommands;
+assert has "-s 10.0.10.140" router.networking.firewall.extraCommands;
 # a host with the agent off has none of it
 assert !test.services.prometheus.exporters.node.enable;
 assert !test.services.alloy.enable;
