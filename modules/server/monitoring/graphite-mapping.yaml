@@ -1,45 +1,64 @@
-# graphite_exporter mapping for TrueNAS SCALE's Graphite exporter (reporting exporter,
-# destination = the monitor VM, port 2003). TrueNAS sends netdata-style names:
-# `<prefix>.<hostname>.<chart>.<dimension>`, with prefix `truenas` assumed here.
-#
-# DRAFT: written from netdata's naming conventions, not from live data. Task 10 (rollout)
-# compares it with what TrueNAS actually sends (unmapped names are still exported under
-# their sanitised Graphite name, so `curl 127.0.0.1:9108/metrics | grep ^truenas` on the
-# monitor shows what to map) and adjusts it then.
+# graphite_exporter mapping for TrueNAS SCALE's Graphite exporter (Reporting ->
+# Exporters, `monitor`: destination 10.0.10.140:2003, prefix and namespace `truenas`,
+# every 10 s). TrueNAS sends netdata paths `truenas.truenas.<chart>.<dimension>`; the
+# names below were read off the wire during the rollout (2026-10-22). netdata exports
+# every chart it has (per-unit cgroups, NFS ops, anomaly detection, ...): only the ones
+# mapped here are kept, the last rule drops the rest. Pool space isn't in the export
+# with a pool name; pool health comes from truenas-pools (exporters.nix).
 #
 # The file is JSON, which is valid YAML: exporters.nix reads it with builtins.fromJSON
 # (dropping these comment lines) to set `mappingSettings`, which NixOS writes out as YAML.
 {
   "mappings": [
     {
-      "match": "truenas.*.disk_space.*.*",
-      "name": "truenas_filesystem_bytes",
-      "labels": { "host": "$1", "mount": "$2", "type": "$3" }
+      "match": "truenas.truenas.truenas_disk_stats.*.*",
+      "name": "truenas_disk_kibibytes_per_second",
+      "labels": { "disk": "$1", "direction": "$2" }
     },
     {
-      "match": "truenas.*.disk.*.*",
-      "name": "truenas_disk_io_kibibytes_per_second",
-      "labels": { "host": "$1", "disk": "$2", "direction": "$3" }
+      "match": "truenas.truenas.truenas_disk_stats.ops.*.*",
+      "name": "truenas_disk_operations_per_second",
+      "labels": { "disk": "$1", "operation": "$2" }
     },
     {
-      "match": "truenas.*.disktemp.*.*",
-      "name": "truenas_disk_temperature_celsius",
-      "labels": { "host": "$1", "disk": "$2" }
+      "match": "truenas.truenas.truenas_disk_stats.busy.*.busy",
+      "name": "truenas_disk_busy_milliseconds",
+      "labels": { "disk": "$1" }
     },
     {
-      "match": "truenas.*.zfs.arc_size.*",
-      "name": "truenas_zfs_arc_size_bytes",
-      "labels": { "host": "$1", "kind": "$2" }
+      "match": "truenas.truenas.truenas_arcstats.size.size",
+      "name": "truenas_zfs_arc_size_bytes"
     },
     {
-      "match": "truenas.*.zfs.hits.*",
-      "name": "truenas_zfs_arc_accesses_per_second",
-      "labels": { "host": "$1", "result": "$2" }
+      "match": "truenas.truenas.truenas_arcstats.*.*",
+      "name": "truenas_zfs_arcstats",
+      "labels": { "stat": "$1", "dimension": "$2" }
     },
     {
-      "match": "truenas.*.net.*.*",
+      "match": "truenas.truenas.truenas_meminfo.*.*",
+      "name": "truenas_memory_bytes",
+      "labels": { "kind": "$1" }
+    },
+    {
+      "match": "truenas.truenas.truenas_cpu_usage.cpu.*",
+      "name": "truenas_cpu_usage_percent",
+      "labels": { "cpu": "$1" }
+    },
+    {
+      "match": "truenas.truenas.cputemp.temperatures.*",
+      "name": "truenas_cpu_temperature_celsius",
+      "labels": { "cpu": "$1" }
+    },
+    {
+      "match": "truenas.truenas.net.*.*",
       "name": "truenas_network_kilobits_per_second",
-      "labels": { "host": "$1", "interface": "$2", "direction": "$3" }
+      "labels": { "interface": "$1", "direction": "$2" }
+    },
+    {
+      "match": ".+",
+      "match_type": "regex",
+      "action": "drop",
+      "name": "dropped"
     }
   ]
 }
