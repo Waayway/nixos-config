@@ -1,6 +1,13 @@
-{ pkgs, ... }:
 {
-  environment.systemPackages = with pkgs; [
-    jdk17
-  ];
+  pkgs,
+  lib,
+  hostPlatform,
+  ...
+}:
+{
+  config = lib.mkIf (!hostPlatform.isServer) {
+    environment.systemPackages = with pkgs; [
+      jdk17
+    ];
+  };
 }
