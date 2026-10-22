@@ -128,6 +128,11 @@ assert lib.all (app: state.groups."${app}-users".members == everyone) [
   "immich"
   "jellyfin"
 ];
+# Grafana (on the monitor): its client and group
+assert state.systems.oauth2.grafana.preferShortUsername;
+assert lib.elem "https://grafana.vanwaaij.com/login/generic_oauth"
+  state.systems.oauth2.grafana.originUrl;
+assert state.groups.grafana-users.members == [ "thijs" ];
 # the apps on prod come from its configuration (tools.accessFrom), with their OIDC clients
 assert id.access.nextcloud.declaredBy == "prod";
 assert lib.elem "https://jellyfin.vanwaaij.com/sso/OID/redirect/kanidm"

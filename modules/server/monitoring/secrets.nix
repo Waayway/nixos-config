@@ -5,9 +5,10 @@
 #
 # Owners are the consuming service's user, or root (0400) when systemd reads the file
 # (`EnvironmentFile`, `LoadCredential`). `services` lists the units that read a secret
-# (restarted when it changes); units that come with later modules (Grafana,
-# healthchecks-sync) are added there:
-#   grafanaAdminPassword, grafanaOidcSecret  owner `grafana` (read by `$__file{}`)
+# (restarted when it changes); units that come with later modules (healthchecks-sync)
+# are added there:
+#   grafanaAdminPassword, grafanaSecretKey,
+#   grafanaOidcSecret                        owner `grafana` (read by `$__file{}`)
 #   pveEnv, healthchecksPingEnv              root, as EnvironmentFile
 #   healthchecksReadonlyKey                  prometheus (credentials_file)
 #   healthchecksApiKey, healthchecksProject, truenasKey
@@ -29,11 +30,21 @@ let
     grafanaAdminPassword = {
       reference = "op://Homelab/grafana-admin/password";
       owner = "grafana";
+      services = [ "grafana.service" ];
+      when = enabled;
+    };
+    # Grafana's own signing/encryption key (NixOS 26.05 has no default any more): the
+    # field `secret-key` of the grafana-admin item, any long random string.
+    grafanaSecretKey = {
+      reference = "op://Homelab/grafana-admin/secret-key";
+      owner = "grafana";
+      services = [ "grafana.service" ];
       when = enabled;
     };
     grafanaOidcSecret = {
       reference = "op://Homelab/kanidm-oauth2-grafana/credential";
       owner = "grafana";
+      services = [ "grafana.service" ];
       when = enabled;
     };
     pveEnv = {

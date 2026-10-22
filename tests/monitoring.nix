@@ -36,6 +36,14 @@ let
   );
   units = monitor.systemd;
   probes = targetsOf "blackbox";
+  gf = monitor.services.grafana;
+  gs = gf.settings;
+  oauth = gs."auth.generic_oauth";
+  ds = lib.listToAttrs (
+    map (d: lib.nameValuePair d.uid d) gf.provision.datasources.settings.datasources
+  );
+  prov = lib.head gf.provision.dashboards.settings.providers;
+  dashDir = ../modules/server/monitoring/dashboards;
 in
 assert node.enable;
 assert lib.elem "systemd" node.enabledCollectors;
@@ -240,6 +248,64 @@ assert
   in
   !(lib.any (j: j.job_name == "pve") off.config.services.prometheus.scrapeConfigs)
   && !off.config.services.prometheus.exporters.pve.enable;
+# Grafana: listens on the LAN, signs in through Kanidm, provisioned from Nix
+assert gf.enable;
+assert gs.server.http_addr == "0.0.0.0";
+assert gs.server.http_port == 3000;
+assert gs.server.root_url == "https://grafana.vanwaaij.com/";
+assert gs.auth.disable_login_form;
+assert oauth.enabled;
+assert oauth.client_id == "grafana";
+assert oauth.use_pkce;
+assert oauth.auth_url == "https://id.vanwaaij.com/ui/oauth2";
+assert oauth.token_url == "https://id.vanwaaij.com/oauth2/token";
+assert oauth.api_url == "https://id.vanwaaij.com/oauth2/openid/grafana/userinfo";
+assert oauth.login_attribute_path == "preferred_username";
+assert oauth.role_attribute_strict;
+assert has "admins" oauth.role_attribute_path && has "'Admin'" oauth.role_attribute_path;
+assert oauth.client_secret == "$__file{${secrets.grafanaOidcSecret}}";
+assert gs.security.admin_user == "admin";
+assert gs.security.admin_password == "$__file{${secrets.grafanaAdminPassword}}";
+assert gs.security.secret_key == "$__file{${secrets.grafanaSecretKey}}";
+assert opn.grafanaSecretKey.reference == "op://Homelab/grafana-admin/secret-key";
+assert opn.grafanaSecretKey.owner == "grafana";
+assert opn.grafanaAdminPassword.services == [ "grafana.service" ];
+assert opn.grafanaOidcSecret.services == [ "grafana.service" ];
+assert ds.prometheus.type == "prometheus" && ds.prometheus.url == "http://127.0.0.1:9090";
+assert ds.prometheus.isDefault;
+assert ds.loki.type == "loki" && ds.loki.url == "http://127.0.0.1:3100";
+assert ds.loki.jsonData.httpHeaderName1 == "X-Scope-OrgID";
+assert ds.loki.secureJsonData.httpHeaderValue1 == "identity|monitor|nixos-manager|prod|router";
+assert prov.allowUiUpdates == false;
+assert prov.options.path == dashDir;
+assert gs.dashboards.default_home_dashboard_path == "${dashDir}/overview.json";
+assert lib.all (f: builtins.pathExists "${dashDir}/${f}.json") [
+  "overview"
+  "node-exporter-full"
+  "proxmox"
+  "traefik"
+  "cadvisor"
+  "logs"
+];
+assert lib.all (f: builtins.isAttrs (builtins.fromJSON (builtins.readFile "${dashDir}/${f}.json")))
+  [
+    "overview"
+    "node-exporter-full"
+    "proxmox"
+    "traefik"
+    "cadvisor"
+    "logs"
+  ];
+assert !(has "${"$"}{DS_" (builtins.readFile "${dashDir}/proxmox.json"));
+assert lib.elem 3000
+  monitor.networking.firewall.interfaces.${monitor.homelab.lan.interface}.allowedTCPPorts;
+assert monitor.homelab.routes.grafana.host == "grafana.vanwaaij.com";
+assert monitor.homelab.routes.grafana.backend == "http://10.0.10.140:3000";
+assert !monitor.homelab.routes.grafana.public;
+assert monitor.homelab.access.grafana.members == [ "thijs" ];
+assert monitor.homelab.access.grafana.oidc.preferShortUsername;
+assert monitor.lodestar.links.grafana.group == "Infrastructure";
+assert lib.elem "https://grafana.vanwaaij.com/" probes;
 # the monitor is not the monitor on other hosts
 assert !prod.homelab.monitoring.server.enable;
 # darwin: the options exist, nothing else

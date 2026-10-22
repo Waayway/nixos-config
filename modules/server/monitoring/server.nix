@@ -81,6 +81,7 @@ lib.optionalAttrs hostPlatform.isLinux {
       type = lib.types.submodule {
         options = lib.genAttrs [
           "grafanaAdminPassword"
+          "grafanaSecretKey"
           "grafanaOidcSecret"
           "pveEnv"
           "healthchecksPingEnv"

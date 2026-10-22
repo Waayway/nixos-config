@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Grafana (dashboards): a simple self-made mark, a line chart in white on a rounded
+       square in orange (#F05A28). Not the Grafana logo. -->
+  <rect width="64" height="64" rx="14" fill="#F05A28"/>
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 14v36h36"/>
+    <path d="M22 40l9-10 7 6 11-16"/>
+  </g>
+</svg>
