@@ -17,8 +17,8 @@ lib.optionalAttrs hostPlatform.isLinux (
     ];
 
     home.activation.installConfig = ''
-      if [ ! -e ~/.config/eww ]; then
-        ln -s ~/.flake/${basePath} ~/.config/eww
+      if [ -L ~/.config/eww ] || [ ! -e ~/.config/eww ]; then
+        ln -sfn ~/.flake/${basePath} ~/.config/eww
       fi
     '';
 
