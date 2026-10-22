@@ -19,6 +19,7 @@ let
   has = lib.hasInfix;
   monitor = nixosConfigurations.monitor.config;
   prom = monitor.services.prometheus;
+  loki = monitor.services.loki;
   job = n: lib.findFirst (j: j.job_name == n) null prom.scrapeConfigs;
   targetsOf = n: lib.concatMap (s: s.targets) (job n).static_configs;
   labelsOf = n: map (s: s.labels) (job n).static_configs;
@@ -82,6 +83,31 @@ assert !(lib.elem "10.0.10.140:9101" (targetsOf "cadvisor"));
 assert targetsOf "traefik" == [ "10.0.10.110:8082" ];
 assert monitor.fileSystems."/var/lib/monitoring".device == "/dev/disk/by-label/monitor-data";
 assert !(lib.elem 9090 monitor.networking.firewall.allowedTCPPorts);
+# Loki: multi-tenant, retention and limits, runtime config, budget timer, firewall
+assert loki.enable;
+assert loki.configuration.auth_enabled;
+assert loki.configuration.limits_config.multi_tenant_queries_enabled;
+assert loki.configuration.limits_config.retention_period == "336h";
+assert loki.configuration.limits_config.ingestion_rate_mb == 1;
+assert loki.configuration.limits_config.ingestion_burst_size_mb == 4;
+assert loki.configuration.compactor.retention_enabled;
+assert loki.configuration.runtime_config.file == "/var/lib/monitoring/loki/runtime.yaml";
+assert loki.configuration.runtime_config.period == "10s";
+assert loki.dataDir == "/var/lib/monitoring/loki";
+assert loki.configuration.server.http_listen_port == 3100;
+assert monitor.systemd.services.loki.unitConfig.RequiresMountsFor == "/var/lib/monitoring";
+assert monitor.systemd.services.prometheus.unitConfig.RequiresMountsFor == "/var/lib/monitoring";
+assert targetsOf "loki" == [ "127.0.0.1:3100" ];
+assert monitor.systemd.timers.loki-budget.timerConfig.OnCalendar == "*:0/5";
+assert monitor.systemd.timers.loki-budget.wantedBy == [ "timers.target" ];
+assert has ''"prod":200'' monitor.systemd.services.loki-budget.environment.BUDGETS;
+assert !(has "router-test" monitor.systemd.services.loki-budget.environment.BUDGETS);
+assert
+  monitor.systemd.services.loki-budget.environment.TEXTFILE
+  == "/var/lib/node-exporter-textfile/loki-budget.prom";
+assert has "-s 10.0.10.100" monitor.networking.firewall.extraCommands;
+assert has "--dport 3100" monitor.networking.firewall.extraCommands;
+assert !(lib.elem 3100 monitor.networking.firewall.allowedTCPPorts);
 # secrets: opnix references and paths, gated by the sub-enables
 assert opn.grafanaAdminPassword.reference == "op://Homelab/grafana-admin/password";
 assert opn.grafanaOidcSecret.owner == "grafana";
