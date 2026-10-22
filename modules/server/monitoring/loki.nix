@@ -88,8 +88,8 @@ lib.optionalAttrs hostPlatform.isLinux {
           file = runtimeFile;
           period = "10s";
         };
-        # Queries across tenants (Grafana's all-tenants view); Loki 3.x spells it so.
-        tenant_federation.enabled = true;
+        # Queries across tenants (Grafana's all-tenants view).
+        querier.multi_tenant_queries_enabled = true;
         analytics.reporting_enabled = false;
       };
     };
