@@ -56,11 +56,13 @@ let
     healthchecksPingEnv = {
       reference = "op://Homelab/healthchecks-ping-key/env";
       owner = "root";
+      services = [ "grafana.service" ];
       when = hc;
     };
     healthchecksApiKey = {
       reference = "op://Homelab/healthchecks-api-key/credential";
       owner = "root";
+      services = [ "healthchecks-sync.service" ];
       when = hc;
     };
     healthchecksReadonlyKey = {

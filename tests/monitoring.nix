@@ -44,6 +44,23 @@ let
   );
   prov = lib.head gf.provision.dashboards.settings.providers;
   dashDir = ../modules/server/monitoring/dashboards;
+  al = gf.provision.alerting;
+  cps = al.contactPoints.settings.contactPoints;
+  rules = (lib.head al.rules.settings.groups).rules;
+  policy = lib.head al.policies.settings.policies;
+  hcs = [
+    "host-down"
+    "vm-down"
+    "disk-full"
+    "failed-unit"
+    "route-down"
+    "truenas-pool"
+    "log-budget"
+    "memory"
+    "watchdog"
+  ];
+  syncChecks = builtins.fromJSON units.services.healthchecks-sync.environment.CHECKS;
+  routeOf = hc: lib.findFirst (r: r.receiver == "homelab-${hc}") null policy.routes;
 in
 assert node.enable;
 assert lib.elem "systemd" node.enabledCollectors;
@@ -309,6 +326,56 @@ assert monitor.homelab.access.grafana.members == [ "thijs" ];
 assert monitor.homelab.access.grafana.oidc.preferShortUsername;
 assert monitor.lodestar.links.grafana.group == "Infrastructure";
 assert lib.elem "https://grafana.vanwaaij.com/" probes;
+# alerts: one rule, contact point, route and check per hc; the watchdog pings every minute
+assert lib.length cps == 9;
+assert map (c: c.name) cps == map (h: "homelab-${h}") hcs;
+assert lib.all (
+  c:
+  let
+    r = lib.head c.receivers;
+  in
+  r.type == "webhook" && r.settings.url == "https://hc-ping.com/$HC_PING_KEY/${c.name}"
+) cps;
+assert lib.length rules == 9;
+assert lib.all (r: lib.any (c: c.name == "homelab-${r.labels.hc}") cps) rules;
+assert (lib.head rules).data != [ ] && (lib.head rules).condition == "C";
+assert (lib.elemAt (lib.head rules).data 0).datasourceUid == "prometheus";
+assert (lib.elemAt (lib.head rules).data 0).model.expr == ''up{job="node"} == 0'';
+assert (lib.head rules)."for" == "3m";
+assert
+  policy.group_by == [
+    "alertname"
+    "host"
+  ];
+assert policy.group_interval == "1m" && policy.repeat_interval == "4h";
+assert lib.all (
+  h:
+  routeOf h != null
+  &&
+    (routeOf h).object_matchers == [
+      [
+        "hc"
+        "="
+        h
+      ]
+    ]
+) hcs;
+assert (routeOf "watchdog").repeat_interval == "1m";
+assert (routeOf "memory").repeat_interval == "4h";
+assert
+  monitor.systemd.services.grafana.serviceConfig.EnvironmentFile == secrets.healthchecksPingEnv;
+assert opn.healthchecksPingEnv.services == [ "grafana.service" ];
+assert opn.healthchecksApiKey.services == [ "healthchecks-sync.service" ];
+assert map (c: c.slug) syncChecks == (map (h: "homelab-${h}") hcs) ++ [ "homelab-truenas" ];
+assert lib.all (c: c.timeout == 31536000) (lib.filter (c: c.slug != "homelab-watchdog") syncChecks);
+assert (lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).timeout == 300;
+assert !(lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).filter;
+assert !(lib.findFirst (c: c.slug == "homelab-truenas") null syncChecks).filter;
+assert units.services.healthchecks-sync.environment.HC_API_KEY_FILE == secrets.healthchecksApiKey;
+assert units.services.healthchecks-sync.serviceConfig.Type == "oneshot";
+assert lib.elem "network-online.target" units.services.healthchecks-sync.after;
+assert units.services.healthchecks-sync.restartTriggers != [ ];
+assert !(prod.systemd.services ? healthchecks-sync);
 # the monitor is not the monitor on other hosts
 assert !prod.homelab.monitoring.server.enable;
 # darwin: the options exist, nothing else
