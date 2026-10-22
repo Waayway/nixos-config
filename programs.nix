@@ -56,4 +56,15 @@ in
     inherit lib;
     inherit (inputs.self) nixosConfigurations darwinConfigurations;
   };
+
+  # VM test of the monitoring stack (tests/monitoring-vm.nix); needs KVM, so build it on
+  # the Linux builder (AGENTS.md).
+  checks.x86_64-linux.monitoring-vm =
+    inputs.nixpkgs.legacyPackages.x86_64-linux.testers.runNixOSTest
+      (
+        import ./tests/monitoring-vm.nix {
+          pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+          inherit lib tools;
+        }
+      );
 }

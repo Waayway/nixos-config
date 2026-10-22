@@ -1,0 +1,259 @@
+# VM test of the monitoring stack (modules/server/monitoring/*.nix): a `monitor` node
+# (Prometheus, Loki, Grafana), an `agent` node (node_exporter + Alloy) and a bystander
+# `other`. Proves scraping, log shipping per tenant, the daily log budget (a 1 MB budget
+# blown by a flood, then nothing accepted), Grafana's provisioning (data sources, and the
+# Loki tenant header read through `$__file{}`), the monitor-data disk, and the firewall
+# (exporters open to the monitor only, Loki to monitored hosts only, Prometheus on
+# loopback). Run on a Linux builder with KVM:
+#   nix build --no-link -L .#checks.x86_64-linux.monitoring-vm
+#
+# The real modules are imported, except secrets.nix (opnix/1Password): the secrets are
+# test files. `server.hosts` is set by hand (no flake to collect from), and the one flake
+# value exporters.nix reads (the router's extra routes, for the blackbox job) is stubbed.
+{
+  pkgs,
+  lib,
+  tools,
+}:
+let
+  dir = ../modules/server/monitoring;
+  monitoringModules = map (f: dir + "/${f}") (
+    lib.filter (f: lib.hasSuffix ".nix" f && f != "secrets.nix") (lib.attrNames (builtins.readDir dir))
+  );
+
+  adminPassword = "test-admin-password";
+
+  common = {
+    imports = monitoringModules ++ [
+      ../modules/server/homelab/lan.nix
+      ../modules/server/homelab/routes-option.nix
+      ../modules/server/homelab/access-option.nix
+      # Comes from the lodestar flake on real hosts.
+      {
+        options.lodestar.links = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+        };
+      }
+    ];
+    homelab.lan.interface = "eth1";
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.jq
+    ];
+  };
+in
+{
+  name = "monitoring-vm";
+
+  node.specialArgs = {
+    inherit tools;
+    hostPlatform = {
+      isLinux = true;
+      isDarwin = false;
+      isServer = true;
+    };
+    # exporters.nix collects routes from the flake and the router's extraRoutes.
+    inputs.self.nixosConfigurations.router.config.homelab = {
+      routes = { };
+      router.extraRoutes = { };
+    };
+    serverOptions = { };
+  };
+
+  nodes = {
+    monitor =
+      { config, nodes, ... }:
+      {
+        imports = [ common ];
+        virtualisation.memorySize = 2048;
+        virtualisation.cores = 2;
+
+        homelab.lan.address = config.networking.primaryIPAddress;
+        homelab.monitoring = {
+          serverAddress = config.networking.primaryIPAddress;
+          server = {
+            enable = true;
+            pve.enable = false;
+            truenas.enable = false;
+            healthchecks.enable = false;
+            hosts = {
+              agent = {
+                address = nodes.agent.networking.primaryIPAddress;
+                logBudgetMB = 1;
+                targets.node = {
+                  port = 9100;
+                  path = "/metrics";
+                };
+              };
+              monitor = {
+                address = config.networking.primaryIPAddress;
+                logBudgetMB = 200;
+                targets.node = {
+                  port = 9100;
+                  path = "/metrics";
+                };
+              };
+            };
+            secrets = {
+              grafanaAdminPassword = pkgs.writeText "grafana-admin-password" adminPassword;
+              grafanaSecretKey = pkgs.writeText "grafana-secret-key" "test-secret-key-0123456789abcdef";
+              grafanaOidcSecret = pkgs.writeText "grafana-oidc-secret" "test-oidc-secret";
+            };
+          };
+        };
+
+        # Faster than the 1m default, so the budget query sees the flood within seconds.
+        services.prometheus.globalConfig.scrape_interval = "5s";
+
+        # The data disk. qemu-vm replaces `fileSystems` with `virtualisation.fileSystems`,
+        # so the module's entry is restated here (same device by label, same options), and
+        # an empty second disk gets the `monitor-data` label before the mount waits for it.
+        virtualisation.emptyDiskImages = [ 1024 ];
+        virtualisation.fileSystems."/var/lib/monitoring" = {
+          device = "/dev/disk/by-label/monitor-data";
+          fsType = "ext4";
+          options = [ "nofail" ];
+        };
+        systemd.services.format-monitor-data = {
+          unitConfig.DefaultDependencies = false;
+          requires = [ "dev-vdb.device" ];
+          after = [ "dev-vdb.device" ];
+          before = [ "var-lib-monitoring.mount" ];
+          wantedBy = [ "local-fs.target" ];
+          path = [
+            pkgs.e2fsprogs
+            pkgs.util-linux
+            pkgs.systemd
+          ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          script = ''
+            blkid /dev/vdb || mkfs.ext4 -q -L monitor-data /dev/vdb
+            udevadm trigger --settle /dev/vdb
+          '';
+        };
+      };
+
+    agent =
+      { nodes, ... }:
+      {
+        imports = [ common ];
+        homelab.monitoring.serverAddress = nodes.monitor.networking.primaryIPAddress;
+        # The flood is ~4000 journal lines; journald's default rate limit would drop most
+        # of them before Alloy sees them.
+        services.journald.rateLimitBurst = 0;
+      };
+
+    other = {
+      environment.systemPackages = [ pkgs.curl ];
+    };
+  };
+
+  testScript =
+    { nodes, ... }:
+    let
+      agentIp = nodes.agent.networking.primaryIPAddress;
+      monitorIp = nodes.monitor.networking.primaryIPAddress;
+    in
+    ''
+      import shlex
+
+      def loki(q, tenant="agent"):
+          return (
+              f"curl -sfG -H 'X-Scope-OrgID: {tenant}' "
+              + "--data-urlencode " + shlex.quote("query=" + q) + " "
+              + "--data-urlencode since=1h "
+              + "localhost:3100/loki/api/v1/query_range"
+          )
+
+      start_all()
+
+      with subtest("monitor-data disk is mounted by label"):
+          monitor.wait_for_unit("var-lib-monitoring.mount")
+          monitor.succeed("findmnt -n -o LABEL /var/lib/monitoring | grep -qx monitor-data")
+
+      with subtest("services start"):
+          monitor.wait_for_unit("prometheus.service")
+          monitor.wait_for_unit("loki.service")
+          monitor.wait_for_unit("grafana.service")
+          monitor.wait_for_open_port(9090)
+          monitor.wait_for_open_port(3100)
+          monitor.wait_for_open_port(3000)
+          agent.wait_for_unit("prometheus-node-exporter.service")
+          agent.wait_for_unit("alloy.service")
+          agent.wait_for_open_port(9100)
+          # Prometheus and Loki keep their data on the data disk.
+          monitor.succeed("findmnt -n -o TARGET -T /var/lib/monitoring/prometheus | grep -qx /var/lib/monitoring")
+          monitor.succeed("findmnt -n -o TARGET -T /var/lib/monitoring/loki | grep -qx /var/lib/monitoring")
+
+      with subtest("prometheus scrapes the agent"):
+          monitor.wait_until_succeeds(
+              "curl -sfG --data-urlencode 'query=up{host=\"agent\",job=\"node\"}' "
+              + "localhost:9090/api/v1/query | jq -e '.data.result[0].value[1] == \"1\"'",
+              timeout=120,
+          )
+
+      with subtest("agent logs reach its loki tenant"):
+          agent.succeed("logger -t mtest hello-monitoring")
+          monitor.wait_until_succeeds(
+              loki('{host="agent"} |= "hello-monitoring"') + " | jq -e '.data.result | length > 0'",
+              timeout=60,
+          )
+          # Another tenant does not see them.
+          monitor.succeed(
+              loki('{host="agent"} |= "hello-monitoring"', tenant="monitor")
+              + " | jq -e '.data.result | length == 0'"
+          )
+
+      with subtest("grafana: health, provisioned data sources, loki tenants via $__file"):
+          monitor.succeed("curl -sf localhost:3000/api/health | jq -e '.database == \"ok\"'")
+          monitor.succeed(
+              "curl -sf -u admin:${adminPassword} localhost:3000/api/datasources "
+              + "| jq -e '[.[].uid] | contains([\"prometheus\", \"loki\"])'"
+          )
+          # Through Grafana's data source proxy: the X-Scope-OrgID header is the tenant
+          # list from the file, so Loki answers with the agent's labels.
+          monitor.wait_until_succeeds(
+              "curl -sf -u admin:${adminPassword} "
+              + "localhost:3000/api/datasources/proxy/uid/loki/loki/api/v1/label/host/values "
+              + "| jq -e '.data | index(\"agent\") != null'",
+              timeout=60,
+          )
+
+      with subtest("log budget blocks a flooding host"):
+          agent.succeed("head -c 3000000 /dev/urandom | base64 -w 1000 | logger -t flood")
+          monitor.wait_until_succeeds(
+              "systemctl start loki-budget && grep -q '^  agent:' /var/lib/monitoring/loki/runtime.yaml",
+              timeout=180,
+          )
+          monitor.succeed(
+              "grep -qx 'loki_budget_exceeded{tenant=\"agent\"} 1' /var/lib/node-exporter-textfile/loki-budget.prom"
+          )
+          monitor.succeed(
+              "grep -qx 'loki_budget_exceeded{tenant=\"monitor\"} 0' /var/lib/node-exporter-textfile/loki-budget.prom"
+          )
+          monitor.fail("grep -q '^  monitor:' /var/lib/monitoring/loki/runtime.yaml")
+          # Loki rereads its runtime config every 10s.
+          monitor.sleep(15)
+          agent.succeed("logger -t mtest after-budget")
+          monitor.sleep(30)
+          monitor.succeed(
+              loki('{host="agent"} |= "after-budget"') + " | jq -e '.data.result | length == 0'"
+          )
+
+      with subtest("firewall"):
+          # Prometheus listens on loopback only.
+          agent.fail("curl -sf --max-time 3 http://${monitorIp}:9090/")
+          # Exporters: the monitor only.
+          monitor.succeed("curl -sf --max-time 3 http://${agentIp}:9100/metrics >/dev/null")
+          other.fail("curl -sf --max-time 3 http://${agentIp}:9100/metrics")
+          # Loki: monitored hosts only (any HTTP answer counts as reachable).
+          agent.succeed("curl -s -o /dev/null --max-time 3 http://${monitorIp}:3100/ready")
+          other.fail("curl -s -o /dev/null --max-time 3 http://${monitorIp}:3100/ready")
+          # Grafana is open on the LAN interface (the router is its client).
+          other.succeed("curl -sf --max-time 3 http://${monitorIp}:3000/api/health")
+    '';
+}
