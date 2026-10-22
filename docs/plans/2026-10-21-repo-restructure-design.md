@@ -143,7 +143,7 @@ modules/
 
 ## How we know it worked
 
-- A snapshot script (scratchpad, not committed) dumps, per host (all 8), a
+- A snapshot script (scratchpad, not committed) dumps, per host (all 9 configurations), a
   fixed set of evaluated values to JSON: system package names, `homelab.*`,
   users (keys, shell, linger, groups), `services.openssh`, enabled
   `systemd.services`, firewall ports, `hardware.graphics` packages,
