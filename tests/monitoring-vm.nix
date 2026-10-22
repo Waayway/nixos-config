@@ -56,6 +56,9 @@ in
     # exporters.nix collects routes from the flake and the router's extraRoutes.
     inputs.self.nixosConfigurations.router.config.homelab = {
       routes = { };
+      # grafana.nix allows its port from the router only; node `other` plays the router
+      # (the test driver numbers agent, monitor, other as .1, .2, .3, asserted below).
+      lan.address = "192.168.1.3";
       router.extraRoutes = { };
     };
     serverOptions = { };
@@ -158,6 +161,7 @@ in
     let
       agentIp = nodes.agent.networking.primaryIPAddress;
       monitorIp = nodes.monitor.networking.primaryIPAddress;
+      otherIp = nodes.other.networking.primaryIPAddress;
     in
     ''
       import shlex
@@ -286,7 +290,9 @@ in
           # Loki: monitored hosts only (any HTTP answer counts as reachable).
           agent.succeed("curl -s -o /dev/null --max-time 3 http://${monitorIp}:3100/ready")
           other.fail("curl -s -o /dev/null --max-time 3 http://${monitorIp}:3100/ready")
-          # Grafana is open on the LAN interface (the router is its client).
+          # Grafana: the router's address only (node `other` stands in for it).
+          assert "${otherIp}" == "192.168.1.3", "router stand-in address changed"
+          agent.fail("curl -sf --max-time 3 http://${monitorIp}:3000/api/health")
           other.succeed("curl -sf --max-time 3 http://${monitorIp}:3000/api/health")
     '';
 }
