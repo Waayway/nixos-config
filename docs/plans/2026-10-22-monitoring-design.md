@@ -183,7 +183,7 @@ exporter ports, nothing else.
     `scripts/kanidm-oauth2-secret.sh grafana` copies it into 1Password
     `kanidm-oauth2-grafana`; the monitor reads it with opnix
     (`client_secret = $__file{...}`), as Immich does.
-  - Login form off (`disable_login_form`); the bootstrap admin
+  - Normal visits redirect to Kanidm (`auto_login`); the login form stays on; the bootstrap admin
     (`Homelab/grafana-admin`) stays for when Kanidm is down, used via
     `/login?disableAutoLogin`. Removing someone from `members` stops new logins; their
     Grafana user stays until deleted there (like the other apps, `docs/identity.md`).
@@ -273,7 +273,8 @@ Every rule carries a label `hc` naming its Healthchecks check (`host-down`,
   sources and dashboards.
 - **Rollout:**
   1. Tailscale policy: `tag:monitor` in `tagOwners`.
-  2. 1Password items: `grafana-admin`, `pve-monitoring-token`,
+  2. 1Password items: `grafana-admin` (fields `password` and `secret-key`, any long
+     random string), `pve-monitoring-token`,
      `truenas-monitoring-key`, `healthchecks-ping-key`, `healthchecks-api-key`
      (read-write, for `healthchecks-sync`), `healthchecks-readonly-key` (metrics).
   3. pve: user `monitoring@pve`, role `PVEAuditor`, token; create VM 140 with its data
