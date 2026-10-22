@@ -176,7 +176,10 @@ let
       }
     ];
     noDataState = "OK";
-    execErrState = if c.hc == "watchdog" then "Alerting" else "KeepLast";
+    # The watchdog must stop pinging when its query fails (Prometheus down silences every
+    # other rule, so the missing pings are the alarm); "Error" would raise a
+    # DatasourceError alert that inherits hc=watchdog and keep pinging.
+    execErrState = if c.hc == "watchdog" then "OK" else "KeepLast";
     "for" = c.for;
     labels.hc = c.hc;
     annotations.summary = c.summary;
@@ -268,6 +271,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
       restartTriggers = [ syncJson ];
+      # A transient network/DNS failure at boot recovers; a 403 does not loop forever.
+      startLimitBurst = 3;
+      startLimitIntervalSec = 3600;
       environment = {
         HC_API_KEY_FILE = cfg.secrets.healthchecksApiKey;
         CHECKS = syncJson;
@@ -275,6 +281,8 @@ lib.optionalAttrs hostPlatform.isLinux {
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = "5min";
         ExecStart = lib.getExe syncScript;
       };
     };

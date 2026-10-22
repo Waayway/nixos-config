@@ -375,6 +375,13 @@ assert units.services.healthchecks-sync.environment.HC_API_KEY_FILE == secrets.h
 assert units.services.healthchecks-sync.serviceConfig.Type == "oneshot";
 assert lib.elem "network-online.target" units.services.healthchecks-sync.after;
 assert units.services.healthchecks-sync.restartTriggers != [ ];
+assert units.services.healthchecks-sync.serviceConfig.Restart == "on-failure";
+assert units.services.healthchecks-sync.serviceConfig.RestartSec == "5min";
+assert units.services.healthchecks-sync.startLimitBurst == 3;
+assert units.services.healthchecks-sync.startLimitIntervalSec == 3600;
+assert (lib.last rules).labels.hc == "watchdog";
+assert (lib.last rules).execErrState == "OK" && (lib.last rules).noDataState == "OK";
+assert (lib.head rules).execErrState == "KeepLast";
 assert !(prod.systemd.services ? healthchecks-sync);
 # the monitor is not the monitor on other hosts
 assert !prod.homelab.monitoring.server.enable;
