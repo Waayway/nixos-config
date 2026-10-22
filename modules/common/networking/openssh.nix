@@ -1,9 +1,8 @@
-{ hostPlatform, ... }:
-# nix-darwin's `services.openssh` module only exposes `enable`. The
-# workstation-flavored `settings.*`/`openFirewall`/`enableAllTerminfo`
-# options don't exist there, so a `mkIf isLinux` on the value still
-# triggers the "option doesn't exist" check on darwin. Build a single
-# attrset per platform so darwin never sees the Linux-only assignments.
+{ lib, hostPlatform, ... }:
+# nix-darwin's `services.openssh` module only exposes `enable`, so each
+# platform gets its own attrset. No inbound SSH on workstations (they are
+# reached through Tailscale SSH); servers enable sshd in
+# server/networking/openssh.nix.
 if hostPlatform.isDarwin then
   {
     # No inbound SSH (Remote Login) on the Macs.
@@ -11,14 +10,5 @@ if hostPlatform.isDarwin then
   }
 else
   {
-    services.openssh = {
-      enable = true;
-      openFirewall = true;
-      settings = {
-        X11Forwarding = true;
-        PermitRootLogin = "prohibit-password";
-        PasswordAuthentication = true;
-      };
-    };
-    environment.enableAllTerminfo = true;
+    services.openssh.enable = lib.mkDefault false;
   }
