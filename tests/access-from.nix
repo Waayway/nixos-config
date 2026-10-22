@@ -15,7 +15,7 @@ let
     lib.evalModules {
       specialArgs = { inherit tools; };
       modules = [
-        ../modules/homelab/access-option.nix
+        ../modules/server/homelab/access-option.nix
         {
           homelab.people.ann = {
             displayName = "Ann";

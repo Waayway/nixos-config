@@ -14,7 +14,7 @@ let
     lib.evalModules {
       specialArgs = { inherit tools; };
       modules = [
-        ../modules/homelab/routes-option.nix
+        ../modules/server/homelab/routes-option.nix
         { homelab.routes = routes; }
       ];
     };

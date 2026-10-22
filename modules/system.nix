@@ -1,33 +1,10 @@
 { umport, ... }:
 {
   imports = umport {
-    # Skip categories that don't exist (yet) so listing them is harmless.
-    paths = builtins.filter builtins.pathExists [
-      ./apps
-      ./backup
-      ./boot
-      ./console
-      ./darwin
-      ./desktop
-      ./development
-      ./editor
-      ./gaming
-      ./hardware
-      ./homelab
-      ./identity
-      ./locale
-      ./lodestar
-      ./networking
-      ./nix
-      ./packages
-      ./secrets
-      ./security
-      ./services
-      ./shell
-      ./system
-      ./truenas
-      ./users
-      ./vm-specific
+    paths = [
+      ./common
+      ./workstation
+      ./server
     ];
     recursive = true;
     includeHome = false;

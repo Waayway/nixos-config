@@ -21,7 +21,7 @@ in
   config = lib.mkMerge [
     {
       # Used by Hyprland's wallpaper scripts and the macOS picker below.
-      home.file.".wallpapers".source = ../../wallpapers;
+      home.file.".wallpapers".source = ../../../wallpapers;
     }
     (lib.optionalAttrs hostPlatform.isDarwin {
       # Sets the picture on every display. macOS asks once for permission to

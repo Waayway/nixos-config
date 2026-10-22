@@ -19,8 +19,8 @@
 #   - optionally the opnix token (below), so the first switch to a server
 #     config can fetch its secrets from 1Password right away
 let
-  proxmoxKey = builtins.readFile ../modules/users/proxmox-vms_rsa.pub;
-  breakGlassKey = builtins.readFile ../modules/users/break-glass-root_ed25519.pub;
+  proxmoxKey = builtins.readFile ../modules/server/users/proxmox-vms_rsa.pub;
+  breakGlassKey = builtins.readFile ../modules/server/users/break-glass-root_ed25519.pub;
 
   # The opnix service-account token is never in this (public) repo. A build
   # opts in with an impure build that names a file holding it, e.g. on
