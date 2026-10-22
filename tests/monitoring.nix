@@ -78,6 +78,7 @@ assert has "10.0.10.140:3100/loki/api/v1/push" alloy;
 assert has "loki.source.journal" alloy;
 assert has ''{priority=\"7\"}'' alloy;
 assert has "stage.match" alloy;
+assert has "max_age       = \"1h\"" alloy;
 assert has ''action   = "drop"'' alloy;
 # exporter ports: the monitor only, never open to everyone
 assert has "-s 10.0.10.140" fw.extraCommands;
@@ -135,6 +136,9 @@ assert monitor.systemd.services.loki.unitConfig.RequiresMountsFor == "/var/lib/m
 assert monitor.systemd.services.prometheus.unitConfig.RequiresMountsFor == "/var/lib/monitoring";
 assert targetsOf "loki" == [ "127.0.0.1:3100" ];
 assert monitor.systemd.timers.loki-budget.timerConfig.OnCalendar == "*:0/5";
+assert monitor.systemd.services.loki-budget.serviceConfig.Restart == "on-failure";
+assert monitor.systemd.services.loki-budget.serviceConfig.RestartSec == "30s";
+assert monitor.systemd.services.loki-budget.unitConfig.StartLimitBurst == 5;
 assert monitor.systemd.timers.loki-budget.wantedBy == [ "timers.target" ];
 assert has ''"prod":200'' monitor.systemd.services.loki-budget.environment.BUDGETS;
 assert !(has "router-test" monitor.systemd.services.loki-budget.environment.BUDGETS);
@@ -218,6 +222,9 @@ assert
   has "chmod 0640" (builtins.readFile ../modules/server/monitoring/exporters.nix)
   && has "chgrp prometheus" (builtins.readFile ../modules/server/monitoring/exporters.nix);
 assert has "ExecStartPre" (builtins.toJSON (lib.attrNames units.services.prometheus.serviceConfig));
+assert units.services.truenas-pools.serviceConfig.Restart == "on-failure";
+assert units.services.truenas-pools.serviceConfig.RestartSec == "30s";
+assert units.services.truenas-pools.unitConfig.StartLimitBurst == 5;
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
 assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
 assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";
@@ -317,8 +324,14 @@ assert lib.all (f: builtins.isAttrs (builtins.fromJSON (builtins.readFile "${das
     "logs"
   ];
 assert !(has "${"$"}{DS_" (builtins.readFile "${dashDir}/proxmox.json"));
-assert lib.elem 3000
-  monitor.networking.firewall.interfaces.${monitor.homelab.lan.interface}.allowedTCPPorts;
+assert
+  !(lib.any (i: lib.elem 3000 i.allowedTCPPorts) (
+    lib.attrValues monitor.networking.firewall.interfaces
+  ));
+assert has "-s 10.0.10.110" monitor.networking.firewall.extraCommands;
+assert has "--dport 3000" monitor.networking.firewall.extraCommands;
+assert has "-D nixos-fw -p tcp -s 10.0.10.110 --dport 3000"
+  monitor.networking.firewall.extraStopCommands;
 assert monitor.homelab.routes.grafana.host == "grafana.vanwaaij.com";
 assert monitor.homelab.routes.grafana.backend == "http://10.0.10.140:3000";
 assert !monitor.homelab.routes.grafana.public;

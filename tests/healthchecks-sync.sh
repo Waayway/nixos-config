@@ -29,7 +29,7 @@ echo >>"$FAKE_DIR/bodies"
 n=$(($(cat "$FAKE_DIR/n" 2>/dev/null || echo 0) + 1))
 echo "$n" >"$FAKE_DIR/n"
 code=$(echo "${FAKE_CODES:-}" | awk -v n="$n" '{print $n}')
-echo '{}' >"$out"
+if [ -n "${FAKE_STRIP:-}" ]; then echo '{}' >"$out"; else tail -n 2 "$FAKE_DIR/bodies" | head -n 1 >"$out"; fi
 echo "${code:-201}"
 FAKE
 chmod +x "$work/bin/curl"
@@ -82,6 +82,12 @@ FAKE_CODES="500" bash "$script" 2>"$work/err" || rc=$?
 check "500 on the first: non-zero exit" "$(yes test "$rc" -ne 0)"
 check "500: stderr names homelab-host-down" "$(yes grep -q homelab-host-down "$work/err")"
 check "stops after the first failure" "$(yes test "$(wc -l <"$work/urls")" -eq 1)"
+
+reset
+rc=0
+FAKE_STRIP=1 FAKE_CODES="201 201" bash "$script" 2>"$work/err" || rc=$?
+check "response without filter fields: non-zero exit" "$(yes test "$rc" -ne 0)"
+check "response without filter fields: stderr names homelab-host-down" "$(yes grep -q homelab-host-down "$work/err")"
 
 if [ "$fails" -ne 0 ]; then echo "$fails failed"; exit 1; fi
 echo "all passed"

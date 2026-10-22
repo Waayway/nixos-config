@@ -1,8 +1,8 @@
 # Grafana on the monitor VM (`homelab.monitoring.server.enable`): the dashboards on
 # `https://grafana.vanwaaij.com` (tailnet only), signed in through Kanidm.
 #
-# - Listens on 0.0.0.0:3000; the port is open on the LAN interface (the router is the
-#   client, like for the other services). State stays in /var/lib/grafana (root disk).
+# - Listens on 0.0.0.0:3000; the port is open to the router's LAN address only
+#   (firewall rule, like Loki's). State stays in /var/lib/grafana (root disk).
 # - Sign-in: Kanidm OIDC client `grafana` (`homelab.access.grafana`, PKCE); normal
 #   visits redirect straight to Kanidm (`auto_login`). `admins` (Kanidm group, people with admin = true) become Grafana Admin,
 #   everyone else Viewer; Kanidm sends groups as SPNs (`admins@id.vanwaaij.com`) and the
@@ -28,6 +28,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   hostPlatform,
   ...
 }:
@@ -40,6 +41,11 @@ let
   dashboards = ./dashboards;
   # Loki tenants (every monitored host), read by Grafana from this file.
   tenants = lib.concatStringsSep "|" (lib.attrNames cfg.hosts);
+  # The router's LAN address, from the flake (the host that serves the routes).
+  routerAddress = inputs.self.nixosConfigurations.router.config.homelab.lan.address;
+  grafanaRule =
+    action:
+    "iptables -w ${action} nixos-fw -p tcp -s ${routerAddress} --dport ${toString port} -j nixos-fw-accept";
 in
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf cfg.enable {
@@ -126,7 +132,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
     };
 
-    networking.firewall.interfaces.${lan.interface}.allowedTCPPorts = [ port ];
+    # Only the router (the front door) may reach Grafana.
+    networking.firewall.extraCommands = grafanaRule "-A";
+    networking.firewall.extraStopCommands = "${grafanaRule "-D"} || true";
 
     homelab.routes.grafana = {
       inherit host;

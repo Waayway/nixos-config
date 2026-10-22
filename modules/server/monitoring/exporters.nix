@@ -207,6 +207,13 @@ lib.optionalAttrs hostPlatform.isLinux {
           serviceConfig = {
             Type = "oneshot";
             ExecStart = lib.getExe poolsScript;
+            # One transient failure must not outlast the 5-minute failed-unit alert.
+            Restart = "on-failure";
+            RestartSec = "30s";
+          };
+          unitConfig = {
+            StartLimitIntervalSec = "1h";
+            StartLimitBurst = 5;
           };
         };
         systemd.timers.truenas-pools = {

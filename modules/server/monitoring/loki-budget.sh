@@ -10,7 +10,9 @@
 # (loki_distributor_bytes_received_total is incremented before the rate-limit check, so
 # a blocked host that keeps pushing would otherwise never drop back under budget.)
 # A tenant over its budget gets a zero rate limit and burst (Loki then rejects every
-# push) until its accepted bytes in the 24h window fall below budget again. Zero, not
+# push) until its accepted bytes in the 24h window fall below 90 % of the budget
+# (hysteresis: a blocked host stops adding bytes, so without it the old bytes leaving
+# the window would unblock and re-block it every run). Zero, not
 # near-zero: a burst of 0.0001 MB still let short lines through (VM test).
 # If the query fails, the script exits non-zero; if it returns no series at all ("no
 # data yet", e.g. a fresh monitor) it exits 0. Either way both files stay as they are:
@@ -32,11 +34,18 @@ if [ "$(jq '.data.result | length' <<<"$resp")" = 0 ]; then
   exit 0
 fi
 
-# One line per budgeted tenant: "<tenant> <0|1>".
-verdicts=$(jq -r --argjson budgets "$BUDGETS" '
+# Tenants blocked right now: the two-space-indented keys under `overrides:`.
+currently=$(sed -n 's/^  \([^ :][^:]*\):$/\1/p' "$RUNTIME_FILE" 2>/dev/null | jq -R . | jq -sc . || true)
+[ -n "$currently" ] || currently='[]'
+
+# One line per budgeted tenant: "<tenant> <0|1>". Unblocked: blocked above 100 % of the
+# budget. Blocked: stays blocked until below 90 %.
+verdicts=$(jq -r --argjson budgets "$BUDGETS" --argjson blocked "$currently" '
   (.data.result | map({key: .metric.tenant, value: (.value[1] | tonumber)}) | from_entries) as $used
   | $budgets | to_entries[]
-  | "\(.key) \(if ($used[.key] // 0) > (.value * 1048576) then 1 else 0 end)"
+  | .key as $t
+  | (if ($blocked | index($t)) != null then 0.9 else 1 end) as $factor
+  | "\($t) \(if ($used[$t] // 0) > (.value * 1048576 * $factor) then 1 else 0 end)"
 ' <<<"$resp")
 
 if [ "$(jq 'length' <<<"$BUDGETS")" = 0 ]; then

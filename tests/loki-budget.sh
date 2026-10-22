@@ -18,6 +18,8 @@ case "$FAKE_MODE" in
   error) echo '{"status":"error","errorType":"bad_data","error":"boom"}' ;;
   empty) echo '{"status":"success","data":{"resultType":"vector","result":[]}}' ;;
   over) echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{"tenant":"router"},"value":[1,"262144000"]},{"metric":{"tenant":"prod"},"value":[1,"1048576"]}]}}' ;;
+  p95) echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{"tenant":"router"},"value":[1,"199229440"]}]}}' ;;
+  p85) echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{"tenant":"router"},"value":[1,"178257920"]}]}}' ;;
   under) echo '{"status":"success","data":{"resultType":"vector","result":[{"metric":{"tenant":"router"},"value":[1,"1048576"]}]}}' ;;
 esac
 FAKE
@@ -66,6 +68,19 @@ FAKE_MODE=over bash "$script"
 check "router blocked again" "$(has "$RUNTIME_FILE" 'router:')"
 FAKE_MODE=under bash "$script"
 check "router unblocked once accepted bytes are low" "$([ "$(grep -c 'router:' "$RUNTIME_FILE")" = 0 ] && echo ok || echo no)"
+
+# 3b. hysteresis: 95 % (199229440 B of 200 MB) keeps a blocked host blocked, 85 % lifts it,
+# and an unblocked host at 95 % stays unblocked
+FAKE_MODE=over bash "$script"
+FAKE_MODE=p95 bash "$script"
+check "blocked host at 95% stays blocked (override)" "$(has "$RUNTIME_FILE" 'router:')"
+check "blocked host at 95% stays blocked (textfile 1)" "$(has "$TEXTFILE" 'loki_budget_exceeded{tenant="router"} 1')"
+FAKE_MODE=p85 bash "$script"
+check "blocked host at 85% is unblocked (override)" "$([ "$(grep -c 'router:' "$RUNTIME_FILE")" = 0 ] && echo ok || echo no)"
+check "blocked host at 85% is unblocked (textfile 0)" "$(has "$TEXTFILE" 'loki_budget_exceeded{tenant="router"} 0')"
+FAKE_MODE=p95 bash "$script"
+check "unblocked host at 95% stays unblocked (override)" "$([ "$(grep -c 'router:' "$RUNTIME_FILE")" = 0 ] && echo ok || echo no)"
+check "unblocked host at 95% stays unblocked (textfile 0)" "$(has "$TEXTFILE" 'loki_budget_exceeded{tenant="router"} 0')"
 
 # 4. no budgets: valid empty outputs
 BUDGETS='{}' FAKE_MODE=under bash "$script"

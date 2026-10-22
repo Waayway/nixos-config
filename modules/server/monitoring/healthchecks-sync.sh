@@ -8,7 +8,8 @@
 # updated. A check with `filter` only reacts to Grafana's webhook body (failure keyword
 # firing, success keyword resolved, anything else ignored). On any other status (403:
 # the free plan's 20-check limit) the script stops at once, names the slug and exits
-# non-zero.
+# non-zero. After a 200/201 the response's check object must echo `filter_http_body` and
+# `failure_kw` for filtered checks; if not, the script exits non-zero naming the slug.
 set -euo pipefail
 
 url=https://healthchecks.io/api/v3/checks/
@@ -38,7 +39,20 @@ jq -c '.[]' <<<"$CHECKS" | while read -r check; do
     -H "@$work/headers" -H 'Content-Type: application/json' \
     --data-binary @- "$url" <<<"$body") || code=curl-failed
   case "$code" in
-    200 | 201) echo "healthchecks-sync: $slug ($code)" ;;
+    200 | 201)
+      # The check object in the response must echo the filter settings, otherwise the
+      # check would treat every webhook as a plain ping (e.g. a resolved alert as up).
+      if jq -e . "$work/response" >/dev/null 2>&1 && jq -e --argjson sent "$body" '
+        if $sent.filter_http_body then
+          .filter_http_body == true and .failure_kw == $sent.failure_kw
+        else true end
+      ' "$work/response" >/dev/null 2>&1; then
+        echo "healthchecks-sync: $slug ($code)"
+      else
+        echo "healthchecks-sync: $slug: response does not echo filter_http_body/failure_kw: $(head -c 300 "$work/response")" >&2
+        exit 1
+      fi
+      ;;
     *)
       echo "healthchecks-sync: $slug failed with status $code: $(head -c 300 "$work/response" 2>/dev/null)" >&2
       exit 1

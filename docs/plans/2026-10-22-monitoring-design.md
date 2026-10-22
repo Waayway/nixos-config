@@ -147,7 +147,7 @@ exporter ports, nothing else.
   from Prometheus (Loki's own metrics are scraped). If a host is over its budget, the
   script writes an override for that tenant with `ingestion_rate_mb` near zero into
   Loki's **runtime config** file (`runtime_config.file`, reloaded every 10 s, no
-  restart); once the 24 h window drops back under budget, the override is removed.
+  restart); once the tenant's accepted bytes drop below 90 % of the budget, the override is removed.
   Rejected lines are counted by Loki (`loki_discarded_samples_total`); Alloy drops them
   rather than buffering forever.
 - **Upper bound on disk:** budget × retention per machine, e.g. 200 MB × 14 = 2.8 GB

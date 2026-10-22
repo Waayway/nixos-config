@@ -38,7 +38,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     environment.etc."alloy/config.alloy".text = ''
       loki.source.journal "journal" {
         forward_to    = [loki.process.journal.receiver]
-        max_age       = "12h"
+        max_age       = "1h"
         relabel_rules = loki.relabel.journal.rules
       }
 
