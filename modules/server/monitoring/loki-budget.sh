@@ -9,8 +9,9 @@
 # The budget counts ACCEPTED bytes: received minus rate_limited discards over 24h.
 # (loki_distributor_bytes_received_total is incremented before the rate-limit check, so
 # a blocked host that keeps pushing would otherwise never drop back under budget.)
-# A tenant over its budget gets a near-zero rate limit (Loki then rejects every push)
-# until its accepted bytes in the 24h window fall below budget again.
+# A tenant over its budget gets a zero rate limit and burst (Loki then rejects every
+# push) until its accepted bytes in the 24h window fall below budget again. Zero, not
+# near-zero: a burst of 0.0001 MB still let short lines through (VM test).
 # If the query fails, the script exits non-zero; if it returns no series at all ("no
 # data yet", e.g. a fresh monitor) it exits 0. Either way both files stay as they are:
 # a blip must neither lift a block nor block everyone.
@@ -64,8 +65,8 @@ else
     echo "overrides:"
     while read -r tenant; do
       echo "  $tenant:"
-      echo "    ingestion_rate_mb: 0.0001"
-      echo "    ingestion_burst_size_mb: 0.0001"
+      echo "    ingestion_rate_mb: 0"
+      echo "    ingestion_burst_size_mb: 0"
     done <<<"$blocked"
   } >"$runtime_tmp"
 fi
