@@ -20,6 +20,8 @@
   fleet = false;
 
   options = {
+    # A disposable test copy: keep it out of Prometheus and Loki.
+    homelab.monitoring.agent.enable = false;
     homelab.router = {
       enable = true;
       # Let's Encrypt staging (untrusted certificate, browsers warn): a test router
