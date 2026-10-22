@@ -75,7 +75,7 @@ Checklist, in order. Replace `atlas` with the host name.
    - The Homebrew step downloads every cask (~8–10 GB with Microsoft 365 and Android Studio) one after another and takes a long time. `.pkg` installers (Microsoft 365, 1Password, Tailscale, Elgato, OneDrive) ask for your password.
    - Existing dotfiles are kept as `*.before-nix`.
    - atlas sets `darwin.homebrew.removeUndeclared = "zap"`: casks/brews that aren't declared are removed (with their app data) on every switch. Other Macs default to `"keep"`.
-9. **If the switch stops partway** (e.g. `brew bundle failed!`): fix the cause and run it again. Activation runs system settings → Homebrew → ThermalForge setup → home-manager, so when Homebrew fails, **home-manager never runs**: no zsh config, starship prompt, Ghostty config or `~/.aerospace.toml` until a switch gets through.
+9. **If the switch stops partway** (e.g. `brew bundle failed!`): fix the cause and run it again. Activation runs system settings → Homebrew → ThermalForge setup → home-manager, so when Homebrew fails, **home-manager never runs**: no Ghostty config, `~/.aerospace.toml` or the user's zsh extras (`~/.zshrc` stays the old one) until a switch gets through. zsh itself and the starship prompt come from the system (`/etc/zshrc`) and work already; with an old `~/.zshrc` starship or highlighting may load twice, which is harmless.
 
 #### After the switch
 

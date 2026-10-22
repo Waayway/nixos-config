@@ -11,7 +11,8 @@ A module with parts for several roles is split into one file per role, same
 category name under each root. Each file holds only what its role adds. sshd,
 for example:
 
-- `common/networking/openssh.nix`: sshd off (workstations use Tailscale SSH).
+- `common/networking/openssh.nix`: sshd off (Linux workstations use Tailscale
+  SSH, switched on by `workstation/networking/tailscale.nix`).
 - `server/networking/openssh.nix`: `mkIf isServer`, sshd on and hardened, port
   22 open.
 

@@ -69,7 +69,9 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   gate. A module that has parts for several roles is split into one file per
   role, same category under each root (`common/networking/openssh.nix` +
   `server/networking/openssh.nix`), each holding only what its role adds.
-- **SSH:** workstations run no sshd; reach them through Tailscale SSH. Servers
+- **SSH:** workstations run no sshd; reach the Linux ones through Tailscale SSH
+  (`workstation/networking/tailscale.nix` runs `tailscale set --ssh`; the
+  `--ssh` up-flag only reaches servers' autoconnect). Servers
   run hardened sshd (no passwords, root `prohibit-password`), port 22 open, and
   carry the break-glass root key (`server/users/`).
 - **macOS-only options are `darwin.*`** (`darwin.debloat`,

@@ -63,7 +63,7 @@ Not goals: splitting the repo, changing how hosts are discovered, renaming the
    and starship are switched off so nothing runs twice. Result on a
    workstation: the same shell as today.
 5. **SSH:** sshd is off on workstations; they are reached through Tailscale
-   SSH (`--ssh`, already on everywhere). Servers run sshd hardened (no
+   SSH (see the addendum: `--ssh` was not on for them). Servers run sshd hardened (no
    passwords, no keyboard-interactive, no X11, root `prohibit-password`,
    firewall open). The break-glass root key and the Proxmox user key are
    server-only (`server/users/`), as is `linger`.
@@ -196,3 +196,9 @@ Differences from the design above, found during the plan's tasks:
 - **Verification method:** a snapshot script dumped the evaluated values of all
   nine hosts to JSON; after each move the dump had to be identical, after each
   behaviour change the diff had to be exactly the expected one.
+- **Tailscale SSH on workstations is declarative.** `extraUpFlags = [ "--ssh" ]`
+  only reaches `tailscaled-autoconnect`, which exists only with an auth key
+  (servers). `workstation/networking/tailscale.nix` adds a oneshot
+  `tailscale-ssh` unit (`tailscale set --ssh`, retries 30s, never fails the
+  switch). `environment.enableAllTerminfo` moved from the server sshd module to
+  `common/system/terminfo.nix` (all Linux hosts), so root shells know Ghostty.
