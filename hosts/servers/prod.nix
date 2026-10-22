@@ -19,6 +19,7 @@
   fleet = true;
 
   options = {
+    hardware.profiles = [ "common-gpu-intel" ];
     homelab.storage.enable = true;
     # q35 (for the Arc's PCIe passthrough) puts virtio-net on the PCIe bridge:
     # the NIC is enp6s18, not the template's ens18.
@@ -42,5 +43,9 @@
     };
   };
 
-  config = { ... }: { };
+  config =
+    { ... }:
+    {
+      hardware.intelgpu.vaapiDriver = "intel-media-driver";
+    };
 }

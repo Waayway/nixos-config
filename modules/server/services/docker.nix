@@ -126,8 +126,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       type = lib.types.bool;
       default = false;
       description = ''
-        The passed-through Intel Arc A380 (QSV / VA-API, iHD driver): firmware, GuC/HuC
-        and the media driver on the host. Set by the app modules' `gpu` options.
+        The passed-through Intel Arc A380 (QSV / VA-API, iHD driver): GuC/HuC and
+        `vainfo` on the host; the host side comes from the nixos-hardware
+        `common-gpu-intel` profile. Set by the app modules' `gpu` options.
       '';
     };
   };
@@ -174,16 +175,9 @@ lib.optionalAttrs hostPlatform.isLinux {
 
       (lib.mkIf cfg.intelGpu {
         # The containers bring their own iHD/oneVPL userspace; the host needs the
-        # GuC/HuC firmware and the kernel side. The packages give `vainfo` here.
-        hardware.enableRedistributableFirmware = true;
+        # kernel side. The nixos-hardware profile adds the userspace packages.
         boot.kernelParams = [ "i915.enable_guc=3" ];
-        hardware.graphics = {
-          enable = true;
-          extraPackages = [
-            pkgs.intel-media-driver
-            pkgs.vpl-gpu-rt
-          ];
-        };
+        hardware.graphics.enable = true;
         environment.systemPackages = [ pkgs.libva-utils ];
       })
     ]
