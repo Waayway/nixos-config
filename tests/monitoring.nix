@@ -17,7 +17,12 @@ let
   alloy = prod.environment.etc."alloy/config.alloy".text;
   fw = prod.networking.firewall;
   has = lib.hasInfix;
-  monitor = nixosConfigurations.monitor.config;
+  # The modules as they run once rolled out: the host file may switch Healthchecks off
+  # during a rollout (hosts/servers/monitor.nix), which must not hide those assertions.
+  monitor =
+    (nixosConfigurations.monitor.extendModules {
+      modules = [ { homelab.monitoring.server.healthchecks.enable = lib.mkForce true; } ];
+    }).config;
   prom = monitor.services.prometheus;
   loki = monitor.services.loki;
   job = n: lib.findFirst (j: j.job_name == n) null prom.scrapeConfigs;
