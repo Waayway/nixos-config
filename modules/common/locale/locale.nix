@@ -5,10 +5,10 @@
   ...
 }:
 let
-  locale = config.modules.locale;
+  locale = config.locale;
 in
 {
-  options.modules.locale = {
+  options.locale = {
     timeZone = lib.mkOption {
       type = lib.types.str;
       description = "The system time zone.";

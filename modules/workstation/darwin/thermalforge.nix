@@ -5,10 +5,10 @@
   ...
 }:
 {
-  options.hardware.thermalforge.enable = lib.mkEnableOption "ThermalForge fan control (macOS)";
+  options.darwin.thermalforge.enable = lib.mkEnableOption "ThermalForge fan control (macOS)";
 
   config = lib.optionalAttrs hostPlatform.isDarwin (
-    lib.mkIf config.hardware.thermalforge.enable {
+    lib.mkIf config.darwin.thermalforge.enable {
       # Built from source by the formula: needs the full Xcode app (not just
       # the command line tools) installed before this is enabled.
       homebrew.taps = [

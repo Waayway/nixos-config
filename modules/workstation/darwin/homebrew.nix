@@ -7,7 +7,7 @@
   ...
 }:
 {
-  options.workstation.homebrew.removeUndeclared = lib.mkOption {
+  options.darwin.homebrew.removeUndeclared = lib.mkOption {
     type = lib.types.enum [
       "keep"
       "uninstall"
@@ -48,7 +48,7 @@
             uninstall = "uninstall";
             zap = "zap";
           }
-          .${config.workstation.homebrew.removeUndeclared};
+          .${config.darwin.homebrew.removeUndeclared};
       };
 
       # Homebrew 6+ only loads casks/formulae from third-party taps that are

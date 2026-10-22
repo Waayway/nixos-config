@@ -15,12 +15,14 @@
 
   options = {
     home-manager.enable = true;
-    hardware.thermalforge.enable = true;
 
-    workstation = {
+    darwin = {
+      thermalforge.enable = true;
       homebrew.removeUndeclared = "zap";
       debloat.enable = true;
+    };
 
+    workstation = {
       apps = {
         browsers.enable = true;
         communication = {

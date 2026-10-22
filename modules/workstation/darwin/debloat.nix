@@ -6,7 +6,7 @@
   ...
 }:
 let
-  cfg = config.workstation.debloat;
+  cfg = config.darwin.debloat;
 
   # Turning the debloat off (or dropping a label from a list) re-enables
   # whatever an earlier switch disabled.
@@ -14,7 +14,7 @@ let
   systemDaemons = if cfg.enable then cfg.systemDaemons else [ ];
 in
 {
-  options.workstation.debloat = {
+  options.darwin.debloat = {
     enable = lib.mkEnableOption "disabling unused macOS and vendor background services";
 
     # Per-user agents (gui/<uid> domain).
