@@ -43,7 +43,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
   `default.nix` pattern; every module gets it as the `tools` specialArg (use
   `tools.<name>`, not a relative import). Files: `mkAppCategory.nix`,
   `color.nix`, `routeType.nix`, `routesFrom.nix`, `accessType.nix`,
-  `accessFrom.nix`, `accessProblems.nix`.
+  `accessFrom.nix`, `accessProblems.nix`, `monitoringTargetsFrom.nix`.
 - `modules/`: all configuration, in three roots that say who gets it. `*_home.nix`
   files are home-manager modules; everything else is a system module.
   - `common/`: every host. `boot console hardware locale lodestar networking nix

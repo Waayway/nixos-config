@@ -24,6 +24,12 @@ in
     inherit lib tools;
   };
 
+  # Evaluation check of tools.monitoringTargetsFrom (tests/monitoring-targets-from.nix).
+  checks.x86_64-linux.monitoring-targets-from = import ./tests/monitoring-targets-from.nix {
+    pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+    inherit lib tools;
+  };
+
   # Evaluation check of tools.accessFrom (tests/access-from.nix), same idea.
   checks.x86_64-linux.access-from = import ./tests/access-from.nix {
     pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
