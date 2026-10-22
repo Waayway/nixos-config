@@ -20,8 +20,9 @@ out=$(ssh -n -i "$TRUENAS_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o Connect
 
 lines=$(jq -er '
   if type != "array" then error("not an array") else . end
+  | if length == 0 then error("no pools") else . end
   | .[]
-  | "truenas_pool_healthy{pool=\"\(.name | gsub("\\\\"; "\\\\\\\\") | gsub("\""; "\\\""))\"} \(if (if .healthy == null then .status == "ONLINE" else .healthy end) then 1 else 0 end)"
+  | "truenas_pool_healthy{pool=\"\(.name | gsub("\\\\"; "\\\\") | gsub("\""; "\\\""))\"} \(if (if .healthy == null then .status == "ONLINE" else .healthy end) then 1 else 0 end)"
 ' <<<"$out") || {
   echo "truenas-pools: cannot parse pool.query output, keeping the textfile" >&2
   exit 1
@@ -32,7 +33,7 @@ trap 'rm -f "$tmp"' EXIT
 {
   echo "# HELP truenas_pool_healthy 1 if the pool reports healthy, else 0."
   echo "# TYPE truenas_pool_healthy gauge"
-  [ -z "$lines" ] || echo "$lines"
+  echo "$lines"
 } >"$tmp"
 chmod 0644 "$tmp"
 mv "$tmp" "$TEXTFILE"

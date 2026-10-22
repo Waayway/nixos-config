@@ -116,7 +116,8 @@ let
     else
       echo '[]' >"$tmp"
     fi
-    ${pkgs.coreutils}/bin/chmod 0644 "$tmp"
+    ${pkgs.coreutils}/bin/chmod 0640 "$tmp"
+    ${pkgs.coreutils}/bin/chgrp prometheus "$tmp"
     ${pkgs.coreutils}/bin/mv "$tmp" ${sdDir}/targets.json
   '';
 in
@@ -153,6 +154,8 @@ lib.optionalAttrs hostPlatform.isLinux {
           listenAddress = "127.0.0.1";
           environmentFile = secrets.pveEnv;
         };
+        # The PVE API has a self-signed certificate.
+        systemd.services.prometheus-pve-exporter.environment.PVE_VERIFY_SSL = "false";
         services.prometheus.scrapeConfigs = [
           (
             {
@@ -172,6 +175,9 @@ lib.optionalAttrs hostPlatform.isLinux {
           listenAddress = "0.0.0.0";
           graphitePort = 2003;
           mappingSettings = mapping;
+          # Metrics on loopback only; the module binds both ports to listenAddress (the
+          # last --web.listen-address wins).
+          extraFlags = [ "--web.listen-address=127.0.0.1:9108" ];
         };
         # Port 2003 is privileged.
         systemd.services.prometheus-graphite-exporter.serviceConfig = {

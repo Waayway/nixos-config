@@ -80,7 +80,6 @@ lib.optionalAttrs hostPlatform.isLinux {
           delete_request_store = "filesystem";
         };
         limits_config = {
-          multi_tenant_queries_enabled = true;
           retention_period = "336h";
           ingestion_rate_mb = 1;
           ingestion_burst_size_mb = 4;
@@ -89,6 +88,8 @@ lib.optionalAttrs hostPlatform.isLinux {
           file = runtimeFile;
           period = "10s";
         };
+        # A top-level key in Loki's config, not part of limits_config.
+        multi_tenant_queries_enabled = true;
         analytics.reporting_enabled = false;
       };
     };

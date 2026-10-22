@@ -97,7 +97,7 @@ assert !(lib.elem 9090 monitor.networking.firewall.allowedTCPPorts);
 # Loki: multi-tenant, retention and limits, runtime config, budget timer, firewall
 assert loki.enable;
 assert loki.configuration.auth_enabled;
-assert loki.configuration.limits_config.multi_tenant_queries_enabled;
+assert loki.configuration.multi_tenant_queries_enabled;
 assert loki.configuration.limits_config.retention_period == "336h";
 assert loki.configuration.limits_config.ingestion_rate_mb == 1;
 assert loki.configuration.limits_config.ingestion_burst_size_mb == 4;
@@ -148,6 +148,8 @@ assert exp.pve.enable;
 assert exp.pve.listenAddress == "127.0.0.1";
 assert exp.pve.port == 9221;
 assert exp.pve.environmentFile == secrets.pveEnv;
+assert units.services.prometheus-pve-exporter.environment.PVE_VERIFY_SSL == "false";
+assert lib.elem "--web.listen-address=127.0.0.1:9108" exp.graphite.extraFlags;
 assert (job "pve").metrics_path == "/pve";
 assert (job "pve").params.module == [ "default" ];
 assert targetsOf "pve" == [ "10.0.10.50" ];
@@ -168,6 +170,8 @@ assert
   !(lib.any (l: has "2003" l && !has "-s 10.0.10.130" l) (
     lib.splitString "\n" monitor.networking.firewall.extraCommands
   ));
+assert lib.elem "d /run/healthchecks-sd 0755 root root -" units.tmpfiles.rules;
+assert has "chmod 0640" (builtins.readFile ../modules/server/monitoring/exporters.nix);
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
 assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
 assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";

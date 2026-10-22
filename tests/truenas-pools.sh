@@ -18,6 +18,8 @@ case "$FAKE_MODE" in
   healthy) echo '[{"name":"store","healthy":true,"status":"ONLINE"},{"name":"archive","healthy":true,"status":"ONLINE"}]' ;;
   degraded) echo '[{"name":"store","healthy":false,"status":"DEGRADED"},{"name":"archive","healthy":true,"status":"ONLINE"}]' ;;
   flagwins) echo '[{"name":"store","healthy":false,"status":"ONLINE"}]' ;;
+  none) echo '[]' ;;
+  weird) echo '[{"name":"a\\b\"c","healthy":true}]' ;;
   nohealthy) echo '[{"name":"store","status":"ONLINE"},{"name":"bad","status":"FAULTED"}]' ;;
 esac
 FAKE
@@ -50,8 +52,11 @@ check "status FAULTED is 0" "$(has "$TEXTFILE" 'truenas_pool_healthy{pool="bad"}
 FAKE_MODE=flagwins bash "$script"
 check "healthy=false wins over status ONLINE" "$(has "$TEXTFILE" 'truenas_pool_healthy{pool="store"} 0')"
 
+FAKE_MODE=weird bash "$script"
+check "pool name escaped" "$(has "$TEXTFILE" 'pool="a\\b\"c"')"
+
 cp "$TEXTFILE" "$work/before"
-for mode in fail garbage; do
+for mode in fail garbage none; do
   rc=0
   FAKE_MODE=$mode bash "$script" 2>/dev/null || rc=$?
   check "$mode exits non-zero" "$([ "$rc" != 0 ] && echo ok || echo no)"
