@@ -162,16 +162,31 @@ exporter ports, nothing else.
 - **Route:** `homelab.routes.grafana = { host = "grafana.vanwaaij.com"; backend =
   "http://10.0.10.140:3000"; public = false; }` in the monitoring module. Tailnet only;
   Tailscale Service `grafana`, split DNS as for every route.
-- **Sign-in:** `homelab.access.grafana` with `members = [ "thijs" ]` and an `oidc`
-  client (redirect `https://grafana.vanwaaij.com/login/generic_oauth`). Grafana's
-  `auth.generic_oauth` against Kanidm, `role_attribute_path` maps people with
-  `admin = true` in `people.nix` to `Admin` and every other member of `grafana-users` to
-  `Viewer`. How the admin flag reaches the token (a second group `grafana-admins` in the
-  `groups` claim, or a claim map) follows what `tools/accessType.nix` can express;
-  if it can't, the access type gets a small extension, as Jellyfin's `AdminRoles` did. Login form off; the bootstrap admin
-  (`Homelab/grafana-admin`) stays for when Kanidm is down. Client secret from
-  1Password via opnix, like the other OIDC apps (exact mechanism follows what
-  `docs/identity.md` does for Immich).
+- **Sign-in:** `homelab.access.grafana` in `grafana.nix`, `members = [ "thijs" ]`, with
+  `oidc = { originUrls = [ "https://grafana.vanwaaij.com/login/generic_oauth" ];
+  originLanding = "https://grafana.vanwaaij.com/"; preferShortUsername = true; icon =
+  ../identity/branding/icons/grafana.svg; }` and the default scopes (they include
+  `groups`). This needs **no change to Kanidm or `tools/accessType.nix`**:
+  `modules/server/identity/kanidm.nix` already provisions the group `admins` (everyone
+  with `admin = true` in `people.nix`) and `grafana-users`, and the `groups` scope puts
+  a person's groups in the token.
+  - Grafana `auth.generic_oauth`: client id `grafana`, auth URL
+    `https://id.vanwaaij.com/ui/oauth2`, token URL `https://id.vanwaaij.com/oauth2/token`,
+    API URL `https://id.vanwaaij.com/oauth2/openid/grafana/userinfo`, `use_pkce = true`
+    (Kanidm requires PKCE), `login_attribute_path = "preferred_username"`,
+    `allow_sign_up = true`, `role_attribute_strict = true`,
+    `role_attribute_path` = admins → `Admin`, else `Viewer`. Kanidm sends groups as
+    SPNs (`admins@id.vanwaaij.com`) plus UUIDs; the path matches the SPN, and the exact
+    form is confirmed by decoding a token during implementation.
+  - **Client secret:** Kanidm generates it when kanidm-provision creates the client (the
+    official image can't take a provisioned one). After `identity` is applied,
+    `scripts/kanidm-oauth2-secret.sh grafana` copies it into 1Password
+    `kanidm-oauth2-grafana`; the monitor reads it with opnix
+    (`client_secret = $__file{...}`), as Immich does.
+  - Login form off (`disable_login_form`); the bootstrap admin
+    (`Homelab/grafana-admin`) stays for when Kanidm is down, used via
+    `/login?disableAutoLogin`. Removing someone from `members` stops new logins; their
+    Grafana user stays until deleted there (like the other apps, `docs/identity.md`).
 - **Lodestar link:** `lodestar.links.grafana`, group *Infrastructure*.
 - **Provisioned from Nix** (`services.grafana.provision`): data sources Prometheus and
   Loki (one Loki data source per tenant is awkward; instead one data source with
@@ -204,21 +219,48 @@ Grafana-managed alert rules, provisioned from Nix (`services.grafana.provision.a
 | Log budget hit | the budget override is active for a host | 0 |
 | Memory pressure | available RAM < 10 % | 15 min |
 
-- **Contact point:** a webhook to the Healthchecks check `homelab-alerts`
-  (`https://hc-ping.com/<uuid>`), URL in 1Password `Homelab/healthchecks-homelab-alerts`.
-  Firing must mark the check down and resolved must mark it up. Healthchecks supports
-  keyword filters on the ping body (failure keyword `"status":"firing"`, success
-  keyword `"status":"resolved"`); **verify at implementation** that this works for HTTP
-  bodies on healthchecks.io. Fallback: a tiny relay on the monitor (a systemd socket
-  service) that reads Grafana's JSON and calls `/<uuid>/fail` or `/<uuid>`.
-- One check for all alerts means one notification per state change; the message
-  (Grafana's summary in the ping body) says what fired, readable in the Healthchecks
-  event log. Grouping: `group_by: [alertname, host]`, repeat every 4 h.
-- **Watchdog:** a rule that always fires sends to a second contact point, the check
-  `homelab-monitor-watchdog` (period 5 min, grace 5 min), repeated every minute. If the
-  monitor, Grafana or its network dies, Healthchecks alerts on the missing pings.
-- Healthchecks' own notification (phone app / email) is configured on healthchecks.io,
-  as for the existing checks.
+Every rule carries a label `hc` naming its Healthchecks check (`host-down`,
+`vm-down`, `disk-full`, `failed-unit`, `route-down`, `truenas-pool`, `log-budget`,
+`memory`); the notification policy routes on it.
+
+- **One Healthchecks check per alert rule**, not one for everything. Healthchecks
+  notifies on a state change only: with a single check, a second problem while the
+  first is still open would never reach the phone. Per rule, that masking is left only
+  within one rule (a second disk filling while the first is), which the 4 h repeat and
+  the ping body cover.
+- **Contact points:** one webhook per check, on slug URLs
+  `https://hc-ping.com/<ping-key>/homelab-<hc>` (Healthchecks "Pinging API": slug URLs
+  need the project's ping key; one 1Password item `healthchecks-ping-key` instead of
+  one UUID per check). Grafana POSTs the same URL for firing and resolved; the body
+  carries `"status":"firing"` or `"status":"resolved"`.
+- **Filtering rules on each check** (Healthchecks "Configuring checks"): match on
+  "Request body of HTTP requests" (first 100 kB), **failure keyword**
+  `"status":"firing"`, **success keyword** `"status":"resolved"`, "If no keywords
+  match": ignore. Keywords are case-sensitive and failure is checked first, so a
+  grouped message with one alert still firing and one resolved counts as a failure,
+  which is right. Grafana's summary in the body shows in the check's event log.
+- **Checks as code:** a oneshot `healthchecks-sync` on the monitor creates or updates
+  the checks through the Management API (`POST /api/v3/checks/` with `unique: ["slug"]`)
+  with a read-write API key (1Password `healthchecks-api-key`): the slug, tags
+  `homelab monitoring`, filtering as above, and a **timeout of 365 days** (alert checks
+  are not heartbeats: without a long timeout, a check would go down a day after its
+  last "resolved"). Notification channels stay on healthchecks.io (the project's
+  default, as for the existing checks). Exact field names (`filter_body`,
+  `success_kw`, `failure_kw`, `filter_default_fail`) are checked against the Management
+  API page during implementation; if the API can't set filtering, it is set once by
+  hand per check and the sync only creates checks and timeouts.
+- **Grouping:** `group_by: [alertname, host]`, group interval 1 min, repeat every 4 h.
+  Healthchecks rate-limits pings to 5 per minute per check; one group per minute per
+  check stays under it.
+- **Watchdog:** a rule that always fires, routed to the check `homelab-watchdog`
+  (timeout 5 min, grace 5 min, success on every ping: no filtering), repeat interval
+  1 min. If the monitor, Grafana or its network dies, the pings stop and Healthchecks
+  alerts.
+- **Healthchecks' metrics in Grafana:** Healthchecks exposes a Prometheus endpoint per
+  project (`https://healthchecks.io/projects/<uuid>/metrics/` with a read-only API key as
+  Bearer token; `hc_check_up`, `hc_checks_down_total`). Prometheus scrapes it every
+  2 min, so the existing checks (restic backups, prod updates) show on the home page
+  next to the alerts. Key in 1Password `healthchecks-readonly-key`.
 
 ## H. Testing and rollout
 
@@ -231,14 +273,16 @@ Grafana-managed alert rules, provisioned from Nix (`services.grafana.provision.a
   sources and dashboards.
 - **Rollout:**
   1. Tailscale policy: `tag:monitor` in `tagOwners`.
-  2. 1Password items: `grafana-admin`, `grafana-oidc` (if not generated by
-     provisioning), `pve-monitoring-token`, `truenas-monitoring-key`,
-     `healthchecks-homelab-alerts`, `healthchecks-monitor-watchdog`; the two checks on
-     healthchecks.io.
+  2. 1Password items: `grafana-admin`, `pve-monitoring-token`,
+     `truenas-monitoring-key`, `healthchecks-ping-key`, `healthchecks-api-key`
+     (read-write, for `healthchecks-sync`), `healthchecks-readonly-key` (metrics).
   3. pve: user `monitoring@pve`, role `PVEAuditor`, token; create VM 140 with its data
      disk; bootstrap the opnix token.
-  4. Promote, apply `monitor`; check Grafana, data sources, pve and blackbox targets.
-  5. Apply `identity` (OIDC client) and `router` (route, Tailscale Service).
+  4. Promote; apply `identity` (creates the `grafana` client and `grafana-users`), then
+     `scripts/kanidm-oauth2-secret.sh grafana`.
+  5. Apply `monitor` (checks get created by `healthchecks-sync`) and `router` (route,
+     Tailscale Service); check Grafana sign-in as admin, data sources, pve and blackbox
+     targets.
   6. Agents one host at a time: nixos-manager, identity, router, prod. Check each in
      Prometheus and Loki before the next.
   7. TrueNAS exporter and alert service.
@@ -257,9 +301,10 @@ modules/server/monitoring/
   server.nix           # Prometheus, scrape configs from the flake
   loki.nix             # Loki, runtime config, budget timer
   grafana.nix          # Grafana, OIDC, route, access, Lodestar link, provisioning
-  alerts.nix           # alert rules, contact points, watchdog
+  alerts.nix           # alert rules, contact points, watchdog, healthchecks-sync
   exporters.nix        # pve, graphite (TrueNAS), blackbox, TrueNAS pool timer
   dashboards/*.json
+modules/server/identity/branding/icons/grafana.svg   # Kanidm app list tile
 tools/monitoringTargetsFrom.nix
 hosts/servers/monitor.nix
 tests/monitoring.nix
