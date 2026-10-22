@@ -6,7 +6,7 @@
   ...
 }:
 # Backrest (web UI for restic) over the restic repositories of
-# modules/backup/restic.nix: browse snapshots, restore files. Read-only in
+# modules/server/backup/restic.nix: browse snapshots, restore files. Read-only in
 # spirit: no plans, no prune/check schedules; backups stay in `restic-<name>`.
 # The config is generated on every start (repos, login), so UI edits don't
 # survive a restart. A repo appears once it exists (it needs its restic ID).

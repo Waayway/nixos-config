@@ -1,4 +1,4 @@
-# Evaluation check of the identity module (modules/identity/kanidm.nix) on router-test
+# Evaluation check of the identity module (modules/server/identity/kanidm.nix) on router-test
 # (`homelab.identity = { enable = true; domain = "id-test.vanwaaij.com"; acmeStaging = true; }`):
 # the Kanidm container and its server.toml, the backups (/store/kanidm here, their own
 # NFS share on identity), the provisioning and policy oneshots, the

@@ -1,4 +1,4 @@
-# Evaluation check of the router (modules/homelab/router/) on router-test, whose
+# Evaluation check of the router (modules/server/homelab/router/) on router-test, whose
 # identity is its own test Kanidm (`id-test.vanwaaij.com`): the identity route passed
 # through as TCP, the sign-in gate (oauth2-proxy container, `auth-test` route) and a
 # gated route's middlewares, tailnet-only routes with an insecure backend, and
@@ -23,8 +23,8 @@ let
   traefikOf = c: c.services.traefik.dynamicConfigOptions;
   failedAssertions = c: lib.filter (a: !a.assertion) c.assertions;
 
-  # archipelago, traefik, truenas and backrest are gated (modules/homelab/routes.nix,
-  # modules/backup/backrest.nix); basic auth can't be combined with the gate
+  # archipelago, traefik, truenas and backrest are gated (modules/server/homelab/routes.nix,
+  # modules/server/backup/backrest.nix); basic auth can't be combined with the gate
   gateAndBasicAuth = extend {
     homelab.router.extraRoutes.archipelago.basicAuth.usersFile = "/run/htpasswd";
   };

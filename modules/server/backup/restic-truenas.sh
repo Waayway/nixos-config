@@ -1,4 +1,4 @@
-# Runs ON TrueNAS as root (sent by modules/backup/restic.nix, never stored there).
+# Runs ON TrueNAS as root (sent by modules/server/backup/restic.nix, never stored there).
 #
 #   bash -c "$this" restic-truenas <restic> <repo> <sb-user> <sb-host> <sb-port>
 #        <known-hosts line> <snapshot prefix> <max age h> <tag> <dataset|/path>…

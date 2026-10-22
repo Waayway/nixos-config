@@ -1,5 +1,5 @@
 # Evaluation check of `tools.accessFrom` over stub configurations built from
-# modules/homelab/access-option.nix: declaredBy and defaults, duplicate apps failing
+# modules/server/homelab/access-option.nix: declaredBy and defaults, duplicate apps failing
 # (naming both configurations), unknown members failing (naming member and app), and
 # configurations without the option skipped.
 {

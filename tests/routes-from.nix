@@ -1,5 +1,5 @@
 # Evaluation check of `tools.routesFrom` over stub configurations built from
-# modules/homelab/routes-option.nix: declaredBy and defaults, duplicate names and
+# modules/server/homelab/routes-option.nix: declaredBy and defaults, duplicate names and
 # shared hosts failing, backend validation, and configurations without the option
 # skipped.
 {

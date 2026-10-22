@@ -4,7 +4,7 @@
   hostPlatform,
   ...
 }:
-# The homelab's TrueNAS (VM 130), applied by modules/truenas/truenas.nix from the
+# The homelab's TrueNAS (VM 130), applied by modules/server/truenas/truenas.nix from the
 # host that sets `truenas.enable` (nixos-manager). Inventory: docs/homelab.md.
 let
   smart =
@@ -16,7 +16,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     truenas = {
       hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA/L1Q4XFYuZc2E54Rru1kKd3L2wJ44vVybOzvo9M3IY";
 
-      # Read by the restic backups (modules/backup/homelab.nix) from
+      # Read by the restic backups (modules/server/backup/homelab.nix) from
       # .zfs/snapshot; kept 3 days for quick local restores too.
       snapshotTasks =
         lib.genAttrs
@@ -51,11 +51,11 @@ lib.optionalAttrs hostPlatform.isLinux {
             snapdir = "VISIBLE";
           });
 
-      # /archive on the VMs (modules/homelab/storage.nix); like the jellyfin
+      # /archive on the VMs (modules/server/homelab/storage.nix); like the jellyfin
       # share, open to the LAN.
       nfsShares.archive-shares.path = "/mnt/archive/shares";
 
-      # Kanidm's online backups (modules/identity/kanidm.nix, `backupNfs`), for the
+      # Kanidm's online backups (modules/server/identity/kanidm.nix, `backupNfs`), for the
       # identity VM only; root squashed, the dataset's root is 65534:65534 0700.
       nfsShares.authentication = {
         path = "/mnt/store/authentication";

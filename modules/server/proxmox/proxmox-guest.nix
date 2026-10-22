@@ -24,7 +24,7 @@ lib.optionalAttrs enabled {
         autoResize = true;
       };
 
-      # BIOS + single ext4 root, no ESP: GRUB on the disk (modules/boot/boot.nix).
+      # BIOS + single ext4 root, no ESP: GRUB on the disk (modules/common/boot/boot.nix).
       bootloader = "grub";
       boot.growPartition = true;
       services.qemuGuest.enable = true;

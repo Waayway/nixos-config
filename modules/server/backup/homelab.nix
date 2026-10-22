@@ -4,7 +4,7 @@
   hostPlatform,
   ...
 }:
-# The homelab's restic repositories (modules/backup/restic.nix), on the host
+# The homelab's restic repositories (modules/server/backup/restic.nix), on the host
 # that sets `backup.restic.enable` (nixos-manager). Everything on the ZFS pools
 # except the VM disks (store/proxmox-vms); database dumps land in
 # store/internal/db-dumps before the 02:00 snapshot.
@@ -23,7 +23,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           "store/internal"
           "store/shares"
           "archive/internal"
-          # Kanidm's online backups (modules/identity/kanidm.nix).
+          # Kanidm's online backups (modules/server/identity/kanidm.nix).
           "store/authentication"
           # TrueNAS's configuration database and the key that decrypts its secrets.
           "/data/freenas-v1.db"

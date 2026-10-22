@@ -60,9 +60,9 @@
         }
       ];
 
-      # CLIs come from nixpkgs (modules/packages, modules/darwin/packages.nix,
-      # modules/development). Apps come from the workstation.apps categories
-      # (modules/apps). Only the always-on Mac basics are listed here.
+      # CLIs come from nixpkgs (modules/common/packages, modules/workstation/darwin/packages.nix,
+      # modules/workstation/development). Apps come from the workstation.apps categories
+      # (modules/workstation/apps). Only the always-on Mac basics are listed here.
       casks = [
         "aerospace" # tiling WM (from nikitabobko/tap)
         "ghostty" # settings are managed by the home-manager module

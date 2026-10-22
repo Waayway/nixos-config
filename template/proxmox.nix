@@ -8,7 +8,7 @@
 #
 # The `proxmox` format from nixos-generators handles the bootloader and the
 # partition layout (BIOS, ext4 root labelled `nixos`), which is what
-# modules/vm-specific/proxmox-guest.nix expects once a VM is switched to its
+# modules/server/proxmox/proxmox-guest.nix expects once a VM is switched to its
 # real host config. This image is self-contained on purpose: the repo's
 # module tree needs the specialArgs that lib/mkSystem.nix provides, so the
 # image only carries what's needed to log in and run the first switch:
@@ -91,7 +91,7 @@ in
 
   # A plain file, not environment.etc: NixOS removes its own /etc entries on
   # the first switch to a config that doesn't declare them, and opnix
-  # (modules/secrets/opnix.nix) expects the token to stay. Never overwrites.
+  # (modules/server/secrets/opnix.nix) expects the token to stay. Never overwrites.
   system.activationScripts.opnixToken = lib.mkIf (opnixToken != null) ''
     if [ ! -s /etc/opnix-token ]; then
       install -m 0600 -o root -g root ${opnixToken} /etc/opnix-token

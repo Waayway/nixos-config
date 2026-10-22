@@ -18,7 +18,7 @@
 
   fleet = true;
 
-  # The front door: Traefik for every route in the flake (modules/homelab/router/).
+  # The front door: Traefik for every route in the flake (modules/server/homelab/router/).
   options = {
     homelab.router.enable = true;
   };

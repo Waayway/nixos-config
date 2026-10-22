@@ -59,7 +59,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         inherit (inputs.self) nixosConfigurations darwinConfigurations;
       };
       # Services tab: every `lodestar.links` in the flake (service modules,
-      # modules/homelab/links.nix).
+      # modules/server/homelab/links.nix).
       links = inputs.lodestar.lib.linksFrom {
         inherit (inputs.self) nixosConfigurations darwinConfigurations;
       };

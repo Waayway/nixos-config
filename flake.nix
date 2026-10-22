@@ -38,7 +38,7 @@
       flake = false;
     };
 
-    # Server secrets from the 1Password vault Homelab (modules/secrets/opnix.nix).
+    # Server secrets from the 1Password vault Homelab (modules/server/secrets/opnix.nix).
     opnix = {
       url = "github:brizzbuzz/opnix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -54,7 +54,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # TIDAL client mod (modules/apps/media.nix): the prebuilt release, the
+    # TIDAL client mod (modules/workstation/apps/media.nix): the prebuilt release, the
     # same files on every platform. Bump the tag to update.
     tidaluna = {
       url = "https://github.com/Inrixia/TidaLuna/releases/download/1.17.1-beta/luna.zip";

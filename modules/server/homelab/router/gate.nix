@@ -1,5 +1,5 @@
 # The router's sign-in gate: oauth2-proxy (official image) on 127.0.0.1:4180, a
-# client of Kanidm (`oauth2-proxy`, provisioned by modules/identity/kanidm.nix) on
+# client of Kanidm (`oauth2-proxy`, provisioned by modules/server/identity/kanidm.nix) on
 # the identity host (`homelab.router.identityHost`). On only with
 # `homelab.router.gate.enable` (by default: some route is gated); otherwise the router
 # has no Docker, container or gate secrets. Routes with `auth.gate` ask it through

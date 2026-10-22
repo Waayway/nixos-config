@@ -1,7 +1,7 @@
 # `homelab.people` and `homelab.access.<app>`: who exists and who may use which app.
 # Plain data options (configure nothing), present on every host; `homelab.access` is
 # collected flake-wide with `tools.accessFrom` and rendered into Kanidm and the router
-# gate by later modules. People are declared once (modules/identity/people.nix).
+# gate by later modules. People are declared once (modules/server/identity/people.nix).
 { lib, tools, ... }:
 {
   options.homelab = {

@@ -16,7 +16,7 @@
 # `opnix-homelab` (read-only on Homelab), placed once at /etc/opnix-token with
 # `sudo opnix token set`. Without it opnix logs a warning and keeps the files it
 # already wrote. Linux workstations need no secrets: off there. On darwin the
-# Lodestar agent's signing key is the only secret (modules/lodestar/agent.nix,
+# Lodestar agent's signing key is the only secret (modules/common/lodestar/agent.nix,
 # same token file). Settings below come from the spike in
 # docs/plans/2026-10-12-homelab-backup-plan.md (phase 1).
 lib.optionalAttrs hostPlatform.isLinux {

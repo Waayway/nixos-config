@@ -11,7 +11,7 @@
     {
       "customType": "regex",
       "description": "Container images in the Nix app modules: image = \"<repo>:<tag>\" (optionally @sha256:<digest>; the string may start on the next line)",
-      "managerFilePatterns": ["/^modules/(services|identity)/.+\\.nix$/"],
+      "managerFilePatterns": ["/^modules/server/(services|identity)/.+\\.nix$/"],
       "matchStrings": [
         "(?:image|serverImage|mlImage|toolsImage)\\s*=\\s*\"(?<depName>[^\":\\s$]+):(?<currentValue>[^\"@\\s$]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
       ],
@@ -26,12 +26,12 @@
       "enabled": false
     },
     {
-      "description": "Immich's images (server, machine-learning, PostgreSQL) move together: one pull request for the whole release (modules/services/immich.nix)",
+      "description": "Immich's images (server, machine-learning, PostgreSQL) move together: one pull request for the whole release (modules/server/services/immich.nix)",
       "matchPackageNames": ["ghcr.io/immich-app/**"],
       "groupName": "immich"
     },
     {
-      "description": "Kanidm's server and tools images move together, one pull request per minor: Kanidm supports upgrading one minor at a time only (modules/identity/kanidm.nix)",
+      "description": "Kanidm's server and tools images move together, one pull request per minor: Kanidm supports upgrading one minor at a time only (modules/server/identity/kanidm.nix)",
       "matchPackageNames": ["kanidm/**"],
       "groupName": "kanidm",
       "separateMultipleMinor": true,

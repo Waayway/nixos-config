@@ -177,6 +177,7 @@ lib.optionalAttrs hostPlatform.isLinux {
         # The containers bring their own iHD/oneVPL userspace; the host needs the
         # kernel side. The nixos-hardware profile adds the userspace packages.
         boot.kernelParams = [ "i915.enable_guc=3" ];
+        # Stays here: the common-gpu-intel profile doesn't enable graphics itself.
         hardware.graphics.enable = true;
         environment.systemPackages = [ pkgs.libva-utils ];
       })

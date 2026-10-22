@@ -36,7 +36,7 @@
       gate.enable = true;
       extraRoutes.whoami-test.auth.gate = true;
     };
-    # A test Kanidm (modules/identity/) next to the test router, with a staging
+    # A test Kanidm (modules/server/identity/) next to the test router, with a staging
     # certificate; the production one is VM 111 (hosts/servers/identity.nix).
     homelab.identity = {
       enable = true;

@@ -21,7 +21,7 @@ tools.mkAppCategory args {
         "1password-cli"
       ];
     };
-    # Linux: the tailscale daemon lives in modules/networking/tailscale.nix.
+    # Linux: the tailscale daemon lives in modules/common/networking/tailscale.nix.
     tailscale.darwinCasks = [ "tailscale-app" ];
     stream-deck.darwinCasks = [ "elgato-stream-deck" ];
     fragments.linux = [ pkgs.fragments ];

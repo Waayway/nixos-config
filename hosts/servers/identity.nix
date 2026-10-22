@@ -18,8 +18,8 @@
 
   fleet = true;
 
-  # Kanidm at id.vanwaaij.com (modules/identity/); online backups to TrueNAS
-  # store/authentication, exported to this VM only (modules/truenas/homelab.nix).
+  # Kanidm at id.vanwaaij.com (modules/server/identity/); online backups to TrueNAS
+  # store/authentication, exported to this VM only (modules/server/truenas/homelab.nix).
   options = {
     homelab.identity = {
       enable = true;

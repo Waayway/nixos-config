@@ -25,8 +25,8 @@
       # Last known tailnet IP (`tailscale status`): confirm at bootstrap.
       listenAddress = "100.92.102.84";
     };
-    # TrueNAS as code (modules/truenas/) and the restic backups driven from here
-    # (modules/backup/).
+    # TrueNAS as code (modules/server/truenas/) and the restic backups driven from here
+    # (modules/server/backup/).
     truenas.enable = true;
     backup.restic.enable = true;
   };

@@ -4,7 +4,7 @@
 # `kanidm-oauth2-<client>-test`, from the test Kanidm on VM 230).
 #
 # Kanidm generates the secret when kanidm-provision creates the client (the official
-# image can't take a provisioned one, modules/identity/kanidm.nix). On the identity
+# image can't take a provisioned one, modules/server/identity/kanidm.nix). On the identity
 # VM, `kanidm-oauth2-basic-secret` (installed by that module) recovers idm_admin inside
 # the container and prints the secret with the tools image's
 # `kanidm system oauth2 show-basic-secret`; it travels SSH stdout -> a shell variable

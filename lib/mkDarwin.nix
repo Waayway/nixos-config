@@ -29,7 +29,7 @@ let
 
   baseConfig = ../modules/system.nix;
 
-  # Lodestar membership (modules/lodestar/): `fleet = true;` in the host file; the
+  # Lodestar membership (modules/common/lodestar/): `fleet = true;` in the host file; the
   # channel defaults by folder (servers follow stable, workstations unstable).
   fleet = {
     member = machineOptions.fleet or false;

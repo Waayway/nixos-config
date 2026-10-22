@@ -14,7 +14,7 @@
 #
 # Who exists and who may use what is Nix: `homelab.people` and every configuration's
 # `homelab.access` (collected with `tools.accessFrom`) plus `extraAccess` (apps outside
-# NixOS, modules/identity/access.nix) are rendered into a kanidm-provision state
+# NixOS, modules/server/identity/access.nix) are rendered into a kanidm-provision state
 # (`provisionState`): every person, a group `admins` and a group `<app>-users` per
 # app, an OAuth2 client per app with `oidc` (its `icon` as the client's image; icons
 # in branding/icons), and `oauth2-proxy` (the router's sign-in gate, "Services" with a
@@ -441,11 +441,11 @@ lib.optionalAttrs hostPlatform.isLinux {
         # The certificate (self-signed until Let's Encrypt's arrives) must exist.
         wants = [ "acme-${cfg.domain}.service" ];
         after = [ "acme-${cfg.domain}.service" ];
-        # /store/… gets this from modules/services/docker.nix.
+        # /store/… gets this from modules/server/services/docker.nix.
         unitConfig.RequiresMountsFor = lib.mkIf (cfg.backupNfs != null) [ backupDir ];
       };
 
-      # Mounted on first access, like modules/homelab/storage.nix, and for the same
+      # Mounted on first access, like modules/server/homelab/storage.nix, and for the same
       # reason without x-systemd.idle-timeout (the container's bind mount looks idle
       # to the host; an expired mount would stop the container).
       boot.supportedFilesystems = lib.mkIf (cfg.backupNfs != null) [ "nfs" ];

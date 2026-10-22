@@ -1,4 +1,4 @@
-# Make TrueNAS match the state declared in Nix (modules/truenas/truenas.nix).
+# Make TrueNAS match the state declared in Nix (modules/server/truenas/truenas.nix).
 #
 #   truenas-reconcile [apply|check]
 #

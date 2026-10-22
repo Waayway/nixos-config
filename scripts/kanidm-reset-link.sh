@@ -7,7 +7,7 @@
 # Use this, not `kanidm person credential create-reset-token` from a CLI pointed at
 # the VM's IP: the CLI builds the link from the address it talks to
 # (https://10.0.10.111:8443/…), where a passkey can't be registered for the domain.
-# On the identity VM, `kanidm-reset-link` (installed by modules/identity/kanidm.nix)
+# On the identity VM, `kanidm-reset-link` (installed by modules/server/identity/kanidm.nix)
 # recovers idm_admin inside the container, creates the token with the tools image and
 # prints the link for the configured domain; the expiry goes to stderr.
 #

@@ -2,7 +2,7 @@
 #
 # Routes are every configuration's `homelab.routes` (collected with
 # `tools.routesFrom`) plus `homelab.router.extraRoutes` (backends this flake doesn't
-# manage, modules/homelab/routes.nix); the merged set is `homelab.router.routes`.
+# manage, modules/server/homelab/routes.nix); the merged set is `homelab.router.routes`.
 # Each route gets a router on the `public` entrypoint (:443, from the internet) when
 # `public`, and one on the `tailnet` entrypoint (127.0.0.1:8443, behind the Tailscale
 # Service) when `tailnet.enable`. The `tailnet` entrypoint sets `X-Homelab-Via:

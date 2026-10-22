@@ -2,7 +2,7 @@
 # (Rocky VMs, Proxmox, TrueNAS). Declared once, on the host that runs the Lodestar
 # server. When a VM moves to NixOS, its entries move into that service's module
 # (`lodestar.links.<id>` next to the service, `host` dropped). Traefik's link lives in
-# the router module (modules/homelab/router/).
+# the router module (modules/server/homelab/router/).
 #
 # Checks run from nixos-manager. Main's Traefik (80/443) is not reachable from the
 # LAN, by public name or by 10.0.10.100, so services behind it are probed on their

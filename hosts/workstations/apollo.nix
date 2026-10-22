@@ -7,7 +7,7 @@
 #   OS:       macOS 26.3.1 (build 25D2128)
 #
 # Shared darwin defaults (dock, finder, trackpad, etc.) live in
-# modules/darwin/system.nix and mirror the real settings on this machine.
+# modules/workstation/darwin/system.nix and mirror the real settings on this machine.
 # Put host-specific overrides in `config` below.
 {
   system = "aarch64-darwin";

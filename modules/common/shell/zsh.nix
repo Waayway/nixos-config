@@ -53,7 +53,8 @@ lib.mkMerge [
         programs.zsh.enableSyntaxHighlighting = true;
         # nix-darwin writes `environment.shellAliases` only to /etc/zprofile
         # (login shells); repeat them in /etc/zshrc so non-login interactive
-        # shells (zellij panes, a nested `zsh`) get them too.
+        # shells (zellij panes, a nested `zsh`) get them too. `setAliases` is an
+        # internal nix-darwin option (the rendered alias lines).
         programs.zsh.interactiveShellInit = config.system.build.setAliases.text;
       }
     else

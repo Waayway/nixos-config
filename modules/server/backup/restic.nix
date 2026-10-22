@@ -13,7 +13,7 @@
 #   2. backs up local paths and SQLite copies of this host (host "nixos-manager");
 #   3. copies a static, pinned restic to TrueNAS if needed and runs it there over
 #      SSH against the newest `backup-*` ZFS snapshot of each dataset (host
-#      "truenas"; modules/backup/restic-truenas.sh). The repo password goes over
+#      "truenas"; modules/server/backup/restic-truenas.sh). The repo password goes over
 #      stdin, the Storage Box key through the forwarded SSH agent: no secret is
 #      stored on TrueNAS;
 #   4. forget/prune and a partial `restic check` from here;
