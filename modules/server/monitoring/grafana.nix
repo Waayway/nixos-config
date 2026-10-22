@@ -3,14 +3,15 @@
 #
 # - Listens on 0.0.0.0:3000; the port is open on the LAN interface (the router is the
 #   client, like for the other services). State stays in /var/lib/grafana (root disk).
-# - Sign-in: Kanidm OIDC client `grafana` (`homelab.access.grafana`, PKCE), the login
-#   form is off. `admins` (Kanidm group, people with admin = true) become Grafana Admin,
+# - Sign-in: Kanidm OIDC client `grafana` (`homelab.access.grafana`, PKCE); normal
+#   visits redirect straight to Kanidm (`auto_login`). `admins` (Kanidm group, people with admin = true) become Grafana Admin,
 #   everyone else Viewer; Kanidm sends groups as SPNs (`admins@id.vanwaaij.com`) and the
 #   path accepts both forms until a decoded token confirms which (docs/monitoring.md).
 #   The client secret comes from 1Password `kanidm-oauth2-grafana`
 #   (scripts/kanidm-oauth2-secret.sh grafana). The bootstrap admin `admin`
 #   (`Homelab/grafana-admin`, field `password`; its field `secret-key` is Grafana's
-#   encryption key) is for when Kanidm is down: `/login?disableAutoLogin`.
+#   encryption key) is the break-glass login at `/login?disableAutoLogin`
+#   (the login form stays on for it).
 # - Provisioned from Nix: data sources `prometheus` and `loki` (fixed uids, the
 #   dashboards refer to them; Loki is one data source over every tenant, the host names
 #   from the flake) and the dashboards in ./dashboards, read-only in the UI.
@@ -26,6 +27,7 @@
 {
   config,
   lib,
+  pkgs,
   hostPlatform,
   ...
 }:
@@ -36,6 +38,8 @@ let
   host = "grafana.vanwaaij.com";
   idHost = "id.vanwaaij.com";
   dashboards = ./dashboards;
+  # Loki tenants (every monitored host), read by Grafana from this file.
+  tenants = lib.concatStringsSep "|" (lib.attrNames cfg.hosts);
 in
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf cfg.enable {
@@ -65,9 +69,6 @@ lib.optionalAttrs hostPlatform.isLinux {
           check_for_updates = false;
         };
         dashboards.default_home_dashboard_path = "${dashboards}/overview.json";
-        auth = {
-          disable_login_form = true;
-        };
         "auth.generic_oauth" = {
           enabled = true;
           name = "vanwaaij.com";
@@ -107,7 +108,7 @@ lib.optionalAttrs hostPlatform.isLinux {
               url = "http://127.0.0.1:3100";
               jsonData.httpHeaderName1 = "X-Scope-OrgID";
               # Every tenant at once (Loki's multi_tenant_queries_enabled).
-              secureJsonData.httpHeaderValue1 = lib.concatStringsSep "|" (lib.attrNames cfg.hosts);
+              secureJsonData.httpHeaderValue1 = "$__file{${pkgs.writeText "loki-tenants" tenants}}";
             }
           ];
         };

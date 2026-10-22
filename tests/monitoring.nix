@@ -253,7 +253,8 @@ assert gf.enable;
 assert gs.server.http_addr == "0.0.0.0";
 assert gs.server.http_port == 3000;
 assert gs.server.root_url == "https://grafana.vanwaaij.com/";
-assert gs.auth.disable_login_form;
+assert oauth.auto_login;
+assert !(gs.auth.disable_login_form or false);
 assert oauth.enabled;
 assert oauth.client_id == "grafana";
 assert oauth.use_pkce;
@@ -275,7 +276,9 @@ assert ds.prometheus.type == "prometheus" && ds.prometheus.url == "http://127.0.
 assert ds.prometheus.isDefault;
 assert ds.loki.type == "loki" && ds.loki.url == "http://127.0.0.1:3100";
 assert ds.loki.jsonData.httpHeaderName1 == "X-Scope-OrgID";
-assert ds.loki.secureJsonData.httpHeaderValue1 == "identity|monitor|nixos-manager|prod|router";
+assert
+  ds.loki.secureJsonData.httpHeaderValue1
+  == "$__file{${nixosConfigurations.monitor.pkgs.writeText "loki-tenants" "identity|monitor|nixos-manager|prod|router"}}";
 assert prov.allowUiUpdates == false;
 assert prov.options.path == dashDir;
 assert gs.dashboards.default_home_dashboard_path == "${dashDir}/overview.json";
