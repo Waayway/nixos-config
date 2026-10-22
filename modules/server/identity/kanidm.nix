@@ -379,7 +379,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     extraAccess = lib.mkOption {
       type = lib.types.attrsOf accessType;
       default = { };
-      description = "Access to apps outside NixOS, as `homelab.access` (modules/identity/access.nix).";
+      description = "Access to apps outside NixOS, as `homelab.access` (modules/server/identity/access.nix).";
     };
 
     access = lib.mkOption {

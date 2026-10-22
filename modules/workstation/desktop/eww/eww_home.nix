@@ -7,7 +7,7 @@
 }:
 lib.optionalAttrs hostPlatform.isLinux (
   let
-    basePath = "modules/desktop/eww/config";
+    basePath = "modules/workstation/desktop/eww/config";
   in
   {
     home.packages = with pkgs; [
