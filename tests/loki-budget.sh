@@ -12,6 +12,7 @@ mkdir "$work/bin"
 # Fake curl: FAKE_MODE picks the reply.
 cat >"$work/bin/curl" <<'FAKE'
 #!/usr/bin/env bash
+echo "$*" >>"$FAKE_ARGS"
 case "$FAKE_MODE" in
   fail) exit 7 ;;
   error) echo '{"status":"error","errorType":"bad_data","error":"boom"}' ;;
@@ -23,6 +24,7 @@ FAKE
 chmod +x "$work/bin/curl"
 
 export PATH="$work/bin:$PATH"
+export FAKE_ARGS=$work/curl-args
 export PROM_URL=http://127.0.0.1:9090
 export BUDGETS='{"router":200,"prod":200}'
 export RUNTIME_FILE=$work/runtime.yaml
@@ -50,12 +52,27 @@ cp "$TEXTFILE" "$work/textfile.before"
 for mode in fail error empty; do
   rc=0
   FAKE_MODE=$mode bash "$script" 2>/dev/null || rc=$?
-  check "$mode exits non-zero" "$([ "$rc" != 0 ] && echo ok || echo no)"
+  want=$([ "$mode" = empty ] && echo 0 || echo nonzero)
+  if [ "$want" = 0 ]; then check "$mode exits 0" "$([ "$rc" = 0 ] && echo ok || echo no)"
+  else check "$mode exits non-zero" "$([ "$rc" != 0 ] && echo ok || echo no)"; fi
   check "$mode keeps runtime file" "$(cmp -s "$RUNTIME_FILE" "$work/runtime.before" && echo ok || echo no)"
   check "$mode keeps textfile" "$(cmp -s "$TEXTFILE" "$work/textfile.before" && echo ok || echo no)"
 done
 
-# 3. everyone under budget lifts the block
+# 3. the budget counts accepted bytes: the query subtracts rate_limited discards, and a
+# blocked tenant whose accepted bytes are low (fixture "under") is unblocked
+check "query subtracts rate_limited discards" "$(has "$FAKE_ARGS" 'loki_discarded_bytes_total{reason="rate_limited"}')"
+FAKE_MODE=over bash "$script"
+check "router blocked again" "$(has "$RUNTIME_FILE" 'router:')"
+FAKE_MODE=under bash "$script"
+check "router unblocked once accepted bytes are low" "$([ "$(grep -c 'router:' "$RUNTIME_FILE")" = 0 ] && echo ok || echo no)"
+
+# 4. no budgets: valid empty outputs
+BUDGETS='{}' FAKE_MODE=under bash "$script"
+check "no budgets: empty textfile lines" "$(grep -q 'tenant=""' "$TEXTFILE" && echo no || echo ok)"
+check "no budgets: empty overrides" "$(has "$RUNTIME_FILE" 'overrides: {}')"
+
+# 5. everyone under budget lifts the block
 FAKE_MODE=under bash "$script"
 check "runtime empty overrides" "$(has "$RUNTIME_FILE" 'overrides: {}')"
 check "textfile router 0" "$(has "$TEXTFILE" 'loki_budget_exceeded{tenant="router"} 0')"

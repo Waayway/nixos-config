@@ -1,7 +1,7 @@
 # Loki on the monitor VM (`homelab.monitoring.server.enable`): every machine is a tenant
 # (Alloy sends `X-Scope-OrgID = <host name>`), 14 days retention, and a hard daily log
 # budget per machine: the loki-budget timer asks Prometheus how many bytes each tenant
-# sent in the last 24h and, over `logBudgetMB`, writes a near-zero rate limit for it
+# was accepted in the last 24h (received minus rate-limited discards) and, over `logBudgetMB`, writes a near-zero rate limit for it
 # into Loki's runtime config (reloaded every 10s), so Loki rejects its pushes until the
 # window drops below budget (loki-budget.sh). The result is also a textfile metric,
 # `loki_budget_exceeded{tenant}`, for the alerts.
