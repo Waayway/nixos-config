@@ -1,6 +1,7 @@
 # Evaluation check of the monitoring agent (modules/server/monitoring/agent.nix) on the
 # real hosts: node_exporter and Alloy on a server, firewall open to the monitor only,
-# nothing on router-test (agent off) or the Macs.
+# nothing on router-test (agent off) or the Macs. Also the monitor host: Prometheus with
+# scrape jobs collected from the flake, and its secrets.
 {
   pkgs,
   lib,
@@ -16,6 +17,13 @@ let
   alloy = prod.environment.etc."alloy/config.alloy".text;
   fw = prod.networking.firewall;
   has = lib.hasInfix;
+  monitor = nixosConfigurations.monitor.config;
+  prom = monitor.services.prometheus;
+  job = n: lib.findFirst (j: j.job_name == n) null prom.scrapeConfigs;
+  targetsOf = n: lib.concatMap (s: s.targets) (job n).static_configs;
+  labelsOf = n: map (s: s.labels) (job n).static_configs;
+  secrets = monitor.homelab.monitoring.server.secrets;
+  opn = monitor.services.onepassword-secrets.secrets;
 in
 assert node.enable;
 assert lib.elem "systemd" node.enabledCollectors;
@@ -56,6 +64,50 @@ assert has "-s 10.0.10.140" router.networking.firewall.extraCommands;
 assert !test.services.prometheus.exporters.node.enable;
 assert !test.services.alloy.enable;
 assert !(test.homelab.monitoring.targets ? node);
+# the monitor host: Prometheus on loopback, retention, jobs per target name
+assert prom.enable;
+assert prom.listenAddress == "127.0.0.1";
+assert prom.port == 9090;
+assert prom.stateDir == "monitoring/prometheus";
+assert lib.elem "--storage.tsdb.retention.time=90d" prom.extraFlags;
+assert lib.elem "--storage.tsdb.retention.size=20GB" prom.extraFlags;
+assert lib.elem "10.0.10.100:9100" (targetsOf "node");
+assert lib.elem "10.0.10.140:9100" (targetsOf "node");
+assert lib.elem { host = "prod"; } (labelsOf "node");
+assert !(lib.any (t: has "10.0.10.230" t) (targetsOf "node"));
+# cAdvisor runs wherever Docker does (services/docker.nix): prod, router, identity; not the monitor
+assert lib.elem "10.0.10.100:9101" (targetsOf "cadvisor");
+assert lib.elem { host = "prod"; } (labelsOf "cadvisor");
+assert !(lib.elem "10.0.10.140:9101" (targetsOf "cadvisor"));
+assert targetsOf "traefik" == [ "10.0.10.110:8082" ];
+assert monitor.fileSystems."/var/lib/monitoring".device == "/dev/disk/by-label/monitor-data";
+assert !(lib.elem 9090 monitor.networking.firewall.allowedTCPPorts);
+# secrets: opnix references and paths, gated by the sub-enables
+assert opn.grafanaAdminPassword.reference == "op://Homelab/grafana-admin/password";
+assert opn.grafanaOidcSecret.owner == "grafana";
+assert opn.truenasKey.reference == "op://Homelab/truenas-automation/private key?ssh-format=openssh";
+assert secrets.pveEnv == monitor.services.onepassword-secrets.secretPaths.pveEnv;
+assert secrets.healthchecksProject != null;
+assert
+  let
+    off = nixosConfigurations.monitor.extendModules {
+      modules = [
+        {
+          homelab.monitoring.server = {
+            pve.enable = false;
+            truenas.enable = false;
+            healthchecks.enable = false;
+          };
+        }
+      ];
+    };
+  in
+  !(off.config.services.onepassword-secrets.secrets ? pveEnv)
+  && !(off.config.services.onepassword-secrets.secrets ? truenasKey)
+  && !(off.config.services.onepassword-secrets.secrets ? healthchecksApiKey)
+  && off.config.homelab.monitoring.server.secrets.pveEnv == null;
+# the monitor is not the monitor on other hosts
+assert !prod.homelab.monitoring.server.enable;
 # darwin: the options exist, nothing else
 assert !atlas.homelab.monitoring.agent.enable;
 pkgs.runCommand "monitoring" { } "touch $out"
