@@ -1,41 +1,18 @@
 {
-  pkgs,
   lib,
   hostPlatform,
   ...
 }:
 {
-  home.packages = with pkgs; [
-    lsd
-    bat
-    glow
-  ];
-
+  # Completion, autosuggestions, syntax highlighting, the shared aliases and
+  # the starship prompt come from the system zsh (`modules/common/shell/zsh.nix`).
   programs.zsh = {
     enable = true;
-    autosuggestion.enable = true;
-    enableCompletion = true;
+    # The system /etc/zshrc already runs compinit.
+    enableCompletion = false;
     shellAliases = {
-      ls = "lsd";
-      l = "ls -l";
-      la = "ls -la";
-      ip = "ip --color=auto";
-      cat = "bat";
-      md = "glow";
       sp = "spotify_player";
     };
-    plugins = with pkgs; [
-      {
-        name = "zsh-syntax-highlighting";
-        src = fetchFromGitHub {
-          owner = "zsh-users";
-          repo = "zsh-syntax-highlighting";
-          rev = "0.6.0";
-          sha256 = "0zmq66dzasmr5pwribyh4kbkk23jxbpdw4rjxx0i7dx8jjp2lzl4";
-        };
-        file = "zsh-syntax-highlighting.zsh";
-      }
-    ];
     initContent = ''
       # Agent shells (Claude Code) don't keep zoxide's chpwd hook, and a
       # fuzzy `cd` there could land in the wrong directory.
@@ -66,10 +43,4 @@
       eval "$(/opt/homebrew/bin/brew shellenv)"
     '';
   };
-
-  programs.starship = {
-    enable = true;
-  };
-
-  xdg.configFile."starship.toml".source = ./starship.toml;
 }
