@@ -1,7 +1,7 @@
 # Grafana on the monitor VM (`homelab.monitoring.server.enable`): the dashboards on
 # `https://grafana.vanwaaij.com` (tailnet only), signed in through Kanidm.
 #
-# - Listens on 0.0.0.0:3000; the port is open to the router's LAN address only
+# - Listens on 0.0.0.0:3000; the port is open to the router and the Lodestar server only
 #   (firewall rule, like Loki's). State stays in /var/lib/grafana (root disk).
 # - Sign-in: Kanidm OIDC client `grafana` (`homelab.access.grafana`, PKCE); normal
 #   visits redirect straight to Kanidm (`auto_login`). `admins` (Kanidm group, people with admin = true) become Grafana Admin,
@@ -43,9 +43,18 @@ let
   tenants = lib.concatStringsSep "|" (lib.attrNames cfg.hosts);
   # The router's LAN address, from the flake (the host that serves the routes).
   routerAddress = inputs.self.nixosConfigurations.router.config.homelab.lan.address;
+  # The Lodestar server's LAN address (its link check probes /api/health).
+  lodestarAddress =
+    (lib.findFirst (c: c.config.services.lodestar-server.enable or false) null (
+      lib.attrValues inputs.self.nixosConfigurations
+    )).config.homelab.lan.address;
+  grafanaClients = [
+    routerAddress
+    lodestarAddress
+  ];
   grafanaRule =
-    action:
-    "iptables -w ${action} nixos-fw -p tcp -s ${routerAddress} --dport ${toString port} -j nixos-fw-accept";
+    action: addr:
+    "iptables -w ${action} nixos-fw -p tcp -s ${addr} --dport ${toString port} -j nixos-fw-accept";
 in
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf cfg.enable {
@@ -132,9 +141,11 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
     };
 
-    # Only the router (the front door) may reach Grafana.
-    networking.firewall.extraCommands = grafanaRule "-A";
-    networking.firewall.extraStopCommands = "${grafanaRule "-D"} || true";
+    # Only the router (front door) and the Lodestar server (link check) may reach Grafana.
+    networking.firewall.extraCommands = lib.concatMapStringsSep "\n" (grafanaRule "-A") grafanaClients;
+    networking.firewall.extraStopCommands = lib.concatMapStringsSep "\n" (
+      a: "${grafanaRule "-D" a} || true"
+    ) grafanaClients;
 
     homelab.routes.grafana = {
       inherit host;

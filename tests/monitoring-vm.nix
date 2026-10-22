@@ -61,6 +61,11 @@ in
       lan.address = "192.168.1.3";
       router.extraRoutes = { };
     };
+    # grafana.nix also finds the Lodestar server (its link check) in the flake.
+    inputs.self.nixosConfigurations.lodestar.config = {
+      services.lodestar-server.enable = true;
+      homelab.lan.address = "192.168.1.4";
+    };
     serverOptions = { };
   };
 

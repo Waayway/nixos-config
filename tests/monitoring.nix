@@ -330,6 +330,7 @@ assert
   ));
 assert has "-s 10.0.10.110" monitor.networking.firewall.extraCommands;
 assert has "--dport 3000" monitor.networking.firewall.extraCommands;
+assert has "-p tcp -s 10.0.10.170 --dport 3000" monitor.networking.firewall.extraCommands;
 assert has "-D nixos-fw -p tcp -s 10.0.10.110 --dport 3000"
   monitor.networking.firewall.extraStopCommands;
 assert monitor.homelab.routes.grafana.host == "grafana.vanwaaij.com";
