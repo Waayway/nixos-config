@@ -151,6 +151,12 @@ lib.optionalAttrs hostPlatform.isLinux {
           enable = true;
           listenAddress = "0.0.0.0";
           port = 9101;
+          # cAdvisor reaches Docker through containerd; NixOS's Docker runs its own
+          # containerd on this socket (namespace moby). Without it containers have no names.
+          extraOptions = [
+            "--containerd=/run/docker/containerd/containerd.sock"
+            "--containerd-namespace=moby"
+          ];
         };
         homelab.monitoring.targets.cadvisor.port = 9101;
 

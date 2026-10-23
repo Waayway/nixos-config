@@ -96,6 +96,7 @@ assert !prod.services.prometheus.exporters.node.openFirewall;
 assert prod.services.cadvisor.enable;
 assert prod.services.cadvisor.port == 9101;
 assert prod.services.cadvisor.listenAddress == "0.0.0.0";
+assert lib.elem "--containerd-namespace=moby" prod.services.cadvisor.extraOptions;
 assert prod.homelab.monitoring.targets.cadvisor.port == 9101;
 assert has "--dport 9101" fw.extraCommands;
 assert router.services.traefik.staticConfigOptions.metrics.prometheus.entryPoint == "metrics";
