@@ -403,6 +403,7 @@ assert (lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).timeout
 assert !(lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).filter;
 assert !(lib.findFirst (c: c.slug == "homelab-truenas") null syncChecks).filter;
 assert units.services.healthchecks-sync.environment.HC_API_KEY_FILE == secrets.healthchecksApiKey;
+assert units.services.healthchecks-sync.environment.HC_CHANNELS == "VWP BACKUP";
 assert units.services.healthchecks-sync.serviceConfig.Type == "oneshot";
 assert lib.elem "network-online.target" units.services.healthchecks-sync.after;
 assert units.services.healthchecks-sync.restartTriggers != [ ];

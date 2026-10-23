@@ -38,6 +38,7 @@ export PATH="$work/bin:$PATH"
 export FAKE_DIR=$work
 echo 'secret-api-key' >"$work/key"
 export HC_API_KEY_FILE=$work/key
+export HC_CHANNELS='VWP BACKUP'
 export CHECKS='[
   {"slug":"homelab-host-down","name":"Host down","timeout":31536000,"grace":60,"filter":true},
   {"slug":"homelab-watchdog","name":"Watchdog","timeout":300,"grace":300,"filter":false}
@@ -59,7 +60,8 @@ w=$(body 3)
 check "alert: slug" "$(yes jq -e '.slug == "homelab-host-down"' <<<"$a")"
 check "alert: unique slug" "$(yes jq -e '.unique == ["slug"]' <<<"$a")"
 check "alert: tags" "$(yes jq -e '.tags == "homelab monitoring"' <<<"$a")"
-check "alert: channels" "$(yes jq -e '.channels == "*"' <<<"$a")"
+check "alert: channels" "$(yes jq -e '.channels == "VWP BACKUP"' <<<"$a")"
+check "watchdog: channels" "$(yes jq -e '.channels == "VWP BACKUP"' <<<"$w")"
 check "alert: timeout 365 days" "$(yes jq -e '.timeout == 31536000' <<<"$a")"
 check "alert: filter_http_body" "$(yes jq -e '.filter_http_body == true' <<<"$a")"
 check "alert: failure_kw" "$(yes jq -e '.failure_kw == "\"status\":\"firing\""' <<<"$a")"
@@ -68,6 +70,12 @@ check "alert: ignore unmatched" "$(yes jq -e '.filter_default_fail == false' <<<
 check "watchdog: timeout 300" "$(yes jq -e '.timeout == 300 and .grace == 300' <<<"$w")"
 check "watchdog: no failure_kw" "$(yes jq -e 'has("failure_kw") | not' <<<"$w")"
 check "watchdog: no filter_http_body" "$(yes jq -e '(.filter_http_body // false) == false' <<<"$w")"
+
+reset
+rc=0
+HC_CHANNELS= bash "$script" 2>"$work/err" || rc=$?
+check "no channels: refuses to run" "$(yes test "$rc" -ne 0)"
+check "no channels: nothing sent" "$(yes test ! -e "$work/urls")"
 
 reset
 rc=0

@@ -277,6 +277,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       environment = {
         HC_API_KEY_FILE = cfg.secrets.healthchecksApiKey;
         CHECKS = syncJson;
+        # The project's Discord integration for homelab alerts, by its exact name in
+        # Healthchecks (not "*": the project has other integrations, e.g. Raika's).
+        HC_CHANNELS = "VWP BACKUP";
       };
       serviceConfig = {
         Type = "oneshot";

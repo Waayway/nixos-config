@@ -64,9 +64,11 @@ Grafana's alert rules (`modules/server/monitoring/alerts.nix`) each report to th
 own Healthchecks.io check, `homelab-<rule>`: `host-down`, `vm-down` (VMs with
 `onboot`), `disk-full` (> 85 %, also Proxmox storage), `failed-unit`, `route-down`,
 `truenas-pool`, `log-budget`, `memory` (< 10 % free). A firing notification marks the
-check down, a resolved one marks it up (keyword filters on the request body); the
-phone notification itself comes from Healthchecks' integrations, as for the other
-checks. `healthchecks-sync` creates the checks through the API on every switch
+check down, a resolved one marks it up (keyword filters on the request body). The
+notification goes to the Discord integration **VWP BACKUP** only (`HC_CHANNELS` in
+`alerts.nix`; the sync replaces a check's integrations with it, never "all": the
+project also has the Raika Discord). Tested end to end on 2026-10-23: a failed unit
+took the check down after ~6.5 minutes and back up 2 minutes after it was cleared. `healthchecks-sync` creates the checks through the API on every switch
 (read-write key in 1Password `healthchecks-api-key`; the free plan allows 20 checks).
 
 - **One check per rule, grouped per host:** if two machines trip the same rule, the

@@ -3,6 +3,8 @@
 #
 #   env: HC_API_KEY_FILE  file with the project's read-write API key
 #        CHECKS           JSON list of { slug, name, timeout, grace, filter }
+#        HC_CHANNELS      integrations to notify: exact names or UUIDs, comma-separated
+#                         (replaces whatever the check had)
 #
 # One `POST /api/v3/checks/` per check with `unique: ["slug"]`: 201 = created, 200 =
 # updated. A check with `filter` only reacts to Grafana's webhook body (failure keyword
@@ -11,6 +13,7 @@
 # non-zero. After a 200/201 the response's check object must echo `filter_http_body` and
 # `failure_kw` for filtered checks; if not, the script exits non-zero naming the slug.
 set -euo pipefail
+: "${HC_CHANNELS:?HC_CHANNELS must name the integrations to notify}"
 
 url=https://healthchecks.io/api/v3/checks/
 work=$(mktemp -d)
@@ -21,11 +24,11 @@ printf 'X-Api-Key: %s\n' "$(tr -d '[:space:]' <"$HC_API_KEY_FILE")" >"$work/head
 
 jq -c '.[]' <<<"$CHECKS" | while read -r check; do
   slug=$(jq -r .slug <<<"$check")
-  body=$(jq -c '
+  body=$(jq -c --arg channels "$HC_CHANNELS" '
     {
       name, slug, timeout, grace,
       tags: "homelab monitoring",
-      channels: "*",
+      channels: $channels,
       unique: ["slug"]
     }
     + (if .filter then {
