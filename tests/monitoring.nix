@@ -40,6 +40,7 @@ let
     )
   );
   units = monitor.systemd;
+  afterOpnix = s: lib.elem "opnix-secrets.service" units.services.${s}.after;
   probes = targetsOf "blackbox";
   gf = monitor.services.grafana;
   gs = gf.settings;
@@ -231,6 +232,14 @@ assert
 assert has "ExecStartPre" (builtins.toJSON (lib.attrNames units.services.prometheus.serviceConfig));
 assert units.services.truenas-pools.serviceConfig.Restart == "on-failure";
 assert units.services.truenas-pools.serviceConfig.RestartSec == "30s";
+# Secret readers start after opnix has written their files (once each, not per secret).
+assert lib.all afterOpnix [
+  "grafana"
+  "prometheus-pve-exporter"
+  "healthchecks-sync"
+  "truenas-pools"
+];
+assert lib.count (u: u == "opnix-secrets.service") units.services.grafana.after == 1;
 assert units.services.truenas-pools.unitConfig.StartLimitBurst == 5;
 assert units.services.truenas-pools.unitConfig.StartLimitIntervalSec == "4min";
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";

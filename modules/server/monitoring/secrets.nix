@@ -98,5 +98,18 @@ lib.optionalAttrs hostPlatform.isLinux {
     }) active;
 
     homelab.monitoring.server.secrets = lib.mapAttrs (n: _: lib.mkDefault secretPaths.${n}) active;
+
+    # A unit that reads a secret starts after opnix has written it: on a fresh VM, or
+    # when a secret is added, it otherwise starts first, finds no file and hits its
+    # start limit. `wants`, not `requires`: offline, opnix fails but keeps its files.
+    systemd.services =
+      lib.genAttrs
+        (lib.unique (
+          map (lib.removeSuffix ".service") (lib.concatMap (d: d.services or [ ]) (lib.attrValues active))
+        ))
+        (_: {
+          after = [ "opnix-secrets.service" ];
+          wants = [ "opnix-secrets.service" ];
+        });
   };
 }
