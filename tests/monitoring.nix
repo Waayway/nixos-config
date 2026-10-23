@@ -144,6 +144,7 @@ assert monitor.systemd.timers.loki-budget.timerConfig.OnCalendar == "*:0/5";
 assert monitor.systemd.services.loki-budget.serviceConfig.Restart == "on-failure";
 assert monitor.systemd.services.loki-budget.serviceConfig.RestartSec == "30s";
 assert monitor.systemd.services.loki-budget.unitConfig.StartLimitBurst == 5;
+assert monitor.systemd.services.loki-budget.unitConfig.StartLimitIntervalSec == "4min";
 assert monitor.systemd.timers.loki-budget.wantedBy == [ "timers.target" ];
 assert has ''"prod":200'' monitor.systemd.services.loki-budget.environment.BUDGETS;
 assert !(has "router-test" monitor.systemd.services.loki-budget.environment.BUDGETS);
@@ -230,6 +231,7 @@ assert has "ExecStartPre" (builtins.toJSON (lib.attrNames units.services.prometh
 assert units.services.truenas-pools.serviceConfig.Restart == "on-failure";
 assert units.services.truenas-pools.serviceConfig.RestartSec == "30s";
 assert units.services.truenas-pools.unitConfig.StartLimitBurst == 5;
+assert units.services.truenas-pools.unitConfig.StartLimitIntervalSec == "4min";
 assert units.timers.truenas-pools.timerConfig.OnCalendar == "*:0/5";
 assert units.services.truenas-pools.environment.TRUENAS_HOST == "10.0.10.130";
 assert units.services.truenas-pools.environment.TRUENAS_USER == "automation";

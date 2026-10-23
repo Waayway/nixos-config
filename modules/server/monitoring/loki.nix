@@ -136,7 +136,9 @@ lib.optionalAttrs hostPlatform.isLinux {
         RestartSec = "30s";
       };
       unitConfig = {
-        StartLimitIntervalSec = "1h";
+        # Shorter than the 5-minute timer: the limit counts every start, so the
+        # timer alone must never reach it; failed runs give up after ~2 minutes.
+        StartLimitIntervalSec = "4min";
         StartLimitBurst = 5;
       };
     };
