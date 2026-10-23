@@ -91,6 +91,7 @@ Open items:
 | 111 | identity | running, onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | Kanidm (`id.vanwaaij.com`), sign-in for apps |
 | 118 | vpn (was 110) | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | WireGuard (wg-easy) |
 | 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB | 128 GB (store-lvm) | old Jellyfin/Immich (`hostpci` removed) |
+| 140 | monitor | running, onboot | NixOS (this repo) | 2 / 4 GB | 16 GB (local-lvm) + 64 GB data (store-lvm) | Grafana, Prometheus, Loki, alerts (`docs/monitoring.md`) |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
 | 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
 | 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm; move to store-lvm aborted, see below) | Minecraft + BlueMap |
@@ -208,6 +209,15 @@ Shut down, 2 vCPU, `onboot 0`.
 - `/home/jenkins/jenkins_home` + `go-cache` (1.6 GB total). The Docker socket and
   binary are mounted into Jenkins (root-equivalent on the VM).
 - Being retired; not backed up.
+
+### 140 monitor
+
+- NixOS from this repo (`hosts/servers/monitor.nix`, modules in
+  `modules/server/monitoring/`), `10.0.10.140`, tag `tag:monitor`, Lodestar agent, since
+  2026-10-23. Grafana at `grafana.vanwaaij.com` (tailnet only, Kanidm sign-in),
+  Prometheus and Loki on a 64 GB data disk, agents on every NixOS server, exporters for
+  pve and TrueNAS, uptime probes of every route, alerts to Healthchecks.io. Details:
+  `docs/monitoring.md`.
 
 ### 111 identity
 
@@ -394,7 +404,7 @@ done, fixed (with date).
 | 8 | **Firewalls inconsistent**: PVE firewall off, Docker bypasses firewalld. | NixOS hosts enable `networking.firewall` with SSH-only defaults; each service module opens only its own ports, backends accept only the router's IP (10.0.10.110). PVE firewall on for the host (22, 8006 from LAN + tailnet). Archipelago: see #31. | 6, 7.4 | Partly done |
 | 9 | **Dead routes and stopped services** (BlueMap, jellyfetch, voice-memo). | Remove dead routes and voice-memo; delete Main (108), media (120). | 5.5 | Partly done: Main/media shut down, not deleted |
 | 10 | **SSH**: pve root allows passwords, one shared RSA key, vpn/TrueNAS unreachable. | `PermitRootLogin prohibit-password` on pve; new ed25519 key for VMs, keys managed in the repo; TrueNAS key-only admin; vpn either NixOS or gone. | 5.9, 7.2 | Open |
-| 11 | **No monitoring or alerting.** | One ntfy channel for everything: PVE notifications, TrueNAS alerts, restic failures, Gatus uptime checks for the public URLs, disk/SMART alerts (would have caught local-lvm at 86%). | 7.5 | Open (Lodestar Services tab checks HTTP only) |
+| 11 | **No monitoring or alerting.** | One ntfy channel for everything: PVE notifications, TrueNAS alerts, restic failures, Gatus uptime checks for the public URLs, disk/SMART alerts (would have caught local-lvm at 86%). | 7.5 | Fixed 2026-10-23: Grafana/Prometheus/Loki on VM 140, alerts per rule to Healthchecks.io, TrueNAS alerts there too (`docs/monitoring.md`). PVE's own notifications are not wired up yet |
 | 12 | **HTTP-01 everywhere** although a DNS-01 wildcard resolver exists. | Routers to the `cloudflare` resolver. | 5.6, 6 | Fixed 2026-10-19: the router uses one DNS-01 wildcard cert |
 | 13 | **nixos-manager** runs workstation bits, has a leftover `/var/lib/fleet-server`, disk was 83% full. | Gate Flatpak/interception-tools on `!isServer`, delete the leftover, grow the disk. | 2.5 | Partly done: disk grown to 64 GB; rest unverified |
 | 14 | **Archipelago isn't `onboot`.** | `qm set 201 --onboot 1`. | 5.4 | Fixed 2026-10-20 (also nixos-manager 170) |

@@ -154,6 +154,14 @@ OIDC app needs the same grant to `svc:id`. After creating a Service, run
 `tailscale serve drain svc:X` and `advertise svc:X` on the router. There is no SSH rule
 for `tag:identity` yet (homelab.md finding 25). See `docs/identity.md`.
 
+Monitoring additions (2026-10-22): `tag:monitor` (owned by `autogroup:admin` and
+`tag:nixos`); `tag:monitor` → `tag:router` on port 53; `tag:monitor` added to the sources
+of the Services grant (uptime probes of every route, and Grafana's sign-in through
+`svc:id`); `nixos-manager` → `tag:monitor` on tcp:7461; Service `grafana`, auto-approved
+for `tag:router`. The auto-approval didn't take when the router already advertised the
+Service before it was created: `tailscale serve drain svc:grafana`, wait a few seconds,
+`advertise` again (both in one go was too fast). See `docs/monitoring.md`.
+
 ## Open items
 
 1. Write deploy key for promote: put a GitHub deploy key (write access) in

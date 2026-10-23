@@ -39,6 +39,7 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 | Jellyfin | Kanidm (SSO-Auth plugin, provider `kanidm`) | a first login creates the user; people with `admin = true` in `people.nix` become Jellyfin administrators (plugin `AdminRoles`), and everyone gets all libraries |
 | Lodestar | Kanidm (OIDC, its own login at `lodestar.vanwaaij.com`) | `lodestar-users` may log in as readers; `admins` act (and must also be in `lodestar-users`: the scope map exists only for that group); see `docs/lodestar.md` |
 | Proxmox | Kanidm (realm `kanidm`, OpenID) | users are created by hand, see below |
+| Grafana | Kanidm (OIDC, `auth.generic_oauth`) | `grafana-users` sign in; `admins` become Grafana Admin, the rest Viewer; break-glass `admin` at `/login?disableAutoLogin` (`docs/monitoring.md`) |
 | Archipelago, Traefik dashboard, TrueNAS, Backrest | the gate | TrueNAS still has its own login behind it |
 
 ## Give someone access

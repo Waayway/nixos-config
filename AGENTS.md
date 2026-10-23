@@ -17,6 +17,7 @@ at `~/.flake` on each machine. Read this before changing anything.
 | prod | Proxmox VM 100, Nextcloud + Jellyfin + Immich (containers) | x86_64-linux | prod | servers |
 | identity | Proxmox VM 111, Kanidm (`id.vanwaaij.com`), sign-in for apps and the router's gate (`docs/identity.md`) | x86_64-linux | identity | servers |
 | nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
+| monitor | Proxmox VM 140, Grafana + Prometheus + Loki, alerts (`docs/monitoring.md`) | x86_64-linux | monitor | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
 10.0.10.0/24, gateway 10.0.10.1). Other VMs there still run Rocky/Debian and are
@@ -50,8 +51,8 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
     packages shell system users` (hardware = nixos-hardware profiles + firmware).
   - `workstation/`: laptops, desktop, Macs. `apps darwin desktop development
     gaming hardware shell`.
-  - `server/`: the Proxmox VMs. `backup homelab identity lodestar networking
-    proxmox secrets services truenas users`.
+  - `server/`: the Proxmox VMs. `backup homelab identity lodestar monitoring
+    networking proxmox secrets services truenas users`.
 - `modules/server/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
   (opnix); no secrets live in the repo.
 - `template/proxmox.nix`: base image for new Proxmox VMs.
@@ -217,6 +218,12 @@ lodestar` here.
   owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity` are owned by
   `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
   or the host cannot join.
+- **identity and router (2 GB RAM) can't evaluate the flake:** a Lodestar apply there
+  is OOM-killed (`nix`, ~1.4 GB) and shows as "interrupted". Build their toplevel on
+  nixos-manager from `stable`, then from atlas `nix copy --no-check-sigs --from
+  ssh-ng://manager@10.0.10.170 --to ssh-ng://<user>@<ip> <path>` and on the VM
+  `sudo nix-env -p /nix/var/nix/profiles/system --set <path>` +
+  `sudo <path>/bin/switch-to-configuration switch`. More RAM would fix it for good.
 - **NixOS maps a machine's own hostname to `127.0.0.2`** in `/etc/hosts`.
   Anything that resolves "itself" by name gets loopback, not its Tailscale IP.
 - **git as root on a user's repo** fails with "dubious ownership"; run git as
