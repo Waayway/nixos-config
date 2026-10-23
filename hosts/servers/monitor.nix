@@ -22,9 +22,6 @@
   # reports here. Data on its own disk, mounted at /var/lib/monitoring.
   options = {
     homelab.monitoring.server.enable = true;
-    # Rollout: no alerts to Healthchecks until every agent reports and the pre-flight
-    # checks pass (docs/plans/2026-10-22-monitoring-plan.md, Task 10 step 7).
-    homelab.monitoring.server.healthchecks.enable = false;
   };
 
   config = { ... }: { };
