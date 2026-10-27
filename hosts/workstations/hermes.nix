@@ -28,21 +28,11 @@
       profiles = [ "framework-amd-ai-300-series" ];
     };
     home-manager.enable = true;
-    #workstation = {
-    #  terminal.enable = true;
-    #  neovim.enable = true;
-    #  desktop = {
-    #    kde.enable = true;
-    #  };
-    #};
-    #server = { };
   };
 
   config =
     { ... }:
     {
-      # Firmware updating service
-      services.fwupd.enable = true;
 
       boot.initrd.availableKernelModules = [
         "nvme"
