@@ -3,9 +3,16 @@ import QtQuick.Layouts
 import Quickshell
 import qs.services
 
-// The bar: a floating pill at the top of the primary monitor, 70% wide.
+// The bar: a floating pill at the top of the primary monitor. 70% wide on
+// wide screens; on narrow ones (the laptop panel, 1440 logical px) the full
+// width minus Hyprland's gaps_out, or the contents don't fit.
 PanelWindow {
     id: bar
+
+    readonly property int side: {
+        const w = screen?.width ?? 0;
+        return w >= 1800 ? Math.round(w * 0.15) : 20;
+    }
 
     anchors {
         top: true
@@ -14,8 +21,8 @@ PanelWindow {
     }
     margins {
         top: 20
-        left: Math.round((screen?.width ?? 0) * 0.15)
-        right: Math.round((screen?.width ?? 0) * 0.15)
+        left: bar.side
+        right: bar.side
     }
     implicitHeight: 58
     color: "transparent"

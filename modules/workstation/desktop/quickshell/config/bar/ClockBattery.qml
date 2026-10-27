@@ -7,8 +7,8 @@ import qs.services
 
 // Clock, with the battery attached on laptops. The battery reads relative to
 // the charge limit (charge_control_end_threshold, 80% on hermes), so a battery
-// charged up to its limit shows 100%. Hovering shows the real charge and the
-// time left (or until the limit).
+// charged up to its limit shows 100%. Hovering opens a popover with the real
+// charge and the time left (or until the limit).
 RowLayout {
     id: root
 
@@ -66,6 +66,7 @@ RowLayout {
     }
 
     Rectangle {
+        id: batteryPill
         visible: root.hasBattery
         implicitWidth: batteryText.implicitWidth + 29
         implicitHeight: 30
@@ -90,23 +91,62 @@ RowLayout {
             anchors.leftMargin: 5 // past the gap strip
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+            text: `${root.shown}%`
             color: Theme.bg
             font.family: Theme.font
             font.pixelSize: 16
-            text: {
-                const pct = `${root.shown}%`;
-                if (!hover.hovered || !root.battery)
-                    return pct;
-                const real = root.limit < 100 ? ` (${Math.round(root.raw)}% of ${root.limit}%)` : "";
-                if (root.battery.state === UPowerDeviceState.Discharging && root.battery.timeToEmpty > 0)
-                    return `${pct}${real} · ${root.duration(root.battery.timeToEmpty)} left`;
-                if (root.battery.state === UPowerDeviceState.Charging && root.battery.timeToFull > 0 && root.raw < root.limit) {
-                    // UPower counts to 100%; scale its estimate to the limit.
-                    const toLimit = root.battery.timeToFull * (root.limit - root.raw) / (100 - root.raw);
-                    return `${pct}${real} · full in ${root.duration(toLimit)}`;
+        }
+
+        // Details while hovering: real charge vs the limit, and time left.
+        PopupWindow {
+            visible: hover.hovered && root.battery !== null
+            anchor.item: batteryPill
+            anchor.edges: Edges.Bottom
+            anchor.gravity: Edges.Bottom
+            anchor.margins.top: 14
+            implicitWidth: details.implicitWidth + 24
+            implicitHeight: details.implicitHeight + 20
+            color: "transparent"
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.rounding
+                color: Theme.bg
+                border.width: 2
+                border.color: Theme.blue7
+
+                Column {
+                    id: details
+                    anchors.centerIn: parent
+                    spacing: 4
+
+                    DetailText {
+                        text: root.limit < 100 ? `${Math.round(root.raw)}% of the ${root.limit}% limit` : `${Math.round(root.raw)}%`
+                    }
+                    DetailText {
+                        color: Theme.fgDark
+                        text: {
+                            const b = root.battery;
+                            if (!b)
+                                return "";
+                            if (b.state === UPowerDeviceState.Discharging)
+                                return b.timeToEmpty > 0 ? `${root.duration(b.timeToEmpty)} left` : "On battery";
+                            if (b.state === UPowerDeviceState.Charging && b.timeToFull > 0 && root.raw < root.limit) {
+                                // UPower counts to 100%; scale its estimate to the limit.
+                                const toLimit = b.timeToFull * (root.limit - root.raw) / (100 - root.raw);
+                                return `Full in ${root.duration(toLimit)}`;
+                            }
+                            return root.raw >= root.limit - 1 ? "Charged to the limit" : "Plugged in";
+                        }
+                    }
                 }
-                return pct + real;
             }
         }
+    }
+
+    component DetailText: Text {
+        color: Theme.fg
+        font.family: Theme.font
+        font.pixelSize: 14
     }
 }
