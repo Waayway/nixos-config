@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   hostPlatform,
   ...
 }:
@@ -24,11 +23,12 @@ lib.optionalAttrs hostPlatform.isLinux {
         };
       };
     };
-    services.blueman.enable = true;
+    # Pair and connect: Adwaita Bluetooth (GTK4/libadwaita, made for tiling
+    # WMs); its daemon runs as a user service. Opened from the Quickshell bar.
+    services.adw-bluetooth.enable = true;
 
     systemd.user.services.mpris-proxy = {
       enable = true;
     };
-    environment.systemPackages = with pkgs; [ blueman ];
   };
 }

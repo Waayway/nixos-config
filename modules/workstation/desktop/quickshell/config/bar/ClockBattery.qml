@@ -100,10 +100,11 @@ RowLayout {
         // Details while hovering: real charge vs the limit, and time left.
         PopupWindow {
             visible: hover.hovered && root.battery !== null
+            // 10 px below the bar, centred under the pill
             anchor.item: batteryPill
+            anchor.rect: Qt.rect(0, 0, batteryPill.width, batteryPill.QsWindow.window ? batteryPill.QsWindow.window.height - batteryPill.mapToItem(null, 0, 0).y + 10 : batteryPill.height + 24)
             anchor.edges: Edges.Bottom
             anchor.gravity: Edges.Bottom
-            anchor.margins.top: 14
             implicitWidth: details.implicitWidth + 24
             implicitHeight: details.implicitHeight + 20
             color: "transparent"

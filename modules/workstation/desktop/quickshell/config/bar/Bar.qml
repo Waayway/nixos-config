@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.services
+import qs.system
 
 // The bar: a floating pill at the top of the primary monitor. 70% wide on
 // wide screens; on narrow ones (the laptop panel, 1440 logical px) the full
@@ -50,7 +51,7 @@ PanelWindow {
             anchors.centerIn: parent
         }
 
-        // Right: named workspaces, clock + battery, tray
+        // Right: named workspaces, clock + battery, system popover (system/)
         RowLayout {
             anchors.right: parent.right
             anchors.rightMargin: 15
@@ -60,9 +61,8 @@ PanelWindow {
             Workspaces {
                 named: true
             }
-            FanControl {}
             ClockBattery {}
-            Tray {}
+            SystemMenu {}
         }
     }
 }
