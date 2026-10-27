@@ -8,6 +8,7 @@ lib.optionalAttrs hostPlatform.isLinux {
   # Workstation-only: skipped on servers (type = "server").
   config = lib.mkIf (!hostPlatform.isServer) {
     programs.hyprland.enable = true;
+
     environment.sessionVariables = {
       # Fix for Electron Apps to say to use wayland
       NIXOS_OZONE_WL = "1";
@@ -18,7 +19,6 @@ lib.optionalAttrs hostPlatform.isLinux {
       ### Display
       wlr-randr
       brightnessctl
-      hyprland-monitor-attached
 
       ### Sound
       playerctl
@@ -32,10 +32,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       grim
       slurp
 
-      # --Overlays Bars and more--
-      waybar
-      wlogout
+      # --Launcher-- (bar and notifications: Quickshell, desktop/quickshell/)
       rofi
+      libnotify
 
       # HyprCursor cursor
       rose-pine-hyprcursor
@@ -45,8 +44,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       nemo-fileroller
 
       # Hypr Ecosystem
-      pkgs.hyprpicker
-      pkgs.hyprpaper
+      hyprpicker
+      hyprpaper
+      hypridle
     ];
+
+    # hyprlock with its PAM service. hypridle, hyprlock and hyprpaper are
+    # configured in desktop/hyprland/config/ and started by Hyprland.
+    programs.hyprlock.enable = true;
   };
 }

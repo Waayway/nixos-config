@@ -1,1 +1,3 @@
 .DS_Store
+# Local monitor experiments (Monique), see hyprland/config/lua/monitors.lua
+modules/workstation/desktop/hyprland/config/lua/monitors.local.lua

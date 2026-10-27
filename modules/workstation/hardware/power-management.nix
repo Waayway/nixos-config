@@ -10,5 +10,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     services.power-profiles-daemon = {
       enable = true;
     };
+    # Battery state for the Quickshell bar (desktop/quickshell/).
+    services.upower.enable = true;
   };
 }

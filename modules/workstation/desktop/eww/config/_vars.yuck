@@ -1,8 +1,0 @@
-(deflisten workspaces :initial "{}" "bash ~/.config/eww/scripts/get-workspaces")
-
-(deflisten media :initial "{}" "bash ~/.config/eww/scripts/media-status")
-
-(deflisten volume :initial "100" "bash ~/.config/eww/scripts/audio")
-
-(deflisten battery :initial "false" "bash ~/.config/eww/scripts/battery")
-

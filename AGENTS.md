@@ -179,6 +179,18 @@ lodestar` here.
 
 ## Gotchas
 
+- **Hyprland and Quickshell configs are plain files, live-linked.**
+  `~/.config/hypr` → `modules/workstation/desktop/hyprland/config/` (Lua +
+  hypridle/hyprlock/hyprpaper `.conf`), `~/.config/quickshell` →
+  `modules/workstation/desktop/quickshell/config/` (QML bar + notifications),
+  via `mkOutOfStoreSymlink`. Edit, then `hyprctl reload` / Quickshell reloads
+  itself; no switch. Check Lua with
+  `Hyprland --verify-config -c ~/.config/hypr/hyprland.lua` and
+  `hyprctl configerrors`. Colours: `tools/color.nix` (Tokyo Night Night) →
+  `~/.config/theme/colors.{lua,conf,json}` (`desktop/theme_home.nix`). Monitors
+  and the "primary" monitor: `hyprland/config/lua/monitors.lua` +
+  `monitor_policy.lua` (`docs/plans/2026-10-27-monitor-management-design.md`).
+
 - **Servers vs. workstations:** `type = "server"` sets `hostPlatform.isServer`.
   Desktop, sound, printing, power-profile and Flatpak modules are gated on
   `!isServer`, as are the dev toolchains. GPUs come from nixos-hardware profiles

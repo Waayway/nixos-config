@@ -1,36 +1,34 @@
+# Tokyo Night (Night variant), https://github.com/folke/tokyonight.nvim
+# Hex without '#'. The desktop's generated theme files
+# (modules/workstation/desktop/theme_home.nix) are built from this.
 { }:
 {
-  foreground = "c0caf5";
-  background = "171721";
-  darker = "111219";
-  accent = "577ea6";
-  mbg = "1f1f2c";
+  name = "tokyonight-night";
 
-  cursorColor = "c0caf5";
+  bg_dark = "16161e";
+  bg = "1a1b26";
+  bg_highlight = "292e42";
+  bg_visual = "283457";
+  terminal_black = "414868";
+  fg = "c0caf5";
+  fg_dark = "a9b1d6";
+  fg_gutter = "3b4261";
+  dark3 = "545c7e";
   comment = "565f89";
-
-  color0 = "212130";
-  color8 = "2d2d3b";
-
-  color1 = "c74d60";
-  color9 = "cc596e";
-
-  color2 = "65d17c";
-  color10 = "7cdb90";
-
-  color3 = "df966a";
-  color11 = "e4a078";
-
-  color4 = "577ea6";
-  color12 = "759bc3";
-
-  color5 = "8870b2";
-  color13 = "af99d7";
-
-  color6 = "55baa6";
-  color14 = "7dcfff";
-
-  color7 = "bbc6f3";
-  color15 = "bbc6f3";
-  name = "tokyo";
+  dark5 = "737aa2";
+  blue0 = "3d59a1";
+  blue = "7aa2f7";
+  cyan = "7dcfff";
+  blue1 = "2ac3de";
+  blue5 = "89ddff";
+  blue7 = "394b70";
+  magenta = "bb9af7";
+  purple = "9d7cd8";
+  orange = "ff9e64";
+  yellow = "e0af68";
+  green = "9ece6a";
+  green1 = "73daca";
+  teal = "1abc9c";
+  red = "f7768e";
+  red1 = "db4b4b";
 }
