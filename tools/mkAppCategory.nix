@@ -10,6 +10,8 @@
 #
 # Per app, each field is optional:
 #   linux        list of packages installed on NixOS
+#   flatpak      list of Flatpak app IDs installed on NixOS via nix-flatpak
+#                (e.g. [ "org.kde.krita" ]; default remote is flathub)
 #   linuxConfig  NixOS config applied when the app is enabled (e.g. programs.*)
 #   darwinPkgs   list of packages installed on nix-darwin
 #   darwinCasks  list of Homebrew casks installed on nix-darwin
@@ -48,6 +50,7 @@ in
     [
       (lib.optionalAttrs hostPlatform.isLinux {
         environment.systemPackages = collect "linux";
+        services.flatpak.packages = collect "flatpak";
       })
       (lib.optionalAttrs hostPlatform.isDarwin {
         environment.systemPackages = collect "darwinPkgs";
