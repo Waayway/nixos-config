@@ -3,9 +3,12 @@
 -- reloads the config or restarts the bar.
 --
 -- Rules:
---   * The laptop panel is off while an external monitor is enabled
---     (`panel_with_external = "on"` keeps it on while the lid is open).
---     Never off when it's the only one.
+--   * The laptop panel is on while the lid is open, next to any externals;
+--     off only when the lid is closed and an external is enabled. Never off
+--     when it's the only one. If it should be on but hasn't come up shortly
+--     after (undocking leaves Hyprland with no outputs for a moment, and a
+--     runtime monitor rule doesn't always take then), the config is reloaded,
+--     which reapplies every monitor rule.
 --   * Primary = enabled monitor with the highest `priority` (monitors.lua),
 --     ties by left-most, then widest. Written to
 --     $XDG_RUNTIME_DIR/hypr/primary-monitor (connector name, e.g. DP-7) and
@@ -14,8 +17,6 @@
 --     monitor, or on the primary when there's only one.
 
 local M = {}
-
-local panel_with_external = "off"
 
 local MONITOR_KEYS = {
     "mode", "position", "scale", "bitdepth", "cm", "sdr_min_luminance", "sdr_max_luminance",
@@ -31,6 +32,7 @@ local state = {
     -- output selector -> monitor spec, for every laptop panel we know of
     internal = {},
     pending = false,
+    loading = false,
 }
 
 local function spec(output, entry, extra)
@@ -165,11 +167,14 @@ function M.refresh()
     end
 
     -- Laptop panel.
-    local panel_on = externals == 0 or (panel_with_external == "on" and not lid_closed())
+    local panel_on = externals == 0 or not lid_closed()
     if panel_on ~= state.panel_on then
         state.panel_on = panel_on
         for _, s in pairs(state.internal) do
             hl.monitor(spec(s.output, s, { disabled = not panel_on }))
+        end
+        if panel_on and next(state.internal) and not state.loading then
+            hl.timer(M.ensure_panel, { timeout = 1500, type = "oneshot" })
         end
     end
 
@@ -195,6 +200,46 @@ function M.refresh()
         state.primary, state.secondary = primary, secondary
         place_workspaces(primary, secondary)
     end
+end
+
+-- The panel should be on: if no internal output is enabled by now, reload.
+-- Only when an internal panel is actually connected (/sys/class/drm), so a
+-- desktop never reloads for a panel it doesn't have.
+function M.ensure_panel()
+    if not state.panel_on then
+        return
+    end
+    for _, m in ipairs(hl.get_monitors()) do
+        if is_real(m) and is_internal(m) then
+            return
+        end
+    end
+    local connected = false
+    local p = io.popen("cat /sys/class/drm/card*-eDP-*/status 2>/dev/null")
+    if p then
+        connected = (p:read("*a") or ""):match("^connected") ~= nil
+        p:close()
+    end
+    if not connected then
+        return
+    end
+    -- A reload resets this Lua state, so remember the last one in a file:
+    -- at most one per 15 s, never a reload loop.
+    local stamp = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr/panel-reload"
+    local f = io.open(stamp, "r")
+    local last = f and tonumber(f:read("*a")) or 0
+    if f then
+        f:close()
+    end
+    if os.time() - last < 15 then
+        return
+    end
+    f = io.open(stamp, "w")
+    if f then
+        f:write(tostring(os.time()))
+        f:close()
+    end
+    hl.exec_cmd("hyprctl reload")
 end
 
 -- Coalesce bursts of events (a dock brings several monitors at once) and let
@@ -228,14 +273,17 @@ function M.setup(monitors)
     hl.on("hyprland.start", schedule)
     hl.on("monitor.added", schedule)
     hl.on("monitor.removed", schedule)
-    -- Lid: only matters with panel_with_external = "on". Suspend/lock on lid
-    -- close stays logind's + hypridle's job (docked: logind ignores the lid).
+    -- Lid: decides the panel while an external is connected. Suspend/lock on
+    -- lid close stays logind's + hypridle's job (docked: logind ignores the lid).
     hl.bind("switch:on:Lid Switch", schedule, { locked = true })
     hl.bind("switch:off:Lid Switch", schedule, { locked = true })
 
     -- On a reload, the monitors are already there: apply now so the panel
-    -- rule is final before Hyprland applies the new config.
+    -- rule is final before Hyprland applies the new config. (No timers while
+    -- loading: the reload is itself what ensure_panel would do.)
+    state.loading = true
     M.refresh()
+    state.loading = false
 end
 
 return M

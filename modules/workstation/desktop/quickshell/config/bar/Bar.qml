@@ -53,6 +53,7 @@ PanelWindow {
             Workspaces {
                 named: true
             }
+            FanControl {}
             ClockBattery {}
             Tray {}
         }

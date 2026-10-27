@@ -39,10 +39,13 @@ Builds on `2026-10-27-hyprland-lua-quickshell-design.md`.
    `hl.on("monitor.added")`, `hl.on("monitor.removed")` and the lid switch, and
    calls `hl.monitor{}` for just the panel. No external daemon, no
    `hyprctl reload`, no script. The rule is the old intent, written down:
-   - panel **on** when no external is connected;
-   - panel **off** when an external is connected, lid open or closed
-     (configurable: `laptop_with_external = "off" | "on"`, default "off",
-     matches today; with "on" the lid closing turns it off);
+   - panel **on** while the lid is open, next to any externals;
+   - panel **off** only when the lid is closed and an external is connected
+     (changed 2026-10-27 from "off with any external": undocking then left a
+     gap with no screen at all);
+   - if the panel should be on but isn't up 1.5 s later (Hyprland briefly has
+     no outputs when a dock goes away, and a runtime monitor rule doesn't
+     always take then), `hyprctl reload`, at most once per 15 s;
    - never disable the last enabled output (safety: if `hl.get_monitors()` would
      be empty, keep the panel on).
 3. **Primary monitor.** Hyprland has no such thing, so the policy defines one:
