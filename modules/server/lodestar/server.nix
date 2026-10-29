@@ -54,6 +54,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       mode = "0400";
     };
 
+    # The write deploy key for promote (push to GitHub over ssh).
+    services.onepassword-secrets.secrets.lodestarDeployKey = {
+      reference = "op://Homelab/lodestar-deploy-key/private key?ssh-format=openssh";
+      owner = "lodestar-server";
+      mode = "0400";
+      services = [ "lodestar-server" ];
+    };
+
+    # Lodestar's ssh only has accept-new; pin GitHub's host key so the first push
+    # does not trust whatever answers.
+    programs.ssh.knownHosts."github.com".publicKey =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
     services.lodestar-server = {
       hosts = inputs.lodestar.lib.hostsFrom {
         inherit (inputs.self) nixosConfigurations darwinConfigurations;
@@ -65,8 +78,8 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
       repoUrl = lib.mkDefault "https://github.com/Waayway/nixos-config";
       pushUrl = lib.mkDefault "git@github.com:Waayway/nixos-config";
-      # Write deploy key for promote: open item, see docs/lodestar.md.
-      deployKeyFile = lib.mkDefault null;
+      # Write deploy key for promote (GitHub deploy key, 1Password item lodestar-deploy-key).
+      deployKeyFile = lib.mkDefault config.services.onepassword-secrets.secretPaths.lodestarDeployKey;
       allowedUsers = lib.mkDefault [ "Waayway@github" ];
       allowedTags = lib.mkDefault [
         "tag:nixos"

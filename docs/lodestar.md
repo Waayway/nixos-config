@@ -164,18 +164,16 @@ Service before it was created: `tailscale serve drain svc:grafana`, wait a few s
 
 ## Open items
 
-1. Write deploy key for promote: put a GitHub deploy key (write access) in
-   the 1Password vault Homelab (item `lodestar-deploy-key`), declare it with
-   `services.onepassword-secrets.secrets.lodestarDeployKey = { reference =
-   "op://Homelab/lodestar-deploy-key/private key"; owner = "lodestar-server";
-   mode = "0400"; services = [ "lodestar-server" ]; };` and set
-   `services.lodestar-server.deployKeyFile =
-   config.services.onepassword-secrets.secretPaths.lodestarDeployKey` (in
-   `hosts/servers/nixos-manager.nix`). Add a GitHub ruleset on `stable` (no
-   force pushes, linear history).
-2. Advertise `tag:fleet` on enrolled Linux hosts (Lodestar has no option for
-   it yet; use `services.tailscale.extraUpFlags`) and fix nixos-manager's
-   Tailscale tags (it still carries `tag:server`).
+1. Write deploy key for promote: declared in `modules/server/lodestar/server.nix`
+   (opnix secret `lodestarDeployKey` from `op://Homelab/lodestar-deploy-key`, set as
+   `deployKeyFile`, GitHub's ssh host key pinned). Still to do outside the repo: create
+   the 1Password item `lodestar-deploy-key` (Homelab, SSH key, ed25519), add its public
+   key as a write deploy key on `Waayway/nixos-config`, add the `protect-channels`
+   ruleset (no force pushes or deletion on `stable` and `unstable`), then roll it out
+   to nixos-manager. Done once the first `lodestar promote` works.
+2. Done (2026-10-27): nixos-manager is re-tagged `tag:nixos,tag:manager`. Advertising
+   `tag:fleet` on enrolled Linux hosts is still open (Lodestar has no option for it
+   yet; use `services.tailscale.extraUpFlags`).
 3. Enrol hephaestus (`fleet = true`); atlas, apollo and hermes are enrolled.
 4. Migrate the VMs (template 9000 is built from `template/proxmox.nix` and
    boot-tested since 2026-10-13; see
