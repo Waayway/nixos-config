@@ -66,9 +66,11 @@ let
     "software-behind"
     "updater-failed"
     "upstream-stale"
+    "updater-stale"
     "watchdog"
   ];
   syncChecks = builtins.fromJSON units.services.healthchecks-sync.environment.CHECKS;
+  ruleOf = hc: lib.head (lib.findFirst (r: r.labels.hc == hc) null rules).data;
   routeOf = hc: lib.findFirst (r: r.receiver == "homelab-${hc}") null policy.routes;
 in
 assert node.enable;
@@ -361,7 +363,7 @@ assert monitor.homelab.access.grafana.oidc.preferShortUsername;
 assert monitor.lodestar.links.grafana.group == "Infrastructure";
 assert lib.elem "https://grafana.vanwaaij.com/" probes;
 # alerts: one rule, contact point, route and check per hc; the watchdog pings every minute
-assert lib.length cps == 12;
+assert lib.length cps == 13;
 assert map (c: c.name) cps == map (h: "homelab-${h}") hcs;
 assert lib.all (
   c:
@@ -370,12 +372,23 @@ assert lib.all (
   in
   r.type == "webhook" && r.settings.url == "https://hc-ping.com/$HC_PING_KEY/${c.name}"
 ) cps;
-assert lib.length rules == 12;
+assert lib.length rules == 13;
 assert lib.all (r: lib.any (c: c.name == "homelab-${r.labels.hc}") cps) rules;
 assert (lib.head rules).data != [ ] && (lib.head rules).condition == "C";
 assert (lib.elemAt (lib.head rules).data 0).datasourceUid == "prometheus";
 assert (lib.elemAt (lib.head rules).data 0).model.expr == ''up{job="node"} == 0'';
 assert (lib.head rules)."for" == "3m";
+# Lodestar: the updater must have run within two days; upstream checks that never succeeded
+# while errors count are stale too.
+assert
+  (ruleOf "updater-stale").model.expr
+  == "time() - lodestar_update_last_run_timestamp_seconds > 2 * 86400";
+assert (lib.findFirst (r: r.labels.hc == "updater-stale") null rules)."for" == "1h";
+assert lib.hasInfix
+  "lodestar_software_latest_check_errors_total > 0 unless on(software) lodestar_software_latest_checked_timestamp_seconds"
+  (ruleOf "upstream-stale").model.expr;
+assert lib.hasInfix "time() - lodestar_software_latest_checked_timestamp_seconds > 86400"
+  (ruleOf "upstream-stale").model.expr;
 assert
   policy.group_by == [
     "alertname"

@@ -105,9 +105,18 @@ let
     {
       hc = "upstream-stale";
       name = "Upstream check stale";
-      expr = "time() - lodestar_software_latest_checked_timestamp_seconds > 86400";
+      # Stale once the last success is a day old, or while checks fail and none succeeded
+      # since the server started.
+      expr = "(time() - lodestar_software_latest_checked_timestamp_seconds > 86400) or (lodestar_software_latest_check_errors_total > 0 unless on(software) lodestar_software_latest_checked_timestamp_seconds)";
       for = "1h";
-      summary = "Lodestar has not checked upstream versions for more than a day";
+      summary = "Lodestar has not checked upstream versions successfully for more than a day";
+    }
+    {
+      hc = "updater-stale";
+      name = "Updater not running";
+      expr = "time() - lodestar_update_last_run_timestamp_seconds > 2 * 86400";
+      for = "1h";
+      summary = "The flake input updater has not finished a run for more than two days";
     }
     {
       hc = "watchdog";
