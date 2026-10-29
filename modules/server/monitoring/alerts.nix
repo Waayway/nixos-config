@@ -89,6 +89,27 @@ let
       summary = "A host has less than 10% memory available";
     }
     {
+      hc = "software-behind";
+      name = "Software behind upstream";
+      expr = "lodestar_software_up_to_date == 0";
+      for = "7d";
+      summary = "A host has run an older version of tracked software than upstream for more than 7 days";
+    }
+    {
+      hc = "updater-failed";
+      name = "Updater failed";
+      expr = ''lodestar_update_last_result{result=~"build-failed|push-failed|eval-failed"} == 1'';
+      for = "0s";
+      summary = "The flake input updater's last run failed (eval, build or push)";
+    }
+    {
+      hc = "upstream-stale";
+      name = "Upstream check stale";
+      expr = "time() - lodestar_software_latest_checked_timestamp_seconds > 86400";
+      for = "1h";
+      summary = "Lodestar has not checked upstream versions for more than a day";
+    }
+    {
       hc = "watchdog";
       name = "Watchdog";
       expr = "vector(1)";

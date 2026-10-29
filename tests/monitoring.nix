@@ -63,6 +63,9 @@ let
     "truenas-pool"
     "log-budget"
     "memory"
+    "software-behind"
+    "updater-failed"
+    "upstream-stale"
     "watchdog"
   ];
   syncChecks = builtins.fromJSON units.services.healthchecks-sync.environment.CHECKS;
@@ -358,7 +361,7 @@ assert monitor.homelab.access.grafana.oidc.preferShortUsername;
 assert monitor.lodestar.links.grafana.group == "Infrastructure";
 assert lib.elem "https://grafana.vanwaaij.com/" probes;
 # alerts: one rule, contact point, route and check per hc; the watchdog pings every minute
-assert lib.length cps == 9;
+assert lib.length cps == 12;
 assert map (c: c.name) cps == map (h: "homelab-${h}") hcs;
 assert lib.all (
   c:
@@ -367,7 +370,7 @@ assert lib.all (
   in
   r.type == "webhook" && r.settings.url == "https://hc-ping.com/$HC_PING_KEY/${c.name}"
 ) cps;
-assert lib.length rules == 9;
+assert lib.length rules == 12;
 assert lib.all (r: lib.any (c: c.name == "homelab-${r.labels.hc}") cps) rules;
 assert (lib.head rules).data != [ ] && (lib.head rules).condition == "C";
 assert (lib.elemAt (lib.head rules).data 0).datasourceUid == "prometheus";
