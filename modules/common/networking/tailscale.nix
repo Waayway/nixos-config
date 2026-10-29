@@ -1,5 +1,6 @@
 {
   lib,
+  config,
   upkgs,
   hostPlatform,
   ...
@@ -14,4 +15,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     # turn SSH on in workstation/networking/tailscale.nix.
     extraUpFlags = [ "--ssh" ];
   };
+
+  # Reported to Lodestar, which compares it with upstream (Software updates).
+  services.lodestar-agent.versions.tailscale = config.services.tailscale.package.version;
 }

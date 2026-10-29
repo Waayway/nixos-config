@@ -67,6 +67,9 @@ lib.optionalAttrs hostPlatform.isLinux {
     programs.ssh.knownHosts."github.com".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
 
+    # The monitoring agent opens this port to the monitor VM only.
+    homelab.monitoring.targets.lodestar.port = cfg.metrics.port;
+
     services.lodestar-server = {
       hosts = inputs.lodestar.lib.hostsFrom {
         inherit (inputs.self) nixosConfigurations darwinConfigurations;
@@ -87,6 +90,15 @@ lib.optionalAttrs hostPlatform.isLinux {
         "tag:fleet"
       ];
       # promote keeps the module default: unstable -> stable.
+
+      # Software the fleet tracks against upstream releases (docs/lodestar.md).
+      updates.software.tailscale = {
+        input = "nixpkgs-unstable";
+        upstream.github = "tailscale/tailscale";
+      };
+
+      # Prometheus metrics, scraped by the monitor VM (target below).
+      metrics.address = config.homelab.lan.address;
 
       # Public URL behind the router (10.0.10.110), logging in with Kanidm.
       proxyListen.address = lib.mkDefault config.homelab.lan.address;

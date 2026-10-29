@@ -87,6 +87,30 @@ lodestar rebuild --channel stable --wait
 nix run github:Waayway/lodestar -- status   # without installing
 ```
 
+## Software updates
+
+Lodestar tracks software that is not a flake input of its own against upstream
+releases. Today that is Tailscale: every Linux host reports its package version
+(`services.lodestar-agent.versions.tailscale` in
+`modules/common/networking/tailscale.nix`; on the Macs Tailscale is a Homebrew
+cask, so nothing is reported), and the server compares it with the latest GitHub
+release of `tailscale/tailscale`. The entries are declared in
+`modules/server/lodestar/server.nix` under `services.lodestar-server.updates.software`.
+
+To add one: report its version from the module that installs it
+(`services.lodestar-agent.versions.<name> = …`) and add
+`updates.software.<name> = { input = "<flake input>"; upstream.github = "<owner/repo>"; };`
+in `server.nix`.
+
+The updater bumps flake inputs daily and pushes the lock change to `unstable` as
+`Lodestar <lodestar@vanwaaij.com>`. Servers follow `stable`, so they still need a
+promote. `lodestar updates` shows the state; `lodestar updates run --wait` runs the
+updater now.
+
+Metrics are served on `10.0.10.170:9466` (`homelab.monitoring.targets.lodestar`
+opens the port to the monitor VM only) and scraped by Prometheus on the monitor.
+Grafana has a dashboard "Software versions".
+
 ## Public URL
 
 `https://lodestar.vanwaaij.com` (route `lodestar` in `modules/server/lodestar/server.nix`:
