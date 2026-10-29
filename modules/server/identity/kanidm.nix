@@ -199,6 +199,9 @@ let
     origin = "https://${cfg.domain}";
     tls_chain = "${certDir}/fullchain.pem";
     tls_key = "${certDir}/key.pem";
+    # The client's address from the router's X-Forwarded-For (Traefik replaces what a
+    # client sends), for the logs and Kanidm's per-client limits.
+    http_client_address_info.x-forward-for = cfg.trustedProxies;
     online_backup = {
       path = "/backup";
       schedule = "00 22 * * *";
@@ -206,6 +209,20 @@ let
     };
   };
   serverToml = (pkgs.formats.toml { }).generate "kanidm-server.toml" serverSettings;
+
+  # The routers in front of this Kanidm (this evaluation for itself, as router-test).
+  routerAddresses = lib.pipe inputs.self.nixosConfigurations [
+    (cs: cs // { ${config.networking.hostName} = { inherit config; }; })
+    lib.attrValues
+    (map (c: c.config))
+    (lib.filter (
+      c:
+      (c.homelab.router.enable or false)
+      && c.homelab.router.identityHost == config.networking.hostName
+      && c.homelab.lan.address != null
+    ))
+    (map (c: c.homelab.lan.address))
+  ];
 
   # --- shared shell -----------------------------------------------------------
   # Wait until the server answers (the container's unit is up before kanidmd is).
@@ -374,6 +391,13 @@ lib.optionalAttrs hostPlatform.isLinux {
         keeps them in /store/kanidm (needs `homelab.storage.enable`). The export's root
         must be writable by 65534 (root is squashed).
       '';
+    };
+
+    trustedProxies = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = routerAddresses;
+      defaultText = lib.literalMD "the LAN address of every router whose `homelab.router.identityHost` is this host";
+      description = "Addresses whose X-Forwarded-For Kanidm takes as the client's address.";
     };
 
     extraAccess = lib.mkOption {

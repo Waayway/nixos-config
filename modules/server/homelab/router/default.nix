@@ -78,8 +78,10 @@ let
         || r.middlewares != { }
         || r.auth.gate
         || r.insecureBackend
+        || r.backendServerName != null
       )
     )
+    || (r.backendServerName != null && !(lib.hasPrefix "https://" (toString r.backend)))
     || (r.auth.gate && r.basicAuth.usersFile != null)
   ) cfg.routes;
 
@@ -172,7 +174,17 @@ let
         ${name}.loadBalancer = {
           servers = [ { url = r.backend; } ];
         }
-        // lib.optionalAttrs r.insecureBackend { serversTransport = "insecure-backend"; };
+        // lib.optionalAttrs (r.backendServerName != null) { serversTransport = "${name}-backend"; }
+        // lib.optionalAttrs (r.insecureBackend && r.backendServerName == null) {
+          serversTransport = "insecure-backend";
+        };
+      };
+      # A backend by address whose certificate names `backendServerName`.
+      serversTransports = lib.optionalAttrs (r.backendServerName != null) {
+        "${name}-backend" = {
+          serverName = r.backendServerName;
+        }
+        // lib.optionalAttrs r.insecureBackend { insecureSkipVerify = true; };
       };
       middlewares = gate // auth // own;
     };
@@ -312,7 +324,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           }
           {
             assertion = malformed == { };
-            message = "homelab.router: routes need exactly one of backend and passthrough, a passthrough route takes no maintenance, basicAuth, middlewares, auth.gate or insecureBackend, and auth.gate excludes basicAuth: ${toString (lib.attrNames malformed)}";
+            message = "homelab.router: routes need exactly one of backend and passthrough, a passthrough route takes no maintenance, basicAuth, middlewares, auth.gate, insecureBackend or backendServerName, backendServerName needs an https:// backend, and auth.gate excludes basicAuth: ${toString (lib.attrNames malformed)}";
           }
           {
             assertion = identity.enable;
@@ -386,8 +398,10 @@ lib.optionalAttrs hostPlatform.isLinux {
                 strip-marker.headers.customRequestHeaders.X-Homelab-Via = "";
                 tailnet-marker.headers.customRequestHeaders.X-Homelab-Via = "tailnet";
               };
-              # For backends with `insecureBackend` (self-signed appliances).
-              serversTransports.insecure-backend.insecureSkipVerify = true;
+              serversTransports = collect "serversTransports" // {
+                # For backends with `insecureBackend` (self-signed appliances).
+                insecure-backend.insecureSkipVerify = true;
+              };
             };
             tcp = {
               routers = collect "tcpRouters";

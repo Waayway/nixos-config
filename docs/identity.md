@@ -8,8 +8,13 @@ findings: `docs/homelab.md` ("111 identity", "What could be better").
 
 - **Kanidm** on VM 111 (`identity`, `10.0.10.111`) at `https://id.vanwaaij.com`, from the
   official image (`modules/server/identity/kanidm.nix`). People sign in with a passkey. The
-  router passes `id.vanwaaij.com` through to it without terminating TLS (Tailscale
-  Service `id`; the VM gets its own Let's Encrypt certificate).
+  router serves `id.vanwaaij.com` with its wildcard certificate like every other site
+  and re-encrypts to Kanidm, checking Kanidm's own Let's Encrypt certificate by name
+  (Tailscale Service `id`). Kanidm takes the client's address from the router's
+  `X-Forwarded-For` (`homelab.identity.trustedProxies`). Until 2026-10-29 `id` was a
+  TLS passthrough; browsers off the tailnet then got Traefik's 404 when they reused a
+  connection opened for another `vanwaaij.com` site (HTTP/2 connection reuse: same IP,
+  and the wildcard covers `id`), typically on an app's redirect to the sign-in.
 - **The sign-in gate**: oauth2-proxy on the router (`modules/server/homelab/router/gate.nix`),
   a Kanidm client shown as "Services" at `auth.vanwaaij.com` (Tailscale Service `auth`).
   A route with `auth.gate = true` (`modules/server/homelab/routes.nix`) asks it through

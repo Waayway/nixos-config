@@ -169,7 +169,10 @@ without mail), Pocket ID (passkeys only, no users as code). Details:
 
 - Kanidm only. Domain **`id.vanwaaij.com`** (hard to change later). Own Let's Encrypt
   certificate (DNS-01); Traefik passes `id.vanwaaij.com` through without terminating
-  TLS. Public, and `svc:id` on the tailnet.
+  TLS. Public, and `svc:id` on the tailnet. *Changed 2026-10-29:* Traefik terminates
+  `id` with the wildcard and re-encrypts to Kanidm. The passthrough broke under HTTP/2
+  connection reuse (one public IP, a wildcard that covers `id`): a browser reusing a
+  connection from another site reached Traefik's HTTP routers and got a 404.
 - **Two-factor:** passkeys preferred; password + TOTP allowed. Credential policy per
   group: `admins` and `lodestar-admins` require a passkey; nobody may use a password
   alone.

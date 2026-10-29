@@ -1,6 +1,6 @@
 # Evaluation check of the router (modules/server/homelab/router/) on router-test, whose
-# identity is its own test Kanidm (`id-test.vanwaaij.com`): the identity route passed
-# through as TCP, the sign-in gate (oauth2-proxy container, `auth-test` route) and a
+# identity is its own test Kanidm (`id-test.vanwaaij.com`): the identity route (an
+# HTTP route re-encrypted to Kanidm, checked against its name), a passthrough route, the sign-in gate (oauth2-proxy container, `auth-test` route) and a
 # gated route's middlewares, tailnet-only routes with an insecure backend, and
 # evaluation failing for a gated route without an access entry and for a route with
 # both a backend and a passthrough.
@@ -54,23 +54,53 @@ let
   neither = extend {
     homelab.router.extraRoutes.neither.host = "neither.vanwaaij.com";
   };
+  passthrough = traefikOf (extend {
+    homelab.router.extraRoutes.pt = {
+      host = "pt.vanwaaij.com";
+      passthrough = "10.0.10.9:443";
+    };
+  });
   gatedPassthrough = extend {
-    homelab.router.extraRoutes.id-test.auth.gate = true;
+    homelab.router.extraRoutes.pt = {
+      host = "pt.vanwaaij.com";
+      passthrough = "10.0.10.9:443";
+      auth.gate = true;
+    };
+  };
+  serverNameOnHttp = extend {
+    homelab.router.extraRoutes.plain = {
+      host = "plain.vanwaaij.com";
+      backend = "http://10.0.10.9:80";
+      backendServerName = "plain.vanwaaij.com";
+    };
   };
 in
-# the identity route: TLS passthrough to Kanidm on both entrypoints
+# the identity route: an HTTP route on both entrypoints, re-encrypted to Kanidm and
+# checked against its name (staging certificate here, so not verified)
+assert http.routers.id-test-public.rule == "Host(`id-test.vanwaaij.com`)";
+assert http.routers.id-test-tailnet.entryPoints == [ "tailnet" ];
 assert
-  tcp.routers.id-test-public == {
-    rule = "HostSNI(`id-test.vanwaaij.com`)";
+  http.services.id-test.loadBalancer == {
+    servers = [ { url = "https://10.0.10.230:8443"; } ];
+    serversTransport = "id-test-backend";
+  };
+assert
+  http.serversTransports.id-test-backend == {
+    serverName = "id-test.vanwaaij.com";
+    insecureSkipVerify = true;
+  };
+assert !(tcp.routers ? id-test-public);
+# a passthrough route: TCP routers on the host's SNI
+assert
+  passthrough.tcp.routers.pt-public == {
+    rule = "HostSNI(`pt.vanwaaij.com`)";
     entryPoints = [ "public" ];
-    service = "id-test";
+    service = "pt";
     tls.passthrough = true;
   };
-assert tcp.routers.id-test-tailnet.entryPoints == [ "tailnet" ];
-assert tcp.routers.id-test-tailnet.tls.passthrough;
-assert tcp.services.id-test.loadBalancer.servers == [ { address = "10.0.10.230:8443"; } ];
-assert !(http.routers ? id-test-public);
-assert !(http.services ? id-test);
+assert passthrough.tcp.routers.pt-tailnet.tls.passthrough;
+assert passthrough.tcp.services.pt.loadBalancer.servers == [ { address = "10.0.10.9:443"; } ];
+assert !(passthrough.http.routers ? pt-public);
 # the gate's own route
 assert http.routers.auth-test-public.rule == "Host(`auth-test.vanwaaij.com`)";
 assert http.routers.auth-test-public.middlewares == [ ];
@@ -142,6 +172,7 @@ assert !ok notGateAccess.http;
 assert failedAssertions both != [ ];
 assert failedAssertions neither != [ ];
 assert failedAssertions gatedPassthrough != [ ];
+assert failedAssertions serverNameOnHttp != [ ];
 assert failedAssertions cfg == [ ];
 # oauth2-proxy: official image, pinned, loopback only, secrets from files
 assert lib.hasPrefix "quay.io/oauth2-proxy/oauth2-proxy:v7." gate.image;
@@ -191,7 +222,12 @@ assert
     p = prod.services.traefik.dynamicConfigOptions;
   in
   prod.homelab.router.gate.enable
-  && p.tcp.services.id.loadBalancer.servers == [ { address = "10.0.10.111:8443"; } ]
+  &&
+    p.http.services.id.loadBalancer == {
+      servers = [ { url = "https://10.0.10.111:8443"; } ];
+      serversTransport = "id-backend";
+    }
+  && p.http.serversTransports.id-backend == { serverName = "id.vanwaaij.com"; }
   && p.http.services.auth.loadBalancer.servers == [ { url = "http://127.0.0.1:4180"; } ]
   && lib.elem "--add-host=id.vanwaaij.com:127.0.0.1" c.extraOptions
   && lib.elem "--oidc-issuer-url=https://id.vanwaaij.com/oauth2/openid/oauth2-proxy" c.cmd

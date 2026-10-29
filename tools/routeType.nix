@@ -37,6 +37,15 @@ lib.types.submodule {
       default = false;
       description = "Don't verify the certificate of an `https://` backend (self-signed appliances).";
     };
+    backendServerName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "id.vanwaaij.com";
+      description = ''
+        Name an `https://` backend given by address is checked against (and sent as
+        SNI): the name on its certificate. Null uses the backend URL's host.
+      '';
+    };
     auth.gate = lib.mkOption {
       type = lib.types.bool;
       default = false;

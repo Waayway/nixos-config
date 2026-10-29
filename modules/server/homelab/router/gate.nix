@@ -6,7 +6,7 @@
 # Traefik's forwardAuth (`/?allowed_groups=<route>-users@<domain>`, default.nix),
 # which also redirects to the sign-in; its own pages (callback) are the route named
 # after the gate host (`auth`, `auth-test`). OIDC discovery and token calls go to the
-# router's own Traefik (:443), which passes the identity host through to Kanidm. The
+# router's own Traefik (:443), which routes the identity host to Kanidm. The
 # session cookie is set on the parent domain (`.vanwaaij.com`, SameSite=Lax), so one
 # sign-in covers every gated site, and `rd` redirects only within it. A test router
 # (servicePrefix set) uses its own cookie name and 1Password items.
@@ -75,8 +75,8 @@ lib.optionalAttrs hostPlatform.isLinux {
       extraOptions = [
         # Listens on the host's loopback only (--http-address).
         "--network=host"
-        # The router's own Traefik (:443), which passes the identity host's name
-        # through to Kanidm; Kanidm itself listens on 8443 only.
+        # The router's own Traefik (:443), which routes the identity host's name to
+        # Kanidm; Kanidm itself listens on 8443 only.
         "--add-host=${id.domain}:127.0.0.1"
       ];
       cmd = [

@@ -230,8 +230,9 @@ Shut down, 2 vCPU, `onboot 0`.
   overwritten from Nix on each provisioning run.
 - Online backups go to TrueNAS `store/authentication` (NFS, this VM only, mounted
   with `RequiresMountsFor`); they are in the restic backups since 2026-10-20.
-- Router entry: Tailscale Services `id` and `auth`; Kanidm is passed through without
-  TLS termination. How-to (people, apps, recovery, upgrades, backup): `docs/identity.md`.
+- Router entry: Tailscale Services `id` and `auth`; Traefik terminates TLS (wildcard)
+  and re-encrypts to Kanidm's own certificate (no passthrough since 2026-10-29, see
+  `docs/identity.md`). How-to (people, apps, recovery, upgrades, backup): `docs/identity.md`.
 
 ### 118 vpn (was 110)
 
@@ -435,7 +436,7 @@ done, fixed (with date).
 | 39 | **Circles app** logs a background-job error every 5 minutes in Nextcloud (upgrade noise, harmless). | Disable the app or wait it out. | - | Open (cosmetic) |
 | 40 | **Kanidm backup dataset** `store/authentication`: root `65534:65534 0700` set by hand, not declared. | Declare it in `modules/server/truenas/` (share id 9 is declared; give it the `[nix] authentication` comment so a reconcile doesn't duplicate it, switch the manager together). | - | Open |
 | 41 | **Kanidm depends on TrueNAS at start** (backup mount `RequiresMountsFor`); login doesn't start if TrueNAS is down at boot. | Make the mount non-blocking for the IdP. | - | Open |
-| 42 | **Kanidm sees the router's address** for all clients (passthrough without PROXY protocol). | Enable PROXY protocol or accept. | - | Open |
+| 42 | **Kanidm sees the router's address** for all clients (passthrough without PROXY protocol). | Enable PROXY protocol or accept. | - | Fixed 2026-10-29: no passthrough; Kanidm trusts the router's `X-Forwarded-For` (tailnet clients show as 127.0.0.1: Tailscale Services forward TCP to Traefik on loopback) |
 | 43 | **Gate cookie** `.vanwaaij.com` is sent to every subdomain (HttpOnly, Secure, SameSite=lax). | Accept or scope per host; also `--trusted-proxy-ip=127.0.0.1/32` was suggested for oauth2-proxy. | - | Open |
 | 44 | **Removing an app from access** keeps its Kanidm group, client and scope map (`--no-auto-remove`). | Delete by hand when an app is retired. | - | Open (by design) |
 | 45 | **Identity's system** includes neovim and moonlight-qt (some app modules are not gated off on servers). | Gate those app modules on `!isServer`. | - | Open |
