@@ -230,12 +230,14 @@ lodestar` here.
   owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity` are owned by
   `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
   or the host cannot join.
-- **identity and router (2 GB RAM) can't evaluate the flake:** a Lodestar apply there
-  is OOM-killed (`nix`, ~1.4 GB) and shows as "interrupted". Build their toplevel on
-  nixos-manager from `stable`, then from atlas `nix copy --no-check-sigs --from
-  ssh-ng://manager@10.0.10.170 --to ssh-ng://<user>@<ip> <path>` and on the VM
-  `sudo nix-env -p /nix/var/nix/profiles/system --set <path>` +
-  `sudo <path>/bin/switch-to-configuration switch`. More RAM would fix it for good.
+- **Small VMs and building:** every host builds its own system, including Lodestar's
+  Rust packages (no binary cache for them). identity and router got 4 GB on 2026-10-29
+  (2 GB was OOM-killed evaluating, "interrupted"); the 16 GB disks of router, identity
+  and monitor fill up on failed builds, so Nix collects garbage below 1 GiB free
+  (`modules/server/proxmox/disk-space.nix`). If a host can't build its own system,
+  build it on nixos-manager from `stable` and from atlas `nix copy --no-check-sigs
+  --from ssh-ng://manager@10.0.10.170 --to ssh-ng://<user>@<ip> <path>`; a Lodestar
+  apply then finds everything built.
 - **NixOS maps a machine's own hostname to `127.0.0.2`** in `/etc/hosts`.
   Anything that resolves "itself" by name gets loopback, not its Tailscale IP.
 - **git as root on a user's repo** fails with "dubious ownership"; run git as
