@@ -87,13 +87,21 @@ builder later without changing this design). Pushing closures to hosts (option B
   `modules/common/nix/cache.nix`.
 - **`cache-publish <commit> <store-path>…`** (a script in the cache VM's module, run by
   Lodestar over SSH as `lodestar`):
-  1. `nix copy --to 'file:///mnt/nix-cache?compression=zstd&secret-key=<file>'` the given
-     paths (closures; already-present paths are skipped by `nix copy`).
-  2. Write `/mnt/nix-cache/.roots/<commit>` listing the paths.
+  1. Take the closure of the given paths and keep **only the paths built on the cache
+     VM** (`nix path-info --json` `ultimate: true`); everything with a cache.nixos.org
+     signature is left out — clients get those from cache.nixos.org, which they try
+     first. `nix copy --no-recursive --to
+     'file:///mnt/nix-cache?compression=zstd&secret-key=<file>'` those paths
+     (already-present paths are skipped). Measured 2026-10-29: of a 7.5 GB server
+     closure 87 MB is local (router), nixos-manager 312 MB, hermes 1.9 GB (mostly unfree
+     apps Hydra doesn't cache: Discord, 1Password, Spotify, IPMIView); all Linux hosts
+     together ≈ 2.5 GB raw, ≈ 1.5–2 GB zstd, plus little for the previous commit.
+  2. Write `/mnt/nix-cache/.roots/<commit>` listing the published paths (the pruner's
+     keep set is these lists, not full closures).
   3. Run the pruner.
-- **Pruner** (`cache-prune`, also a daily timer): the keep set is the closure of the
-  paths in the `.roots` files of the **current and previous published commit of every
-  channel** (Lodestar passes the channel → commit map as `.roots/channels.json` on each
+- **Pruner** (`cache-prune`, also a daily timer): the keep set is the union of the
+  paths listed in the `.roots` files of the **current and previous published commit of
+  every channel** (Lodestar passes the channel → commit map as `.roots/channels.json` on each
   publish). Every `.narinfo` outside the keep set is deleted with the `.nar` it points
   to; then `.roots` files of commits no longer kept. A run never deletes anything if
   `channels.json` is missing or unreadable.
