@@ -56,7 +56,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "count(lodestar_software_up_to_date == 0) or vector(0)",
+          "expr": "count(count by (exported_host) (lodestar_software_up_to_date == 0)) or vector(0)",
           "instant": true,
           "range": false
         }
@@ -233,7 +233,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "lodestar_software_running_info",
+          "expr": "max by (exported_host, software, version) (lodestar_software_running_info)",
           "instant": true,
           "range": false,
           "format": "table"
@@ -244,7 +244,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "lodestar_software_up_to_date",
+          "expr": "max by (exported_host, software) (lodestar_software_up_to_date)",
           "instant": true,
           "range": false,
           "format": "table"
@@ -389,7 +389,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "lodestar_software_latest_info",
+          "expr": "max by (software, version) (lodestar_software_latest_info)",
           "instant": true,
           "range": false,
           "format": "table"
@@ -400,7 +400,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "time() - lodestar_software_latest_checked_timestamp_seconds",
+          "expr": "max by (software) (time() - lodestar_software_latest_checked_timestamp_seconds)",
           "instant": true,
           "range": false,
           "format": "table"
