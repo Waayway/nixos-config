@@ -403,7 +403,9 @@ lib.optionalAttrs hostPlatform.isLinux {
                 insecure-backend.insecureSkipVerify = true;
               };
             };
-            tcp = {
+            # Only with a passthrough route: Traefik rejects the whole file for an
+            # empty `[tcp.routers]` table.
+            tcp = lib.mkIf (collect "tcpRouters" != { }) {
               routers = collect "tcpRouters";
               services = collect "tcpServices";
             };

@@ -14,7 +14,6 @@ let
   cfg = host.config;
   dyn = cfg.services.traefik.dynamicConfigOptions;
   http = dyn.http;
-  tcp = dyn.tcp;
   gate = cfg.virtualisation.oci-containers.containers.oauth2-proxy;
   has = lib.hasInfix;
   ok = v: (builtins.tryEval (builtins.deepSeq v v)).success;
@@ -89,7 +88,8 @@ assert
     serverName = "id-test.vanwaaij.com";
     insecureSkipVerify = true;
   };
-assert !(tcp.routers ? id-test-public);
+# no passthrough route left: no tcp section (Traefik rejects an empty `[tcp.routers]`)
+assert !(dyn ? tcp);
 # a passthrough route: TCP routers on the host's SNI
 assert
   passthrough.tcp.routers.pt-public == {
