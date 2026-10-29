@@ -110,6 +110,28 @@ updater now.
 Metrics are served on `10.0.10.170:9466` (`homelab.monitoring.targets.lodestar`
 opens the port to the monitor VM only) and scraped by Prometheus on the monitor.
 Grafana has a dashboard "Software versions".
+Alerts: "Software behind upstream", "Updater failed", "Upstream check stale" (also
+while checks fail and none succeeded since the server started) and "Updater not running"
+(no finished run for two days).
+
+Before the first run (and after adding software):
+
+- Check nixos-manager's free space against what the updater will build: it builds every
+  Linux host whose tracked versions change, in its own store. Build one host's toplevel
+  there (see AGENTS.md, "Linux builder") and compare
+  `nix path-info -Sh <toplevel>` (closure size; several hosts share most of it) with
+  `df -h /nix`.
+- The first scheduled run is one interval (a day) after the server starts with the
+  updater on, and then one interval after the newest finished run, also across
+  restarts. Right after deploying, run it once by hand and watch it:
+  `lodestar updates run --wait` (waits up to two hours), then `lodestar updates` and
+  `journalctl -u lodestar-server` on nixos-manager.
+
+Limitation: only hosts whose tracked versions change are built. Bumping an input that
+many things come from (nixpkgs) also changes the closure of hosts whose tracked versions
+stay the same (e.g. the Macs, or a host without the software); those reach `unstable`
+unbuilt and a breakage shows up at their next apply. Prefer tracking software from a narrow input; to stop the updater, set
+`updates.software = { }` in `server.nix`.
 
 ## Public URL
 
