@@ -117,8 +117,8 @@ The server reads the file at each login, so a rotated secret needs no restart. G
 come from the ID token at login: a membership change applies at the next login.
 
 Policy grants (set 2026-10-20): nixos-manager uses MagicDNS, so `id.vanwaaij.com` resolves
-to the tailnet Service `svc:id`. The host `nixos-manager` (it carries `tag:server`, not
-`tag:manager`, see open item 2) has grants to the router on port 53 (split DNS) and to
+to the tailnet Service `svc:id`. The host `nixos-manager` (re-tagged `tag:nixos,tag:manager` on
+2026-10-27) has grants to the router on port 53 (split DNS) and to
 `svc:id` on tcp:443. The Tailscale Service `lodestar` is granted to the same sources as
 the other Services and auto-approved for `tag:router`. The router reaches the listener
 over the LAN: no grant. The Services link of
