@@ -65,11 +65,15 @@ builder later without changing this design). Pushing closures to hosts (option B
 
 ## 2. Storage on TrueNAS
 
-- Dataset **`store/nix-cache`**, created by hand like every dataset
-  (`modules/server/truenas/truenas.nix`: pools and datasets stay manual). Its NFS share
-  (`nfsShares.nix-cache`, path `/mnt/store/nix-cache`, hosts `[ "10.0.10.171" ]`) is
-  code in `modules/server/truenas/homelab.nix`, and the `store` snapshot task excludes
-  it (rebuildable, like `store/proxmox-vms`). Mounted on the cache VM
+- A directory **`nix-cache`** in the existing dataset **`store/internal`** (no new
+  dataset). Its NFS share (`nfsShares.nix-cache`, path
+  `/mnt/store/internal/nix-cache`, hosts `[ "10.0.10.171" ]`) is code in
+  `modules/server/truenas/homelab.nix`; the directory itself is created once by hand
+  (owner matching the cache VM's `lodestar` uid, mapped via the share's `mapall`).
+  `store/internal` is in the nightly `store` snapshot task (3 days; a directory can't be
+  left out of a dataset snapshot) and in the restic backups
+  (`modules/server/backup/homelab.nix`); the restic job **excludes `nix-cache/`**, the
+  cache is rebuildable. Mounted on the cache VM
   at `/mnt/nix-cache` with a systemd automount **without idle timeout** (AGENTS.md
   gotcha), owner `lodestar`.
 - The directory is a Nix **file binary cache**: `nix-cache-info`, `*.narinfo`,
@@ -199,8 +203,9 @@ deleted with their lock files.
 
 ## 7. Bootstrap and rollout
 
-1. Create 1Password items `nix-cache-signing-key` and `lodestar-builder-key`; TrueNAS
-   dataset + NFS export (TrueNAS-as-code).
+1. Create 1Password items `nix-cache-signing-key` and `lodestar-builder-key`; the
+   `nix-cache` directory in `store/internal` and its NFS share (TrueNAS-as-code), and
+   the restic exclude.
 2. Clone VM 171 from template 9000 (sizes above); first system built on nixos-manager
    and copied, then `opnix token set`; enrol in Lodestar.
 3. Router route + Services grant + `tag:cache` in the tailnet policy (API, as before).
