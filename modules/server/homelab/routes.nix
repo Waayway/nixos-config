@@ -5,7 +5,10 @@
 # isn't routed (dead today).
 #
 # Also the identity route, named after its host's first label (`id`, on router-test
-# `id-test`): Kanidm, passed through as TLS (it serves its own certificate). The
+# `id-test`): Kanidm, behind Traefik's wildcard like every route and re-encrypted to
+# its own certificate. Not a TLS passthrough: browsers reuse an HTTP/2 connection
+# opened for another vanwaaij.com site (same IP, the wildcard covers `id`), and on
+# such a connection only an HTTP router answers (Traefik 404 otherwise). The
 # sign-in gate's route (`auth`) comes with the gate (modules/server/homelab/router/default.nix).
 #
 # Archipelago, TrueNAS and the Traefik dashboard sit behind the sign-in gate
@@ -28,7 +31,10 @@ lib.optionalAttrs hostPlatform.isLinux {
     homelab.router.extraRoutes = {
       ${label id.domain} = {
         host = id.domain;
-        passthrough = "${id.address}:8443";
+        backend = "https://${id.address}:8443";
+        backendServerName = id.domain;
+        # A test Kanidm's certificate is from Let's Encrypt staging.
+        insecureBackend = id.acmeStaging;
       };
 
       # Self-signed certificate on the appliance; tailnet only.

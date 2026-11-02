@@ -85,6 +85,12 @@ assert
     schedule = "00 22 * * *";
     versions = 7;
   };
+# the client address from the router in front (router-test is its own router)
+assert s.http_client_address_info.x-forward-for == [ "10.0.10.230" ];
+assert
+  prod.homelab.identity.serverSettings.http_client_address_info.x-forward-for == [
+    "10.0.10.110"
+  ];
 # ACME (Cloudflare DNS-01, staging on the test VM) and the firewall
 assert cfg.security.acme.certs.${domain}.dnsProvider == "cloudflare";
 assert has "acme-staging-v02" cfg.security.acme.certs.${domain}.server;
