@@ -107,10 +107,10 @@ lib.optionalAttrs hostPlatform.isLinux {
         upstream.github = "tailscale/tailscale";
       };
 
-      # Build gate on the cache VM. `enable` stays false until the cache works; the
-      # rollout flips it (docs/lodestar.md, "Build cache").
+      # Build gate on the cache VM: every Linux host of a channel is built there and
+      # published before any agent applies (docs/lodestar.md, "Build cache").
       builds = {
-        enable = false;
+        enable = true;
         store = "ssh-ng://lodestar@10.0.10.171";
         sshKeyFile = config.services.onepassword-secrets.secretPaths.lodestarBuilderKey;
       };
