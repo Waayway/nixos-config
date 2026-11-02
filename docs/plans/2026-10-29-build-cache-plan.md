@@ -15,7 +15,7 @@
 - One build per commit: every path to building goes through `BuildGate::ensure_built` (or, for the updater, `build_dir` + `record`); lock file `state_dir/builds/<commit>.lock` (`std::fs::File::lock`, exclusive, taken in `spawn_blocking`), result `state_dir/builds/<commit>.json` written via temp file + `rename`.
 - Only **Linux** hosts are built; darwin hosts never.
 - A failed host blocks the **whole channel**: apply → HTTP 409 `build of <commit> failed on the builder: <host>[, <host>…]`, audit `apply-refused`, nothing sent to agents.
-- Results are final; only `lodestar build <commit> --retry` (admin, tailnet-only) removes failed hosts from a result.
+- Build failures are final; only `lodestar build retry <commit>` (admin, tailnet-only) removes failed hosts from a result. "Builder unreachable" and publish failures are not recorded: the hosts stay missing, applies get a 409 and prebuild/re-send retry with backoff (final review, 2026-11-02).
 - Publish only paths built on the cache VM (`ultimate: true`), never full closures; `nix copy --no-recursive --to 'file://<dir>?compression=zstd&secret-key=<file>'`.
 - Pruner keep set = union of `.roots/<commit>` lists for the current and previous published commit of every channel in `.roots/channels.json`; missing/unreadable `channels.json` → delete nothing.
 - Cache URL `https://cache.vanwaaij.com/nix`; key name `cache.vanwaaij.com-1`; clients `extra-substituters`, `extra-trusted-public-keys`, `connect-timeout = 5`, `fallback = true`, Linux only.
