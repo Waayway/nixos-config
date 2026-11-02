@@ -129,11 +129,14 @@ nix.settings = {
   extra-substituters = [ "https://cache.vanwaaij.com/nix" ];
   extra-trusted-public-keys = [ "cache.vanwaaij.com-1:<public key>" ];
   connect-timeout = 5;
+  fallback = true;
 };
 ```
 
 If the router or the cache is down, Nix falls back to cache.nixos.org and local builds
-after the timeout; nothing hangs. Agents are unchanged: they still `nix build` their own
+after the timeout; nothing hangs. `fallback = true` is required: without it a
+substituter that times out fails the build instead of building locally (found by the
+end-to-end VM test, 2026-11-02). A dead cache costs ~30 s per apply (5 attempts × 5 s). Agents are unchanged: they still `nix build` their own
 system, which now only downloads.
 
 ## 6. The build gate (Lodestar)

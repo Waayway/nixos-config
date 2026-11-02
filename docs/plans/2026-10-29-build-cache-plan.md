@@ -18,7 +18,7 @@
 - Results are final; only `lodestar build <commit> --retry` (admin, tailnet-only) removes failed hosts from a result.
 - Publish only paths built on the cache VM (`ultimate: true`), never full closures; `nix copy --no-recursive --to 'file://<dir>?compression=zstd&secret-key=<file>'`.
 - Pruner keep set = union of `.roots/<commit>` lists for the current and previous published commit of every channel in `.roots/channels.json`; missing/unreadable `channels.json` → delete nothing.
-- Cache URL `https://cache.vanwaaij.com/nix`; key name `cache.vanwaaij.com-1`; clients `extra-substituters`, `extra-trusted-public-keys`, `connect-timeout = 5`, Linux only.
+- Cache URL `https://cache.vanwaaij.com/nix`; key name `cache.vanwaaij.com-1`; clients `extra-substituters`, `extra-trusted-public-keys`, `connect-timeout = 5`, `fallback = true`, Linux only.
 - Cache VM: VMID 171, `10.0.10.171`, 8 vCPU, 8 GB, 32 GB disk, tags `tag:nixos,tag:cache`, channel `stable`; nginx port 80 open only to `10.0.10.110`.
 - Storage: dataset `store/internal/nix-cache` (manual), NFS share path `/mnt/store/internal/nix-cache` to `10.0.10.171` only, excluded from the `store` snapshot task; mounted at `/mnt/nix-cache`, automount **without idle timeout**.
 - 1Password Homelab items: `nix-cache-signing-key` (field `credential`), `lodestar-builder-key` (SSH key).
@@ -199,7 +199,7 @@
 **Files:**
 - Create: `~/.flake/modules/common/nix/cache.nix`
 - Modify: `~/.flake/modules/server/homelab/routes.nix` (or the cache module) for `homelab.routes.cache`, `~/.flake/modules/server/lodestar/server.nix` (`builds` values + opnix `lodestarBuilderKey`), `~/.flake/modules/server/monitoring/alerts.nix` (+ `tests/monitoring.nix` counts), `~/.flake/docs/lodestar.md`
-- [ ] **Step 1:** route: host `cache.vanwaaij.com`, backend `http://10.0.10.171:80`, `public = false`, tailnet enabled, no gate. Clients (Linux only, `lib.optionalAttrs hostPlatform.isLinux`): substituter, public key (from O1), `connect-timeout = 5`. Lodestar: `builds = { enable = true; store = "ssh-ng://lodestar@10.0.10.171"; sshKeyFile = <opnix path>; }`. Alert check "Build failed": `lodestar_build_last_result{result="failed"} == 1`, `for = "0s"`, plain summary.
+- [ ] **Step 1:** route: host `cache.vanwaaij.com`, backend `http://10.0.10.171:80`, `public = false`, tailnet enabled, no gate. Clients (Linux only, `lib.optionalAttrs hostPlatform.isLinux`): substituter, public key (from O1), `connect-timeout = 5`, `fallback = true` (without it a timed-out substituter fails the build; L8). Lodestar: `builds = { enable = true; store = "ssh-ng://lodestar@10.0.10.171"; sshKeyFile = <opnix path>; }`. Alert check "Build failed": `lodestar_build_last_result{result="failed"} == 1`, `for = "0s"`, plain summary.
 - [ ] **Step 2: Verify** — every host evaluates; darwin hosts have no new substituter; router renders the route and Service `svc:cache`; monitor test counts updated; `nix flake check --no-build --keep-going`.
 - [ ] **Step 3: Commit** — `feat(cache): route, clients, Lodestar build gate on`.
 
