@@ -27,7 +27,7 @@ Run for the lab itself.
 | 140–149 | Messaging & monitoring |
 | 150–159 | Backup & data protection |
 | 160–169 | Databases & middleware |
-| 170–179 | Dev, build & CI |
+| 170–179 | Dev, build & CI (170 nixos-manager, 171 cache) |
 | 180–189 | Sandbox / throwaway |
 | 190–199 | Free |
 

@@ -98,6 +98,7 @@ Open items:
 | 140 | monitor | running, onboot | NixOS (this repo) | 2 / 4 GB | 16 GB (local-lvm) + 64 GB data (store-lvm) | Grafana, Prometheus, Loki, alerts (`docs/monitoring.md`) |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
 | 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
+| 171 | cache | planned | NixOS (this repo) | see design | 16 GB (local-lvm) | Lodestar builder + build cache on a TrueNAS share (`docs/plans/2026-10-29-build-cache-design.md`) |
 | 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm; move to store-lvm aborted, see below) | Minecraft + BlueMap |
 | 201 | archipelago | running, onboot (set 2026-10-20) | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
 | 230 | router-test | running, not onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | router's test twin, test Service `test-whoami-test` |

@@ -18,6 +18,7 @@ at `~/.flake` on each machine. Read this before changing anything.
 | identity | Proxmox VM 111, Kanidm (`id.vanwaaij.com`), sign-in for apps and the router's gate (`docs/identity.md`) | x86_64-linux | identity | servers |
 | nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
 | monitor | Proxmox VM 140, Grafana + Prometheus + Loki, alerts (`docs/monitoring.md`) | x86_64-linux | monitor | servers |
+| cache | Proxmox VM 171, build cache + Lodestar builder (docs/plans/2026-10-29-build-cache-design.md) | x86_64-linux | cache | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
 10.0.10.0/24, gateway 10.0.10.1). Other VMs there still run Rocky/Debian and are
