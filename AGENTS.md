@@ -112,8 +112,8 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 - **No git worktrees.** Work in the checkout.
 - **The user often has uncommitted work in the tree.** Never stash, reset or
   commit it. Commit only your own paths: `git commit -m "…" -- <paths>`.
-- Commit messages: conventional style (`fix(scope): …`, `feat(lodestar): …`),
-  ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Commit messages: conventional style (`fix(scope): …`, `feat(lodestar): …`), no
+  `Co-Authored-By` or other AI attribution trailer.
 - Ask before pushing unless the user said to push.
 
 ## Branches and pushing

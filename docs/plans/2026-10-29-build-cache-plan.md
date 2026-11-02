@@ -23,7 +23,7 @@
 - Storage: dataset `store/internal/nix-cache` (manual), NFS share path `/mnt/store/internal/nix-cache` to `10.0.10.171` only, excluded from the `store` snapshot task; mounted at `/mnt/nix-cache`, automount **without idle timeout**.
 - 1Password Homelab items: `nix-cache-signing-key` (field `credential`), `lodestar-builder-key` (SSH key).
 - Options default off: `services.lodestar-server.builds.enable = false` keeps today's behaviour.
-- Conventions: lodestar `AGENTS.md` (cargo fmt, clippy `-D warnings`, tests in `<crate>/tests/`, validate every git/nix argument), `~/.flake/AGENTS.md` (module gating, nixfmt, commit own paths, never stash). Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Conventions: lodestar `AGENTS.md` (cargo fmt, clippy `-D warnings`, tests in `<crate>/tests/`, validate every git/nix argument), `~/.flake/AGENTS.md` (module gating, nixfmt, commit own paths, never stash). Commits carry no `Co-Authored-By` or other AI attribution trailer.
 
 ## Review Focus
 
