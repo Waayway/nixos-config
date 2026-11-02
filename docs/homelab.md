@@ -29,6 +29,10 @@ Open items:
   mapping is removed. See "What could be better" for the open findings (#16 to #50).
 - TrueNAS NFS export `/mnt/archive/shares` (id 8) is declared in
   `modules/server/truenas/homelab.nix` and applied.
+- TrueNAS NFS export `/mnt/store/internal/nix-cache` (build cache VM 171,
+  10.0.10.171 only, root squashed) is declared there too; its dataset
+  `store/internal/nix-cache` is created by hand, owned by the cache VM's `lodestar`
+  user, and excluded from the `store` snapshot task (never snapshotted or backed up).
 
 ## Access
 

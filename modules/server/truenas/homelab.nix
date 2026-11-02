@@ -28,7 +28,12 @@ lib.optionalAttrs hostPlatform.isLinux {
           (pool: {
             dataset = pool;
             recursive = true;
-            exclude = lib.optional (pool == "store") "store/proxmox-vms";
+            exclude = lib.optionals (pool == "store") [
+              "store/proxmox-vms"
+              # The build cache (docs/plans/2026-10-29-build-cache-design.md) is
+              # rebuildable and churns; never snapshotted, so never backed up.
+              "store/internal/nix-cache"
+            ];
             namingSchema = "backup-%Y-%m-%d_%H-%M";
             keep = {
               value = 3;
@@ -61,6 +66,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       nfsShares.authentication = {
         path = "/mnt/store/authentication";
         hosts = [ "10.0.10.111" ];
+      };
+
+      # The Nix build cache's store (VM 171), mounted by the cache VM only; root
+      # squashed, so the dataset's owner must be the cache VM's `lodestar` user.
+      nfsShares.nix-cache = {
+        path = "/mnt/store/internal/nix-cache";
+        hosts = [ "10.0.10.171" ];
       };
 
       # TrueNAS 26 has no SMART test schedules of its own. Errors go out by mail.
