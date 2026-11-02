@@ -29,13 +29,13 @@ assert lib.all (
   n: !(lib.elem url (darwinConfigurations.${n}.config.nix.settings.extra-substituters or [ ]))
 ) (lib.attrNames darwinConfigurations);
 # route: tailnet only, not gated, served from the cache VM
-assert http.services.cache.loadBalancer.servers == [ { url = "http://10.0.10.171:80"; } ];
-assert http.routers.cache-tailnet.rule == "Host(`cache.vanwaaij.com`)";
-assert !(http.routers ? cache-public);
-assert !(lib.any (lib.hasSuffix "-gate") http.routers.cache-tailnet.middlewares);
-assert router.services.tailscale.serve.services ? cache;
-# Lodestar build gate: values set, off until the rollout
-assert !lodestar.services.lodestar-server.builds.enable;
+assert http.services.nix-cache.loadBalancer.servers == [ { url = "http://10.0.10.171:80"; } ];
+assert http.routers.nix-cache-tailnet.rule == "Host(`cache.vanwaaij.com`)";
+assert !(http.routers ? nix-cache-public);
+assert !(lib.any (lib.hasSuffix "-gate") http.routers.nix-cache-tailnet.middlewares);
+assert router.services.tailscale.serve.services ? nix-cache;
+# Lodestar build gate: on, building on the cache VM
+assert lodestar.services.lodestar-server.builds.enable;
 assert lodestar.services.lodestar-server.builds.store == "ssh-ng://lodestar@10.0.10.171";
 assert
   lodestar.services.onepassword-secrets.secrets.lodestarBuilderKey.reference

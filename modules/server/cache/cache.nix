@@ -40,7 +40,9 @@ lib.optionalAttrs hostPlatform.isLinux {
 
     # Served to the fleet through the router, on the tailnet only (no gate: nix clients
     # cannot sign in; the store is public data signed by the cache key).
-    homelab.routes.cache = {
+    # Not named `cache`: a Tailscale Service named like a device loses its MagicDNS
+    # name to the device (cache.tail41ca60.ts.net is the VM itself).
+    homelab.routes.nix-cache = {
       host = "cache.vanwaaij.com";
       backend = "http://10.0.10.171:80";
       public = false;

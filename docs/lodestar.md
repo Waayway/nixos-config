@@ -230,6 +230,14 @@ for `tag:router`. The auto-approval didn't take when the router already advertis
 Service before it was created: `tailscale serve drain svc:grafana`, wait a few seconds,
 `advertise` again (both in one go was too fast). See `docs/monitoring.md`.
 
+Build cache additions (2026-11-02): `tag:cache` (owned by `autogroup:admin` and
+`tag:nixos`); Service `nix-cache` in the Services grant, auto-approved for `tag:router`;
+`tag:nixos` → `svc:nix-cache` on tcp:443 so every server substitutes from it (not
+`svc:cache`: a Service named like a device loses its MagicDNS name to the device);
+`nixos-manager` → `tag:cache` on tcp:7461 (forgetting this leaves the VM "agent-down").
+nixos-manager reaches the builder over the LAN (`ssh-ng://lodestar@10.0.10.171`), not
+the tailnet. See "Build cache" above.
+
 ## Open items
 
 1. Write deploy key for promote: declared in `modules/server/lodestar/server.nix`
