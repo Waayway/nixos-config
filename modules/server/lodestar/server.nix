@@ -67,6 +67,16 @@ lib.optionalAttrs hostPlatform.isLinux {
     programs.ssh.knownHosts."github.com".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
 
+    # SSH key Lodestar builds with on the cache VM (ssh-ng), and the VM's pinned host key.
+    services.onepassword-secrets.secrets.lodestarBuilderKey = {
+      reference = "op://Homelab/lodestar-builder-key/private key?ssh-format=openssh";
+      owner = "lodestar-server";
+      mode = "0400";
+      services = [ "lodestar-server" ];
+    };
+    programs.ssh.knownHosts."10.0.10.171".publicKey =
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDgVxuT3EJBWBOI5e8KQHpWSsuwnWpKNSPLNsgv6aepC";
+
     # The monitoring agent opens this port to the monitor VM only.
     homelab.monitoring.targets.lodestar.port = cfg.metrics.port;
 
@@ -95,6 +105,14 @@ lib.optionalAttrs hostPlatform.isLinux {
       updates.software.tailscale = {
         input = "nixpkgs-unstable";
         upstream.github = "tailscale/tailscale";
+      };
+
+      # Build gate on the cache VM. `enable` stays false until the cache works; the
+      # rollout flips it (docs/lodestar.md, "Build cache").
+      builds = {
+        enable = false;
+        store = "ssh-ng://lodestar@10.0.10.171";
+        sshKeyFile = config.services.onepassword-secrets.secretPaths.lodestarBuilderKey;
       };
 
       # Prometheus metrics, scraped by the monitor VM (target below).

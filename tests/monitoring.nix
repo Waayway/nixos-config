@@ -67,6 +67,7 @@ let
     "updater-failed"
     "upstream-stale"
     "updater-stale"
+    "build-failed"
     "watchdog"
   ];
   syncChecks = builtins.fromJSON units.services.healthchecks-sync.environment.CHECKS;
@@ -324,7 +325,7 @@ assert ds.loki.type == "loki" && ds.loki.url == "http://127.0.0.1:3100";
 assert ds.loki.jsonData.httpHeaderName1 == "X-Scope-OrgID";
 assert
   ds.loki.secureJsonData.httpHeaderValue1
-  == "$__file{${nixosConfigurations.monitor.pkgs.writeText "loki-tenants" "identity|monitor|nixos-manager|prod|router"}}";
+  == "$__file{${nixosConfigurations.monitor.pkgs.writeText "loki-tenants" "cache|identity|monitor|nixos-manager|prod|router"}}";
 assert prov.allowUiUpdates == false;
 assert prov.options.path == dashDir;
 assert gs.dashboards.default_home_dashboard_path == "${dashDir}/overview.json";
@@ -363,7 +364,7 @@ assert monitor.homelab.access.grafana.oidc.preferShortUsername;
 assert monitor.lodestar.links.grafana.group == "Infrastructure";
 assert lib.elem "https://grafana.vanwaaij.com/" probes;
 # alerts: one rule, contact point, route and check per hc; the watchdog pings every minute
-assert lib.length cps == 13;
+assert lib.length cps == 14;
 assert map (c: c.name) cps == map (h: "homelab-${h}") hcs;
 assert lib.all (
   c:
@@ -372,7 +373,7 @@ assert lib.all (
   in
   r.type == "webhook" && r.settings.url == "https://hc-ping.com/$HC_PING_KEY/${c.name}"
 ) cps;
-assert lib.length rules == 13;
+assert lib.length rules == 14;
 assert lib.all (r: lib.any (c: c.name == "homelab-${r.labels.hc}") cps) rules;
 assert (lib.head rules).data != [ ] && (lib.head rules).condition == "C";
 assert (lib.elemAt (lib.head rules).data 0).datasourceUid == "prometheus";
@@ -416,8 +417,8 @@ assert opn.healthchecksApiKey.services == [ "healthchecks-sync.service" ];
 assert map (c: c.slug) syncChecks == (map (h: "homelab-${h}") hcs) ++ [ "homelab-truenas" ];
 assert lib.all (c: c.timeout == 31536000) (lib.filter (c: c.slug != "homelab-watchdog") syncChecks);
 assert (lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).timeout == 300;
-assert !(lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).filter;
-assert !(lib.findFirst (c: c.slug == "homelab-truenas") null syncChecks).filter;
+assert (lib.findFirst (c: c.slug == "homelab-watchdog") null syncChecks).keywords == null;
+assert (lib.findFirst (c: c.slug == "homelab-truenas") null syncChecks).keywords != null;
 assert units.services.healthchecks-sync.environment.HC_API_KEY_FILE == secrets.healthchecksApiKey;
 assert units.services.healthchecks-sync.environment.HC_CHANNELS == "VWP BACKUP";
 assert units.services.healthchecks-sync.serviceConfig.Type == "oneshot";

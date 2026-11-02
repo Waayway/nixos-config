@@ -228,7 +228,7 @@ lodestar` here.
   everything with `RequiresMountsFor` is stopped with it (prod, 2026-10-19; fixed in
   `modules/server/homelab/storage.nix`).
 - **The opnix trust credential is `tag:nixos`.** In the Tailscale policy `tag:nixos`
-  owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity` are owned by
+  owns itself, and `tag:router`, `tag:prod`, `tag:manager`, `tag:fleet`, `tag:identity`, `tag:cache` are owned by
   `tag:nixos`; a new host tag must be added to `tagOwners` with `tag:nixos` as owner,
   or the host cannot join.
 - **Small VMs and building:** every host builds its own system, including Lodestar's

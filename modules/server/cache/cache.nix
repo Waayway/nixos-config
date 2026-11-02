@@ -25,7 +25,8 @@ lib.optionalAttrs hostPlatform.isLinux {
     };
 
     # No x-systemd.idle-timeout (see modules/server/homelab/storage.nix). nfsvers=4.2:
-    # the cache scripts flock over NFS, which needs v4.
+    # the cache scripts flock over NFS, which needs v4. nofail: a cache outage (TrueNAS
+    # down) must not stop the builder from booting.
     fileSystems."/mnt/nix-cache" = {
       device = "10.0.10.130:/mnt/store/internal/nix-cache";
       fsType = "nfs";
@@ -35,6 +36,15 @@ lib.optionalAttrs hostPlatform.isLinux {
         "nfsvers=4.2"
         "x-systemd.automount"
       ];
+    };
+
+    # Served to the fleet through the router, on the tailnet only (no gate: nix clients
+    # cannot sign in; the store is public data signed by the cache key).
+    homelab.routes.cache = {
+      host = "cache.vanwaaij.com";
+      backend = "http://10.0.10.171:80";
+      public = false;
+      tailnet.enable = true;
     };
 
     services.onepassword-secrets.secrets.nixCacheSigningKey = {

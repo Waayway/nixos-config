@@ -133,6 +133,28 @@ stay the same (e.g. the Macs, or a host without the software); those reach `unst
 unbuilt and a breakage shows up at their next apply. Prefer tracking software from a narrow input; to stop the updater, set
 `updates.software = { }` in `server.nix`.
 
+## Build cache
+
+Lodestar builds each promoted commit on the cache VM (ssh-ng) and publishes it to a
+file binary cache on a TrueNAS share; every Linux host substitutes from
+`https://cache.vanwaaij.com/nix` (tailnet only, through the router), falling back to
+building locally when it is unreachable. Design: `docs/plans/2026-10-29-build-cache-design.md`.
+
+Where the values live:
+
+- Cache VM: `modules/server/cache/cache.nix` (NFS share, signing key, nginx, the
+  `cache` route).
+- Clients: `modules/common/nix/cache.nix` (substituter, public key, `fallback`; skipped
+  on the cache host itself).
+- Lodestar server: `modules/server/lodestar/server.nix` (`services.lodestar-server.builds`,
+  opnix secret `lodestarBuilderKey`, the VM's pinned host key).
+- Alert "Build failed": `modules/server/monitoring/alerts.nix`.
+
+`lodestar build status` shows the last builds; `lodestar build retry <commit>` runs one
+again. `builds.enable` is `false` in `server.nix` until the cache works; the rollout
+flips it to `true` (then promote waits for the build). Recovery (cache down, wrong
+signing key, full share): `docs/operations.md` in the lodestar repo.
+
 ## Public URL
 
 `https://lodestar.vanwaaij.com` (route `lodestar` in `modules/server/lodestar/server.nix`:

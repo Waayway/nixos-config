@@ -50,6 +50,13 @@ in
     inherit (inputs.self) nixosConfigurations;
   };
 
+  # Evaluation check of the build cache wiring (tests/cache.nix).
+  checks.x86_64-linux.cache = import ./tests/cache.nix {
+    pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+    inherit lib;
+    inherit (inputs.self) nixosConfigurations darwinConfigurations;
+  };
+
   # Evaluation check of the monitoring agent (tests/monitoring.nix).
   checks.x86_64-linux.monitoring = import ./tests/monitoring.nix {
     pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;

@@ -124,6 +124,13 @@ let
       summary = "The flake input updater has not finished a run for more than two days";
     }
     {
+      hc = "build-failed";
+      name = "Build failed";
+      expr = ''lodestar_build_last_result{result="failed"} == 1'';
+      for = "0s";
+      summary = "A Lodestar build on the cache VM failed";
+    }
+    {
       hc = "watchdog";
       name = "Watchdog";
       expr = "vector(1)";
