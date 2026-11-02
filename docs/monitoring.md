@@ -81,10 +81,14 @@ took the check down after ~6.5 minutes and back up 2 minutes after it was cleare
   late; nothing is lost on the monitor's side.
 - **TrueNAS's own alerts** (SMART, pool, updates) go to `homelab-truenas` through a
   TrueNAS alert service of type Slack (Alerts → Alert Services, "Healthchecks
-  homelab-truenas"), posting to the check's `/fail` URL. Every TrueNAS alert, including
-  "cleared", marks it down: after dealing with it, mark the check up again by pinging
-  it once (`curl https://hc-ping.com/<ping key>/homelab-truenas`, the ping key is in
-  1Password `healthchecks-ping-key`).
+  homelab-truenas"), posting to the check's ping URL (not `/fail`). The check filters
+  on TrueNAS' message text (`alerts.nix`): a message with a new alert or a "Current
+  alerts" list marks it down, one that only clears alerts marks it up, so it recovers on
+  its own once TrueNAS has no alerts left at the service's level (WARNING). TrueNAS'
+  "Send Test Alert" is ignored. A *dismissed* alert sends no "cleared" message: then
+  mark the check up by hand (`curl -d 'been cleared'
+  https://hc-ping.com/<ping key>/homelab-truenas`, the ping key is in 1Password
+  `healthchecks-ping-key`; a body without a keyword is ignored).
 
 ## Adding something
 

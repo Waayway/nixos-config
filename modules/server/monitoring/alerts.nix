@@ -8,7 +8,7 @@
 #   (Grafana fills in the env var from the ping-key env file, systemd's EnvironmentFile
 #   of grafana.service), a route in the notification policy, and a Healthchecks check
 #   (`healthchecks-sync`). The watchdog always fires and pings every minute; the
-#   `truenas` check has no rule: TrueNAS' own alert service posts to its /fail URL.
+#   `truenas` check has no rule: TrueNAS' own alert service posts to its ping URL.
 # - A rule's query returns series only while the condition holds (a comparison), so the
 #   condition is "any value" and no data means fine. Webhook bodies carry
 #   `"status":"firing"` / `"status":"resolved"`, which the checks filter on
@@ -30,7 +30,12 @@ let
   year = 31536000;
 
   # hc = check name without the `homelab-` prefix. grace is the check's grace (seconds).
-  # `filter` = the check only reacts to the firing/resolved keywords.
+  # `keywords` = the check only reacts to these words in the request body (failure wins;
+  # comma-separated lists); null = every request is a plain ping.
+  grafanaKeywords = {
+    failure = ''"status":"firing"'';
+    success = ''"status":"resolved"'';
+  };
   checks = [
     {
       hc = "host-down";
@@ -126,13 +131,21 @@ let
       summary = "Always firing: if the pings stop, the monitor or its network is down";
       timeout = 300;
       grace = 300;
-      filter = false;
+      keywords = null;
       repeat = "1m";
     }
     {
       hc = "truenas";
       name = "TrueNAS alerts";
-      filter = false;
+      # TrueNAS' Slack-type alert service sends one message per change
+      # (`format_alerts` in middlewared/alert/base.py): "New alert(s):", "The following
+      # alert has been cleared:" / "These alerts have been cleared:", then "Current
+      # alerts:" while any remain. So: anything new or still active is down, a message
+      # that only clears is up. Its "This is a test alert" matches neither (ignored).
+      keywords = {
+        failure = "New alert,Current alerts:";
+        success = "been cleared";
+      };
     }
   ];
 
@@ -141,7 +154,7 @@ let
     {
       timeout = year;
       grace = 60;
-      filter = true;
+      keywords = grafanaKeywords;
       repeat = "4h";
     }
     // c;
@@ -151,7 +164,7 @@ let
 
   syncChecks = map (c: {
     slug = slug c;
-    inherit (c) timeout grace filter;
+    inherit (c) timeout grace keywords;
     name = "Homelab: ${c.name}";
   }) all;
   syncJson = builtins.toJSON syncChecks;

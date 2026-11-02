@@ -2,15 +2,15 @@
 # healthchecks-sync oneshot on the monitor VM, see alerts.nix).
 #
 #   env: HC_API_KEY_FILE  file with the project's read-write API key
-#        CHECKS           JSON list of { slug, name, timeout, grace, filter }
+#        CHECKS           JSON list of { slug, name, timeout, grace, keywords }
 #        HC_CHANNELS      integrations to notify: exact names or UUIDs, comma-separated
 #                         (replaces whatever the check had)
 #
 # One `POST /api/v3/checks/` per check with `unique: ["slug"]`: 201 = created, 200 =
-# updated. A check with `filter` only reacts to Grafana's webhook body (failure keyword
-# firing, success keyword resolved, anything else ignored). On any other status (403:
-# the free plan's 20-check limit) the script stops at once, names the slug and exits
-# non-zero. After a 200/201 the response's check object must echo `filter_http_body` and
+# updated. A check with `keywords` ({ failure, success }) only reacts to those words in
+# the request body (Grafana's firing/resolved, TrueNAS' alert texts; anything else is
+# ignored). On any other status (403: the free plan's 20-check limit) the script stops
+# at once, names the slug and exits non-zero. After a 200/201 the response's check object must echo `filter_http_body` and
 # `failure_kw` for filtered checks; if not, the script exits non-zero naming the slug.
 set -euo pipefail
 : "${HC_CHANNELS:?HC_CHANNELS must name the integrations to notify}"
@@ -31,10 +31,10 @@ jq -c '.[]' <<<"$CHECKS" | while read -r check; do
       channels: $channels,
       unique: ["slug"]
     }
-    + (if .filter then {
+    + (if .keywords then {
         filter_http_body: true,
-        failure_kw: "\"status\":\"firing\"",
-        success_kw: "\"status\":\"resolved\"",
+        failure_kw: .keywords.failure,
+        success_kw: .keywords.success,
         filter_default_fail: false
       } else {} end)
   ' <<<"$check")
