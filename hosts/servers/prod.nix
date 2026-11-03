@@ -41,6 +41,10 @@
       live = true;
       gpu = true;
     };
+    homelab.whento = {
+      enable = true;
+      live = true;
+    };
   };
 
   config =

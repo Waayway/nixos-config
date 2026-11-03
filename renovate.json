@@ -21,7 +21,7 @@
   "packageRules": [
     {
       "description": "Floating app images follow their track through the weekly update; Renovate proposes only a new track (minor or major), never patches or digests (list = homelab.containers.floating)",
-      "matchDepNames": ["nextcloud", "jellyfin/jellyfin"],
+      "matchDepNames": ["nextcloud", "jellyfin/jellyfin", "ghcr.io/when-to/whento"],
       "matchUpdateTypes": ["patch", "digest", "pin", "pinDigest"],
       "enabled": false
     },

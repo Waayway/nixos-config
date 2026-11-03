@@ -8,7 +8,7 @@ VM moves to NixOS or a service changes. Migration and backup plans:
 
 The front-door rebuild (`docs/plans/2026-10-19-homelab-front-door-*.md`) is live: UniFi
 forwards 80/443 to the **router** (since 2026-10-19, about 22:00), which serves the
-internet and the tailnet; **prod** runs Nextcloud, Jellyfin and Immich. Main and media
+internet and the tailnet; **prod** runs Nextcloud, Jellyfin, Immich and WhenTo. Main and media
 are shut down. **identity** (VM 111, Kanidm at `id.vanwaaij.com`) is the sign-in
 for the apps and the sign-in gate. Details in the sections "100 prod", "110 router"
 and "111 identity" below; the
@@ -87,7 +87,7 @@ Open items:
 
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
-| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich (containers) |
+| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich, WhenTo (containers) |
 | 101 | router | stopped | NixOS (old attempt) | 2 / 2 GB | 64 GB (store-lvm) | unused, to delete |
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
@@ -122,7 +122,7 @@ VM 101 no longer exists.
   the only way in from outside. On q35 the NIC is `enp6s18`, not `ens18`: set
   `homelab.lan.interface` per host (the default is `ens18`).
 - Containers via `virtualisation.oci-containers` (modules `modules/server/services/{nextcloud,
-  jellyfin,immich,docker,updates}.nix`):
+  jellyfin,immich,whento,docker,updates}.nix`):
   - **Nextcloud 32.0.15** (`nextcloud:32-apache`, track `32-apache`), MariaDB 11.4,
     Redis; **Collabora** at `office.vanwaaij.com`. Backend `http://10.0.10.100:8080`.
     User data on `/store/nextcloud/data`. Pantry is disabled (see open items).
@@ -132,17 +132,24 @@ VM 101 no longer exists.
   - **Immich v2** (fresh install, ML on OpenVINO): media `/store/immich-v2`, Postgres in a container;
     Main's old library `/store/immich/library` is mounted read-only at
     `/mnt/old-library` (external library still to be added).
+  - **WhenTo 2.0** (`ghcr.io/when-to/whento:2.0`, track `2.0`; scheduling of recurring
+    events) at `whento.vanwaaij.com`, public and on the tailnet, backend
+    `http://10.0.10.100:8085`. PostgreSQL 16 and Redis 7 in containers, database and
+    JWT keys on local disk (`/var/lib/prod/whento`). WhenTo's own accounts (no OIDC, so
+    no Kanidm), registration closed; the first admin is created at `/bootstrap` with the
+    one-time key from `sudo docker logs whento`. No SMTP yet: no verification, magic-link
+    or reminder mails. Secrets: 1Password Homelab `whento-config` (`env`).
 - Mounts (`modules/server/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
   `/archive` = `/mnt/archive/shares`, NFS automounts.
 - **Dumps:** nightly 01:30, `<app>-db-dump` timers write
   `/store/db-dumps/<app>/<app>-<date>.sql.gz` (apps `nextcloud` via `mariadb-dump`,
-  `immich` via `pg_dumpall`; newest N kept, mode 0600). They land on ZFS, so the
+  `immich` via `pg_dumpall`, `whento` via `pg_dump`; newest N kept, mode 0600). They land on ZFS, so the
   restic backups pick them up. Restore: stop the app container, then
   `zcat <dump> | docker exec -i <db-container> ...` (`nextcloud-db`: `mariadb -u root
   nextcloud` with `MYSQL_PWD` set from the container's root password; `immich-postgres`:
-  `psql --username=<DB_USERNAME>`); the exact invocations are unverified, test on a
+  `psql --username=<DB_USERNAME>`; `whento-postgres`: `psql --username=whento whento`); the exact invocations are unverified, test on a
   copy first. The restic repos also hold `/store/internal` for file-level restores.
-- **Updates:** the floating images (Nextcloud, Jellyfin, Immich) are pulled by a weekly
+- **Updates:** the floating images (Nextcloud, Jellyfin, Immich, WhenTo) are pulled by a weekly
   timer, Friday 23:00; it reports to Healthchecks (1Password Homelab item
   `healthchecks-prod-updates`). **Renovate** (installed on the GitHub repo, config
   `renovate.json`, Saturdays before 06:00) opens PRs for images in
@@ -386,6 +393,7 @@ the iSCSI zvol `store/proxmox-vms`, Archipelago (not needed), voice-memo
 | `archive/internal` | TrueNAS | 96 KiB | files |
 | Nextcloud DB | Main, MariaDB (VM disk, not on ZFS) | 1.7 GB on disk | dump to ZFS first |
 | Immich DB (if revived) | media, Postgres (VM disk) | 262 MB | dump to ZFS first |
+| WhenTo DB | prod, Postgres (`/var/lib/prod/whento/db`, VM disk) | new | nightly `pg_dump` to `/store/db-dumps/whento` |
 | Lodestar DB | nixos-manager `/var/lib/lodestar-server/lodestar.db` | 100 KB | SQLite `.backup` |
 | TrueNAS config | TrueNAS | small | export to a dataset |
 
