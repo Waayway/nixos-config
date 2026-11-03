@@ -160,6 +160,15 @@ lib.optionalAttrs hostPlatform.isLinux {
       inherit host;
       backend = "http://${lan.address}:${toString port}";
       maintenance = !cfg.live;
+      # No landing or sign-up pages: a full page load of the home page, the
+      # marketing page or /register goes to /login, and so does the register API
+      # (refused by ALLOWED_REGISTER anyway). In-app navigation never reaches the
+      # router, so the SPA's own links still render those pages; signing up stays
+      # impossible. Participant links (/c/…) and feeds (/api/v1/ics/…) are untouched.
+      middlewares.closed.redirectRegex = {
+        regex = "^https://([^/]+)/(register/?|why-whento/?|api/v1/auth/register/?)?(\\?.*)?$";
+        replacement = "https://$1/login";
+      };
     };
 
     lodestar.links.whento = {
