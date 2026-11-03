@@ -5,12 +5,30 @@
   hostPlatform,
   ...
 }:
+let
+  # 1.104.5 (Serve and SSH stalls on lossy networks) ahead of nixpkgs (NixOS/nixpkgs#582547,
+  # same vendorHash). Only while the pinned unstable is older; drop once it has 1.104.5.
+  pinned = "1.104.5";
+  tailscale =
+    if lib.versionOlder upkgs.tailscale.version pinned then
+      upkgs.tailscale.overrideAttrs {
+        version = pinned;
+        src = upkgs.fetchFromGitHub {
+          owner = "tailscale";
+          repo = "tailscale";
+          tag = "v${pinned}";
+          hash = "sha256-aq4pBe75wNRFDEa3kSDa/pBLsZws5mOUOjHDUycpmXM=";
+        };
+      }
+    else
+      upkgs.tailscale;
+in
 lib.optionalAttrs hostPlatform.isLinux {
   services.tailscale = {
     enable = true;
     # From unstable for TS-2026-013 (fixed in 1.104.2; nixos-26.05 has 1.98.10). Drop
     # once stable's tailscale is at least that.
-    package = upkgs.tailscale;
+    package = tailscale;
     # Used by tailscaled-autoconnect (servers, with an auth key). Workstations
     # turn SSH on in workstation/networking/tailscale.nix.
     extraUpFlags = [ "--ssh" ];
