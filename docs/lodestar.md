@@ -238,6 +238,12 @@ Build cache additions (2026-11-02): `tag:cache` (owned by `autogroup:admin` and
 nixos-manager reaches the builder over the LAN (`ssh-ng://lodestar@10.0.10.171`), not
 the tailnet. See "Build cache" above.
 
+WhenTo additions (2026-11-03): Service `whento` (created in the console) in the Services
+grant, auto-approved for `tag:router`. Without the policy entry the router advertised
+it but never hosted it (no `services/whento` in its CapMap); after the policy edit,
+`drain` + `advertise` again. A new `lodestar.links` entry reaches the Services tab only
+after nixos-manager is rebuilt (the server's links are computed from every host).
+
 ## Open items
 
 1. Write deploy key for promote: declared in `modules/server/lodestar/server.nix`
