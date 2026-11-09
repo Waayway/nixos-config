@@ -79,7 +79,11 @@ module is imported for every host (the module is inert unless enabled, so the
     eat the ChatGPT plan.
   - Discord (plain values in the module, not secrets): `DISCORD_ALLOWED_USERS =
     137629736993030144` (Thijs), `DISCORD_HOME_CHANNEL = 1569317421251039294` (cron
-    and reminder output), `require_mention` in server channels, DMs allowed.
+    and reminder output), DMs allowed. It answers every message from an allowed user
+    in every channel it can see, no @mention needed: `DISCORD_REQUIRE_MENTION =
+    false` and `DISCORD_IGNORE_NO_MENTION = false` (also answers messages that
+    @mention someone else). Messages from anyone not in `DISCORD_ALLOWED_USERS` are
+    still ignored.
 - `environmentFiles`: one file that opnix renders with `DISCORD_BOT_TOKEN`,
   `OPENROUTER_API_KEY` and the Grafana token (section 3).
 - `extraPackages`: `claude-code`, `codex`, `git`, `gh`, `jq`, `ripgrep`, `nix` on the
