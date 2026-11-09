@@ -39,6 +39,8 @@ assert h.environment.DISCORD_ALLOWED_USERS == "137629736993030144";
 assert h.environment.DISCORD_HOME_CHANNEL == "1569317421251039294";
 assert h.environment.DISCORD_REQUIRE_MENTION == "false";
 assert h.environment.DISCORD_IGNORE_NO_MENTION == "false";
+# replies in the channel itself, no thread per message
+assert h.environment.DISCORD_AUTO_THREAD == "false";
 assert !(h.environment ? DISCORD_ALLOW_ALL_USERS) && !(h.environment ? GATEWAY_ALLOW_ALL_USERS);
 # no pay-per-token keys
 assert !(h.environment ? ANTHROPIC_API_KEY) && !(h.environment ? OPENAI_API_KEY);

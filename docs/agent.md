@@ -22,7 +22,8 @@ Nix win on every activation; anything else you set at runtime (`/model`,
 
 Only Discord user `137629736993030144` (Thijs), in DMs and in every server channel the
 bot can see, without an @mention (`DISCORD_REQUIRE_MENTION=false`,
-`DISCORD_IGNORE_NO_MENTION=false`). Everyone else is ignored. Cron and reminder output
+`DISCORD_IGNORE_NO_MENTION=false`), in the channel itself rather than a thread
+(`DISCORD_AUTO_THREAD=false`). Everyone else is ignored. Cron and reminder output
 goes to the home channel `1569317421251039294`. To limit it to some channels, set
 `DISCORD_ALLOWED_CHANNELS` in `modules/server/agent/hermes.nix`.
 

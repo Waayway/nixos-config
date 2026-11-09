@@ -76,6 +76,8 @@ lib.optionalAttrs hostPlatform.isLinux {
         DISCORD_HOME_CHANNEL = "1569317421251039294";
         DISCORD_REQUIRE_MENTION = "false";
         DISCORD_IGNORE_NO_MENTION = "false";
+        # Reply in the channel, not in a new thread per message.
+        DISCORD_AUTO_THREAD = "false";
         # Claude Code updates come with `nix flake update`.
         DISABLE_AUTOUPDATER = "1";
       };
