@@ -32,10 +32,9 @@
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
     # Hermes Agent (Nous Research) and its NixOS module, on iris (modules/server/agent/).
-    hermes-agent = {
-      url = "github:NousResearch/hermes-agent";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # Its own nixpkgs (nixos-unstable), not ours: its pinned pnpm/node don't build
+    # against 26.05, and on its own pin they come from cache.nixos.org.
+    hermes-agent.url = "github:NousResearch/hermes-agent";
 
     nixvim.url = "github:Waayway/nvim-config/nixvim";
 
