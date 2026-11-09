@@ -11,7 +11,7 @@ work for him, without paying per token.
 
 ## Goal
 
-- A NixOS VM **iris** (VM 172) runs Hermes as a service, managed like every other server
+- A NixOS VM **iris** (VM 101) runs Hermes as a service, managed like every other server
   (thin host file, one module, Lodestar applies it).
 - Thijs talks to it through a **Discord bot** (his own); only his Discord user answers.
 - Models are paid by **plans, not tokens**: ChatGPT plan (Codex OAuth) as the main model,
@@ -48,10 +48,10 @@ named like a device loses its MagicDNS name to the device (`docs/lodestar.md`, t
 ## 1. VM and host (agreed)
 
 - `hosts/servers/iris.nix`: `type = "server"`, `useDefaultHardware = true`,
-  `isHomeServer = true`, `netInterface = { ip = "10.0.10.172"; prefixLength = 24; }`,
+  `isHomeServer = true`, `netInterface = { ip = "10.0.10.101"; prefixLength = 24; }`,
   `tags = [ "tag:iris" ]`, `fleet = true`, `options.homelab.agent.enable = true`.
-- VM 172 on `pve`, cloned from `nixos-26.05-template` (9000): 4 vCPU, 6 GB RAM, 40 GB
-  on local-lvm, `cpu: host` (opnix), `onboot: 1`. 172 is in the 170–179 dev/build band
+- VM 101 on `pve`, cloned from `nixos-26.05-template` (9000): 4 vCPU, 6 GB RAM, 40 GB
+  on local-lvm, `cpu: host` (opnix), `onboot: 1`. 101 is in the 100–109 core & personal compute band
   (`docs/vmids.md`). `pve` had about 15 GB RAM available on 2026-11-09.
 - Tailscale policy: `tag:iris` in `tagOwners`, owner `tag:nixos`. `tag:nixos` already
   reaches `svc:nix-cache`, so iris substitutes from the fleet cache.
@@ -86,7 +86,7 @@ module is imported for every host (the module is inert unless enabled, so the
   come with `nix flake update`.
 - `mcpServers.grafana`: `mcp-grafana` from nixpkgs, `GRAFANA_URL =
   https://grafana.vanwaaij.com`, token from the environment file.
-- Backend (dashboard): `backend.mode = "dashboard"`, bound to `10.0.10.172:9119`,
+- Backend (dashboard): `backend.mode = "dashboard"`, bound to `10.0.10.101:9119`,
   password auth (password from opnix). Firewall: 9119 open to the router
   (`10.0.10.110`) only.
 - Hardening: `hermes` has no sudo, no SSH keys, isn't in `wheel`; the upstream unit's
@@ -122,7 +122,7 @@ they are OAuth tokens that rotate, owned by Hermes/Claude Code on iris (section 
 ## 4. Network and dashboard
 
 - Route `homelab.routes.agent` (in the agent module, the way services declare their
-  routes): `host = "agent.vanwaaij.com"`, `backend = "http://10.0.10.172:9119"`,
+  routes): `host = "agent.vanwaaij.com"`, `backend = "http://10.0.10.101:9119"`,
   `public = false`, `tailnet.enable = true`, `auth.gate = true`.
 - Kanidm: app `agent` in `homelab.identity.access` with `gate = true`, members
   `[ "thijs" ]`.
