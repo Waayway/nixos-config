@@ -12,6 +12,10 @@ let
   h = iris.services.hermes-agent;
   secrets = iris.services.onepassword-secrets.secrets;
   fallback = lib.head h.settings.fallback_providers;
+  router = nixosConfigurations.router.config;
+  http = router.services.traefik.dynamicConfigOptions.http;
+  kanidm = nixosConfigurations.identity.config.homelab.identity.provisionState;
+  fwRule = "iptables -w -A nixos-fw -p tcp -s 10.0.10.110 --dport 9119 -j nixos-fw-accept";
 in
 assert iris.networking.hostName == "iris";
 assert iris.homelab.agent.enable;
@@ -80,4 +84,15 @@ assert
 assert h.backend.mode == "dashboard" && h.backend.host == "10.0.10.101" && h.backend.port == 9119;
 assert h.settings.dashboard.public_url == "https://agent.vanwaaij.com";
 assert h.settings.dashboard.trusted_proxies == [ "10.0.10.110" ];
+# dashboard route: tailnet only, behind the gate, Thijs only
+assert http.services.agent.loadBalancer.servers == [ { url = "http://10.0.10.101:9119"; } ];
+assert http.routers.agent-tailnet.rule == "Host(`agent.vanwaaij.com`)";
+assert !(http.routers ? agent-public);
+assert lib.any (lib.hasSuffix "-gate") http.routers.agent-tailnet.middlewares;
+assert router.services.tailscale.serve.services ? agent;
+assert kanidm.groups.agent-users.members == [ "thijs" ];
+# port 9119 for the router only, not the whole LAN
+assert !(lib.elem 9119 (iris.networking.firewall.interfaces.ens18.allowedTCPPorts or [ ]));
+assert !(lib.elem 9119 iris.networking.firewall.allowedTCPPorts);
+assert lib.hasInfix fwRule iris.networking.firewall.extraCommands;
 pkgs.runCommand "agent" { } "touch $out"
