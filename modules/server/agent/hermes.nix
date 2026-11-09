@@ -68,6 +68,39 @@ lib.optionalAttrs hostPlatform.isLinux {
           public_url = "https://${host}";
           trusted_proxies = [ "10.0.10.110" ];
         };
+
+        # Iris is a coding/ops agent on Discord, not a general assistant: trim the
+        # bundled skill catalog down to the agent and software-development ones
+        # (plus web's blocked-page-recovery and the creative claude-design skill
+        # Thijs still wants) for Discord specifically, so the rest never load
+        # into context there.
+        skills.platform_disabled.discord = [
+          "architecture-diagram"
+          "ascii-video"
+          "baoyu-infographic"
+          "humanizer"
+          "manim-video"
+          "p5js"
+          "popular-web-designs"
+          "songwriting-and-ai-music"
+          "document-to-action-items"
+          "google-workspace"
+          "maps"
+          "meeting-action-items"
+          "microsoft-office"
+          "pdf"
+          "product-price-monitor"
+          "teams-meeting-pipeline"
+          "weekly-review-planning"
+          "arxiv"
+          "competitor-news-monitor"
+          "grounded-citations"
+          "email-inbox-triage"
+          "himalaya"
+          "xurl"
+          "youtube-content"
+          "obsidian"
+        ];
       };
 
       # Plain values (secrets: secrets.nix). Only Thijs; every message, no @mention.
@@ -87,6 +120,7 @@ lib.optionalAttrs hostPlatform.isLinux {
       extraPackages = with pkgs; [
         claude-code
         codex
+        _1password-cli
         git
         gh
         jq
