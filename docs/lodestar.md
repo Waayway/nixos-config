@@ -264,3 +264,9 @@ after nixos-manager is rebuilt (the server's links are computed from every host)
    `opnix-secrets` failed; the new generation is active and the old secret
    files stay. Show that as "applied, secrets not refreshed" instead of a
    failed apply.
+
+iris additions (Hermes Agent, VM 101, `docs/agent.md`): `tag:iris` (owned by
+`autogroup:admin` and `tag:nixos`); `tag:iris` → `svc:grafana` on tcp:443 (the read-only
+Grafana MCP); `nixos-manager` → `tag:iris` on tcp:7461; Service `agent` in the Services
+grant, auto-approved for `tag:router`, then `drain` + `advertise svc:agent` on the
+router. Not `svc:hermes`: the laptop is the device `hermes`.

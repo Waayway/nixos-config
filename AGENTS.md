@@ -18,6 +18,7 @@ at `~/.flake` on each machine. Read this before changing anything.
 | identity | Proxmox VM 111, Kanidm (`id.vanwaaij.com`), sign-in for apps and the router's gate (`docs/identity.md`) | x86_64-linux | identity | servers |
 | nixos-manager | Proxmox VM 170, Lodestar server + Linux builder | x86_64-linux | manager | servers |
 | monitor | Proxmox VM 140, Grafana + Prometheus + Loki, alerts (`docs/monitoring.md`) | x86_64-linux | monitor | servers |
+| iris | Proxmox VM 101, Hermes Agent (Discord bot), dashboard `agent.vanwaaij.com` (`docs/agent.md`) | x86_64-linux | iris | servers |
 | cache | Proxmox VM 171, build cache + Lodestar builder (docs/plans/2026-10-29-build-cache-design.md) | x86_64-linux | cache | servers |
 
 Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
@@ -52,7 +53,7 @@ Not managed by this repo: the Hetzner `primary-server`, the old work laptop
     packages shell system users` (hardware = nixos-hardware profiles + firmware).
   - `workstation/`: laptops, desktop, Macs. `apps darwin desktop development
     gaming hardware shell`.
-  - `server/`: the Proxmox VMs. `backup homelab identity lodestar monitoring
+  - `server/`: the Proxmox VMs. `agent backup homelab identity lodestar monitoring
     networking proxmox secrets services truenas users`.
 - `modules/server/secrets/opnix.nix`: server secrets from the 1Password vault Homelab
   (opnix); no secrets live in the repo.

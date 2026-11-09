@@ -20,7 +20,7 @@ Run for the lab itself.
 
 | Block | Use |
 |---|---|
-| 100–109 | Core & personal compute |
+| 100–109 | Core & personal compute (100 prod, 101 iris) |
 | 110–119 | Network & remote access |
 | 120–129 | Media |
 | 130–139 | Home automation |

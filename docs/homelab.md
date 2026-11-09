@@ -88,7 +88,7 @@ Open items:
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
 | 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich, WhenTo (containers) |
-| 101 | router | stopped | NixOS (old attempt) | 2 / 2 GB | 64 GB (store-lvm) | unused, to delete |
+| 101 | iris | running, onboot | NixOS (this repo) | 4 / 6 GB | 40 GB (local-lvm) | Hermes Agent, Discord bot; dashboard `agent.vanwaaij.com` (`docs/agent.md`) |
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
 | 110 | router | running, onboot | NixOS (this repo) | 2 / 2 GB | 16 GB (local-lvm) | front door: Traefik, split DNS, Tailscale Services |
