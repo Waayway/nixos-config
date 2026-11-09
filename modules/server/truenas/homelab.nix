@@ -75,6 +75,14 @@ lib.optionalAttrs hostPlatform.isLinux {
         hosts = [ "10.0.10.171" ];
       };
 
+      # iris's nightly copy of the Hermes state (modules/server/agent/backup.nix), for
+      # iris only; root squashed, the dataset's owner is iris's `hermes` (uid 950).
+      # In store/internal, so the 02:00 snapshot and the restic `store` repo have it.
+      nfsShares.iris = {
+        path = "/mnt/store/internal/iris";
+        hosts = [ "10.0.10.101" ];
+      };
+
       # TrueNAS 26 has no SMART test schedules of its own. Errors go out by mail.
       cronJobs = {
         smart-short = {

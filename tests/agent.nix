@@ -15,6 +15,9 @@ let
   router = nixosConfigurations.router.config;
   http = router.services.traefik.dynamicConfigOptions.http;
   kanidm = nixosConfigurations.identity.config.homelab.identity.provisionState;
+  nas = nixosConfigurations.nixos-manager.config.truenas;
+  backup = iris.systemd.services.hermes-backup;
+  mount = iris.fileSystems."/var/lib/hermes-backup";
   fwRule = "iptables -w -A nixos-fw -p tcp -s 10.0.10.110 --dport 9119 -j nixos-fw-accept";
 in
 assert iris.networking.hostName == "iris";
@@ -95,4 +98,15 @@ assert kanidm.groups.agent-users.members == [ "thijs" ];
 assert !(lib.elem 9119 (iris.networking.firewall.interfaces.ens18.allowedTCPPorts or [ ]));
 assert !(lib.elem 9119 iris.networking.firewall.allowedTCPPorts);
 assert lib.hasInfix fwRule iris.networking.firewall.extraCommands;
+# nightly state copy to TrueNAS store/internal/iris (snapshot 02:00, restic 02:30)
+assert nas.nfsShares.iris.path == "/mnt/store/internal/iris";
+assert nas.nfsShares.iris.hosts == [ "10.0.10.101" ];
+assert mount.device == "10.0.10.130:/mnt/store/internal/iris";
+assert !(lib.any (lib.hasPrefix "x-systemd.idle-timeout") mount.options);
+assert iris.users.users.hermes.uid == 950;
+assert iris.systemd.timers.hermes-backup.timerConfig.OnCalendar == "*-*-* 01:30";
+assert lib.elem "/var/lib/hermes-backup" backup.unitConfig.RequiresMountsFor;
+assert backup.serviceConfig.User == "hermes";
+# a consistent copy of the SQLite files, not a raw copy of a live database
+assert lib.hasInfix ".backup" backup.script && lib.hasInfix "--exclude" backup.script;
 pkgs.runCommand "agent" { } "touch $out"
