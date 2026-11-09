@@ -43,6 +43,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       }
     ];
 
+    # Make `op` available to the agent's shell tools as well as the service.
+    environment.systemPackages = [ pkgs._1password-cli ];
+
     services.hermes-agent = {
       enable = true;
       container.enable = false;
