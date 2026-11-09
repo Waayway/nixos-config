@@ -124,4 +124,18 @@ assert lib.hasInfix "[ $? -eq 1 ]" backup.script;
 # the hermes CLI on PATH for the logins (docs/agent.md), sharing the gateway's state
 assert lib.any (p: lib.getName p == "hermes-agent") iris.environment.systemPackages;
 assert iris.environment.variables.HERMES_HOME == "/var/lib/hermes/.hermes";
+# a change to Hermes's env or config.yaml in Nix restarts both units (Hermes reads them
+# only at start; the activation rewrites the files but doesn't restart anything)
+assert lib.all
+  (
+    u:
+    lib.any (
+      t: lib.hasInfix "DISCORD_AUTO_THREAD" (toString t)
+    ) iris.systemd.services.${u}.restartTriggers
+    && lib.any (t: lib.hasInfix "public_url" (toString t)) iris.systemd.services.${u}.restartTriggers
+  )
+  [
+    "hermes-agent"
+    "hermes-backend"
+  ];
 pkgs.runCommand "agent" { } "touch $out"

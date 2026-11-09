@@ -82,6 +82,12 @@ lib.optionalAttrs hostPlatform.isLinux {
     };
 
     systemd.services = lib.genAttrs units (_: {
+      # Hermes reads .env and config.yaml only at start, and upstream's activation
+      # rewrites them without restarting anything: restart when they change in Nix.
+      restartTriggers = [
+        (builtins.toJSON config.services.hermes-agent.environment)
+        (builtins.toJSON config.services.hermes-agent.settings)
+      ];
       after = [ "opnix-secrets.service" ];
       wants = [ "opnix-secrets.service" ];
       serviceConfig = {
