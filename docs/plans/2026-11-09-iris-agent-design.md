@@ -77,8 +77,9 @@ module is imported for every host (the module is inert unless enabled, so the
     runtime (`/model`); the repo only sets defaults.
   - auxiliary tasks (compression, vision): OpenRouter free model, so side work doesn't
     eat the ChatGPT plan.
-  - Discord: allowed users = Thijs's user ID (a plain value in the module, not a
-    secret), `require_mention` in server channels, DMs allowed.
+  - Discord (plain values in the module, not secrets): `DISCORD_ALLOWED_USERS =
+    137629736993030144` (Thijs), `DISCORD_HOME_CHANNEL = 1569317421251039294` (cron
+    and reminder output), `require_mention` in server channels, DMs allowed.
 - `environmentFiles`: one file that opnix renders with `DISCORD_BOT_TOKEN`,
   `OPENROUTER_API_KEY` and the Grafana token (section 3).
 - `extraPackages`: `claude-code`, `codex`, `git`, `gh`, `jq`, `ripgrep`, `nix` on the
@@ -169,7 +170,7 @@ they are OAuth tokens that rotate, owned by Hermes/Claude Code on iris (section 
 
 ## Open items for Thijs
 
-- Discord user ID (for the allowlist) and the bot (token into `iris-discord`; Message
+- The bot (token into `iris-discord`; Message
   Content and Server Members intents on; private bot invited with the manual URL,
   permissions `309237763136`).
 - OpenRouter key into `iris-openrouter`.
