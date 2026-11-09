@@ -25,9 +25,11 @@ let
       mkdir -p "$tmp/$(dirname "$db")"
       sqlite3 "$db" ".backup '$tmp/$db'"
     done
-    tar --create --file "$tmp/files.tar" \
+    # The gateway writes logs and sessions all the time: "file changed as we read it"
+    # (exit 1) is expected; anything else is a real failure.
+    tar --create --file "$tmp/files.tar" --warning=no-file-changed \
       --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' --exclude='*.db-journal' \
-      --exclude='./.cache' --exclude='./.npm' .
+      --exclude='./.cache' --exclude='./.npm' . || [ $? -eq 1 ]
     tar --create --gzip --file "${dir}/hermes-$stamp.tar.gz.part" -C "$tmp" .
     mv "${dir}/hermes-$stamp.tar.gz.part" "${dir}/hermes-$stamp.tar.gz"
     ls -1t ${dir}/hermes-*.tar.gz | tail -n +8 | xargs -r rm -f

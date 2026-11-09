@@ -59,12 +59,14 @@ themselves, and are in the nightly backup. They are not in 1Password.
 | `Iris Discord Bot Token` | `credential` | `DISCORD_BOT_TOKEN` |
 | `iris-openrouter` | `credential` | `OPENROUTER_API_KEY` |
 | `iris-grafana` | `token` | Grafana service account `iris` (Viewer) for `mcp-grafana` |
-| `iris-dashboard` | `password`, `secret` | dashboard password (user `thijs`), session key |
+| `iris-dashboard` | `password`, `secret` | dashboard password (user `thijs`), session key: letters and digits only (the render refuses quotes, backslashes, spaces) |
 
 Upstream copies `environmentFiles` into `.env` at activation, before opnix has
 fetched. So the secrets go in another way: a root `ExecStartPre` writes
 `/run/hermes-secrets/env` from the opnix files, and both units read it as
-`EnvironmentFile`. opnix restarts them when a value changes.
+`EnvironmentFile` (with `-`: systemd also loads it for that `ExecStartPre`, before it
+exists). A missing or empty secret stops the unit with the variable's name in the log.
+opnix restarts them when a value changes.
 
 ## Dashboard
 

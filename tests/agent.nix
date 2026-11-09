@@ -18,6 +18,7 @@ let
   nas = nixosConfigurations.nixos-manager.config.truenas;
   backup = iris.systemd.services.hermes-backup;
   mount = iris.fileSystems."/var/lib/hermes-backup";
+  render = iris.homelab.agent.secretsEnvScript;
   fwRule = "iptables -w -A nixos-fw -p tcp -s 10.0.10.110 --dport 9119 -j nixos-fw-accept";
 in
 assert iris.networking.hostName == "iris";
@@ -47,7 +48,7 @@ assert h.environmentFiles == [ ];
 assert lib.all
   (
     u:
-    lib.elem "/run/hermes-secrets/env" (
+    lib.elem "-/run/hermes-secrets/env" (
       lib.toList iris.systemd.services.${u}.serviceConfig.EnvironmentFile
     )
     && lib.elem "opnix-secrets.service" iris.systemd.services.${u}.after
@@ -109,4 +110,16 @@ assert lib.elem "/var/lib/hermes-backup" backup.unitConfig.RequiresMountsFor;
 assert backup.serviceConfig.User == "hermes";
 # a consistent copy of the SQLite files, not a raw copy of a live database
 assert lib.hasInfix ".backup" backup.script && lib.hasInfix "--exclude" backup.script;
+# a missing or odd secret stops the render with its name, instead of an empty value
+# (or one systemd would unquote) in the env file
+assert lib.all (n: lib.hasInfix "need ${n} " render) [
+  "DISCORD_BOT_TOKEN"
+  "OPENROUTER_API_KEY"
+  "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"
+  "HERMES_DASHBOARD_BASIC_AUTH_SECRET"
+];
+assert lib.hasInfix "[ -s " render && lib.hasInfix "A-Za-z0-9" render;
+# tar's "file changed as we read it" (exit 1) doesn't fail the night
+assert lib.hasInfix "--warning=no-file-changed" backup.script;
+assert lib.hasInfix "[ $? -eq 1 ]" backup.script;
 pkgs.runCommand "agent" { } "touch $out"

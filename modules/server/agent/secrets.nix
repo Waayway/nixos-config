@@ -26,23 +26,51 @@ let
     services = units;
   };
   envFile = "/run/hermes-secrets/env";
-  render = pkgs.writeShellScript "hermes-secrets-env" ''
+  # `need NAME file`: one NAME=value line, or stop naming what's missing. Values are
+  # restricted to characters systemd's env-file parser leaves alone (no quotes,
+  # backslashes or spaces): tokens and keys are, and the dashboard password is
+  # generated letters and digits (docs/agent.md).
+  renderText = ''
     set -eu
     umask 077
+    need() {
+      if ! [ -s "$2" ]; then
+        echo "hermes-secrets-env: $1: $2 is missing or empty (opnix token? item name?)" >&2
+        exit 1
+      fi
+      v=$(cat "$2")
+      case "$v" in
+        *[!A-Za-z0-9._~+/=:-]*)
+          echo "hermes-secrets-env: $1 has characters an env file would change" >&2
+          exit 1
+          ;;
+      esac
+      printf '%s=%s\n' "$1" "$v"
+    }
     mkdir -p /run/hermes-secrets
     tmp=$(mktemp /run/hermes-secrets/env.XXXXXX)
     {
-      printf 'DISCORD_BOT_TOKEN=%s\n' "$(cat ${secretPaths.irisDiscord})"
-      printf 'OPENROUTER_API_KEY=%s\n' "$(cat ${secretPaths.irisOpenrouter})"
-      printf 'HERMES_DASHBOARD_BASIC_AUTH_USERNAME=thijs\n'
-      printf 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=%s\n' "$(cat ${secretPaths.irisDashboardPassword})"
-      printf 'HERMES_DASHBOARD_BASIC_AUTH_SECRET=%s\n' "$(cat ${secretPaths.irisDashboardSecret})"
+      need DISCORD_BOT_TOKEN ${secretPaths.irisDiscord}
+      need OPENROUTER_API_KEY ${secretPaths.irisOpenrouter}
+      echo HERMES_DASHBOARD_BASIC_AUTH_USERNAME=thijs
+      need HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ${secretPaths.irisDashboardPassword}
+      need HERMES_DASHBOARD_BASIC_AUTH_SECRET ${secretPaths.irisDashboardSecret}
     } > "$tmp"
     chown hermes:hermes "$tmp"
     mv "$tmp" ${envFile}
   '';
+  render = pkgs.writeShellScript "hermes-secrets-env" renderText;
 in
 lib.optionalAttrs hostPlatform.isLinux {
+  # The render script's text, for tests/agent.nix (reading the built script would need
+  # a Linux builder at evaluation).
+  options.homelab.agent.secretsEnvScript = lib.mkOption {
+    type = lib.types.str;
+    internal = true;
+    readOnly = true;
+    default = renderText;
+  };
+
   config = lib.mkIf config.homelab.agent.enable {
     services.onepassword-secrets.secrets = {
       # Created by Thijs as an API Credential item.
@@ -60,7 +88,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       wants = [ "opnix-secrets.service" ];
       serviceConfig = {
         ExecStartPre = lib.mkBefore [ "+${render}" ];
-        EnvironmentFile = [ envFile ];
+        # `-`: systemd loads it for ExecStartPre too, before the render has written
+        # it (/run is empty after boot); ExecStart then reads the fresh file.
+        EnvironmentFile = [ "-${envFile}" ];
       };
     });
   };
