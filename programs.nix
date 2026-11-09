@@ -57,6 +57,13 @@ in
     inherit (inputs.self) nixosConfigurations darwinConfigurations;
   };
 
+  # Evaluation check of iris, the Hermes Agent VM (tests/agent.nix).
+  checks.x86_64-linux.agent = import ./tests/agent.nix {
+    pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+    inherit lib;
+    inherit (inputs.self) nixosConfigurations;
+  };
+
   # Evaluation check of the monitoring agent (tests/monitoring.nix).
   checks.x86_64-linux.monitoring = import ./tests/monitoring.nix {
     pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;

@@ -114,6 +114,7 @@ systemFunc rec {
 
     inputs.opnix.nixosModules.default
     inputs.lodestar.nixosModules.default
+    inputs.hermes-agent.nixosModules.default
     homeManager
   ];
 }

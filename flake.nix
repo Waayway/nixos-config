@@ -31,6 +31,12 @@
 
     nix-flatpak.url = "github:gmodena/nix-flatpak";
 
+    # Hermes Agent (Nous Research) and its NixOS module, on iris (modules/server/agent/).
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     nixvim.url = "github:Waayway/nvim-config/nixvim";
 
     rofiThemeRepo = {
