@@ -170,6 +170,7 @@ they are OAuth tokens that rotate, owned by Hermes/Claude Code on iris (section 
 ## Open items for Thijs
 
 - Discord user ID (for the allowlist) and the bot (token into `iris-discord`; Message
-  Content intent on).
+  Content and Server Members intents on; private bot invited with the manual URL,
+  permissions `309237763136`).
 - OpenRouter key into `iris-openrouter`.
 - Which ChatGPT plan (Plus/Pro); Hermes doesn't document how Codex limits count.
