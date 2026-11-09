@@ -7,7 +7,7 @@
 }:
 # Hermes Agent (github.com/NousResearch/hermes-agent) on iris, from upstream's NixOS
 # module in native mode (a systemd service, not its OCI container): a Discord bot for
-# Thijs that thinks with his ChatGPT plan, falls back to free OpenRouter models and
+# Thijs that thinks with his ChatGPT plan and
 # hands coding to Claude Code on his Claude plan. Design:
 # docs/plans/2026-11-09-iris-agent-design.md; runbook: docs/agent.md.
 #
@@ -23,10 +23,6 @@ let
 
   host = "agent.vanwaaij.com";
   port = 9119;
-  # Free OpenRouter models that take tools (openrouter.ai/api/v1/models, 2026-11-09).
-  # Thijs switches models at runtime (/model); these are only the defaults.
-  freeModel = "nvidia/nemotron-3-ultra-550b-a55b:free";
-  freeVisionModel = "nvidia/nemotron-3.5-super-vl:free";
 
   # mcp-grafana with the Viewer token read at start, so it stays out of config.yaml.
   grafanaMcp = pkgs.writeShellScript "mcp-grafana-iris" ''
@@ -56,28 +52,12 @@ lib.optionalAttrs hostPlatform.isLinux {
 
       settings = {
         # The ChatGPT plan (Codex OAuth, logged in by hand: docs/agent.md); the first
-        # model upstream lists for "ChatGPT or Codex Subscription".
+        # model upstream lists for "ChatGPT or Codex Subscription". The only provider
+        # for now: no fallback, side tasks (summaries, vision) on this model too. Free
+        # OpenRouter as fallback is designed but skipped (docs/agent.md).
         model = {
           provider = "openai-codex";
           default = "gpt-6-sol";
-        };
-        # Plan limits hit or not logged in yet: free OpenRouter.
-        fallback_providers = [
-          {
-            provider = "openrouter";
-            model = freeModel;
-          }
-        ];
-        # Side work (summaries, image reading) doesn't eat the ChatGPT plan.
-        auxiliary = {
-          compression = {
-            provider = "openrouter";
-            model = freeModel;
-          };
-          vision = {
-            provider = "openrouter";
-            model = freeVisionModel;
-          };
         };
         # Behind the router (Traefik, Kanidm gate): the only peer whose forwarded
         # headers count, and the name the dashboard accepts as Host.

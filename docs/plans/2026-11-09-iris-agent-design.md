@@ -1,7 +1,9 @@
 # iris: a VM for Hermes Agent
 
-Status: agreed in conversation 2026-11-09 up to section 1 (VM and host); sections 2–6
-written for review. Implementation plan follows once this is approved.
+Status: approved 2026-11-09 and implemented (docs/plans/2026-11-09-iris-agent-plan.md).
+Change at rollout: OpenRouter skipped for now (Thijs, 2026-11-09): no fallback provider,
+auxiliary tasks on the main model, no `iris-openrouter` item. The OpenRouter parts below
+describe the design for when it's added.
 
 ## Why
 

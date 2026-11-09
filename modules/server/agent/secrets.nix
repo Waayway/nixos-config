@@ -51,7 +51,6 @@ let
     tmp=$(mktemp /run/hermes-secrets/env.XXXXXX)
     {
       need DISCORD_BOT_TOKEN ${secretPaths.irisDiscord}
-      need OPENROUTER_API_KEY ${secretPaths.irisOpenrouter}
       echo HERMES_DASHBOARD_BASIC_AUTH_USERNAME=thijs
       need HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ${secretPaths.irisDashboardPassword}
       need HERMES_DASHBOARD_BASIC_AUTH_SECRET ${secretPaths.irisDashboardSecret}
@@ -75,7 +74,6 @@ lib.optionalAttrs hostPlatform.isLinux {
     services.onepassword-secrets.secrets = {
       # Created by Thijs as an API Credential item.
       irisDiscord = secret "op://Homelab/Iris Discord Bot Token/credential";
-      irisOpenrouter = secret "op://Homelab/iris-openrouter/credential";
       # Grafana service account `iris`, role Viewer (docs/agent.md).
       irisGrafana = secret "op://Homelab/iris-grafana/token";
       irisDashboardPassword = secret "op://Homelab/iris-dashboard/password";

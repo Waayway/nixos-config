@@ -11,7 +11,6 @@ let
   others = lib.attrNames (lib.removeAttrs nixosConfigurations [ "iris" ]);
   h = iris.services.hermes-agent;
   secrets = iris.services.onepassword-secrets.secrets;
-  fallback = lib.head h.settings.fallback_providers;
   router = nixosConfigurations.router.config;
   http = router.services.traefik.dynamicConfigOptions.http;
   kanidm = nixosConfigurations.identity.config.homelab.identity.provisionState;
@@ -29,11 +28,12 @@ assert iris.services.hermes-agent.stateDir == "/var/lib/hermes";
 assert iris.services.hermes-agent.user == "hermes";
 assert !(lib.elem "wheel" (iris.users.users.hermes.extraGroups or [ ]));
 assert lib.all (n: !nixosConfigurations.${n}.config.services.hermes-agent.enable) others;
-# models: ChatGPT plan first, free OpenRouter as fallback and for side tasks
+# models: the ChatGPT plan only (OpenRouter skipped for now): no fallback, side tasks on
+# the main model, no OpenRouter key
 assert h.settings.model.provider == "openai-codex";
-assert fallback.provider == "openrouter" && lib.hasSuffix ":free" fallback.model;
-assert h.settings.auxiliary.compression.provider == "openrouter";
-assert h.settings.auxiliary.vision.provider == "openrouter";
+assert !(h.settings ? fallback_providers) || h.settings.fallback_providers == [ ];
+assert !(h.settings ? auxiliary);
+assert !(secrets ? irisOpenrouter) && !(lib.hasInfix "OPENROUTER" render);
 # Discord: Thijs only, every message, cron output to the home channel
 assert h.environment.DISCORD_ALLOWED_USERS == "137629736993030144";
 assert h.environment.DISCORD_HOME_CHANNEL == "1569317421251039294";
@@ -59,14 +59,12 @@ assert lib.all
   ];
 assert lib.all (n: secrets.${n}.owner == "hermes" && secrets.${n}.mode == "0400") [
   "irisDiscord"
-  "irisOpenrouter"
   "irisGrafana"
   "irisDashboardPassword"
   "irisDashboardSecret"
 ];
 assert secrets.irisDiscord.reference == "op://Homelab/Iris Discord Bot Token/credential";
 assert lib.all (n: secrets ? ${n}) [
-  "irisOpenrouter"
   "irisGrafana"
   "irisDashboardPassword"
   "irisDashboardSecret"
@@ -114,7 +112,6 @@ assert lib.hasInfix ".backup" backup.script && lib.hasInfix "--exclude" backup.s
 # (or one systemd would unquote) in the env file
 assert lib.all (n: lib.hasInfix "need ${n} " render) [
   "DISCORD_BOT_TOKEN"
-  "OPENROUTER_API_KEY"
   "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"
   "HERMES_DASHBOARD_BASIC_AUTH_SECRET"
 ];

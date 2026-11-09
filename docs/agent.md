@@ -29,7 +29,11 @@ goes to the home channel `1569317421251039294`. To limit it to some channels, se
 ## Models
 
 - Main: the ChatGPT plan through Codex OAuth (`openai-codex`, default `gpt-6-sol`).
-- Fallback, summaries, image reading: free OpenRouter models (key in 1Password).
+- No fallback provider yet: summaries and image reading use the main model too. Free
+  OpenRouter models as fallback were designed and skipped for now (2026-11-09); to add
+  them, put the key in 1Password `iris-openrouter`/`credential`, add it to
+  `secrets.nix` (`need OPENROUTER_API_KEY …`) and set `fallback_providers` in
+  `hermes.nix`.
 - Coding: Hermes's bundled `claude-code` skill runs Claude Code on iris, on Thijs's
   Claude plan. The `codex` CLI is there too.
 
@@ -57,7 +61,6 @@ themselves, and are in the nightly backup. They are not in 1Password.
 | Item | Field | Use |
 |---|---|---|
 | `Iris Discord Bot Token` | `credential` | `DISCORD_BOT_TOKEN` |
-| `iris-openrouter` | `credential` | `OPENROUTER_API_KEY` |
 | `iris-grafana` | `token` | Grafana service account `iris` (Viewer) for `mcp-grafana` |
 | `iris-dashboard` | `password`, `secret` | dashboard password (user `thijs`), session key: letters and digits only (the render refuses quotes, backslashes, spaces) |
 
