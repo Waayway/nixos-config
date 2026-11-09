@@ -9,6 +9,9 @@
 let
   iris = nixosConfigurations.iris.config;
   others = lib.attrNames (lib.removeAttrs nixosConfigurations [ "iris" ]);
+  h = iris.services.hermes-agent;
+  secrets = iris.services.onepassword-secrets.secrets;
+  fallback = lib.head h.settings.fallback_providers;
 in
 assert iris.networking.hostName == "iris";
 assert iris.homelab.agent.enable;
@@ -18,4 +21,63 @@ assert iris.services.hermes-agent.stateDir == "/var/lib/hermes";
 assert iris.services.hermes-agent.user == "hermes";
 assert !(lib.elem "wheel" (iris.users.users.hermes.extraGroups or [ ]));
 assert lib.all (n: !nixosConfigurations.${n}.config.services.hermes-agent.enable) others;
+# models: ChatGPT plan first, free OpenRouter as fallback and for side tasks
+assert h.settings.model.provider == "openai-codex";
+assert fallback.provider == "openrouter" && lib.hasSuffix ":free" fallback.model;
+assert h.settings.auxiliary.compression.provider == "openrouter";
+assert h.settings.auxiliary.vision.provider == "openrouter";
+# Discord: Thijs only, every message, cron output to the home channel
+assert h.environment.DISCORD_ALLOWED_USERS == "137629736993030144";
+assert h.environment.DISCORD_HOME_CHANNEL == "1569317421251039294";
+assert h.environment.DISCORD_REQUIRE_MENTION == "false";
+assert h.environment.DISCORD_IGNORE_NO_MENTION == "false";
+assert !(h.environment ? DISCORD_ALLOW_ALL_USERS) && !(h.environment ? GATEWAY_ALLOW_ALL_USERS);
+# no pay-per-token keys
+assert !(h.environment ? ANTHROPIC_API_KEY) && !(h.environment ? OPENAI_API_KEY);
+# secrets: read at unit start from a file rendered in /run (not copied into .env at
+# activation, which runs before opnix has fetched them), never the store
+assert h.environmentFiles == [ ];
+assert lib.all
+  (
+    u:
+    lib.elem "/run/hermes-secrets/env" (
+      lib.toList iris.systemd.services.${u}.serviceConfig.EnvironmentFile
+    )
+    && lib.elem "opnix-secrets.service" iris.systemd.services.${u}.after
+  )
+  [
+    "hermes-agent"
+    "hermes-backend"
+  ];
+assert lib.all (n: secrets.${n}.owner == "hermes" && secrets.${n}.mode == "0400") [
+  "irisDiscord"
+  "irisOpenrouter"
+  "irisGrafana"
+  "irisDashboardPassword"
+  "irisDashboardSecret"
+];
+assert secrets.irisDiscord.reference == "op://Homelab/Iris Discord Bot Token/credential";
+assert lib.all (n: secrets ? ${n}) [
+  "irisOpenrouter"
+  "irisGrafana"
+  "irisDashboardPassword"
+  "irisDashboardSecret"
+];
+# tools and the read-only homelab view
+assert lib.all (n: lib.any (p: lib.getName p == n) h.extraPackages) [
+  "claude-code"
+  "codex"
+  "git"
+  "gh"
+  "jq"
+  "ripgrep"
+];
+assert h.environment.DISABLE_AUTOUPDATER == "1";
+assert
+  h.mcpServers ? grafana
+  && !(lib.hasInfix "GRAFANA_SERVICE_ACCOUNT_TOKEN=" (builtins.toJSON h.mcpServers));
+# dashboard on the LAN address, behind the router only
+assert h.backend.mode == "dashboard" && h.backend.host == "10.0.10.101" && h.backend.port == 9119;
+assert h.settings.dashboard.public_url == "https://agent.vanwaaij.com";
+assert h.settings.dashboard.trusted_proxies == [ "10.0.10.110" ];
 pkgs.runCommand "agent" { } "touch $out"

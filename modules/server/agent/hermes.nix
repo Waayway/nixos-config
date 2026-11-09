@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   hostPlatform,
   ...
 }:
@@ -17,17 +18,105 @@
 # sandbox.
 let
   cfg = config.homelab.agent;
+  lan = config.homelab.lan;
+  secretPaths = config.services.onepassword-secrets.secretPaths;
+
+  host = "agent.vanwaaij.com";
+  port = 9119;
+  # Free OpenRouter models that take tools (openrouter.ai/api/v1/models, 2026-11-09).
+  # Thijs switches models at runtime (/model); these are only the defaults.
+  freeModel = "nvidia/nemotron-3-ultra-550b-a55b:free";
+  freeVisionModel = "nvidia/nemotron-3.5-super-vl:free";
+
+  # mcp-grafana with the Viewer token read at start, so it stays out of config.yaml.
+  grafanaMcp = pkgs.writeShellScript "mcp-grafana-iris" ''
+    export GRAFANA_URL=https://grafana.vanwaaij.com
+    GRAFANA_SERVICE_ACCOUNT_TOKEN="$(cat ${secretPaths.irisGrafana})"
+    export GRAFANA_SERVICE_ACCOUNT_TOKEN
+    exec ${pkgs.mcp-grafana}/bin/mcp-grafana "$@"
+  '';
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.agent.enable = lib.mkEnableOption "Hermes Agent (Discord bot)";
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = lan.address != null;
+        message = "homelab.agent needs homelab.lan.address (the host file's netInterface.ip).";
+      }
+    ];
+
     services.hermes-agent = {
       enable = true;
       container.enable = false;
       user = "hermes";
       group = "hermes";
       stateDir = "/var/lib/hermes";
+
+      settings = {
+        # The ChatGPT plan (Codex OAuth, logged in by hand: docs/agent.md); the first
+        # model upstream lists for "ChatGPT or Codex Subscription".
+        model = {
+          provider = "openai-codex";
+          default = "gpt-6-sol";
+        };
+        # Plan limits hit or not logged in yet: free OpenRouter.
+        fallback_providers = [
+          {
+            provider = "openrouter";
+            model = freeModel;
+          }
+        ];
+        # Side work (summaries, image reading) doesn't eat the ChatGPT plan.
+        auxiliary = {
+          compression = {
+            provider = "openrouter";
+            model = freeModel;
+          };
+          vision = {
+            provider = "openrouter";
+            model = freeVisionModel;
+          };
+        };
+        # Behind the router (Traefik, Kanidm gate): the only peer whose forwarded
+        # headers count, and the name the dashboard accepts as Host.
+        dashboard = {
+          public_url = "https://${host}";
+          trusted_proxies = [ "10.0.10.110" ];
+        };
+      };
+
+      # Plain values (secrets: secrets.nix). Only Thijs; every message, no @mention.
+      environment = {
+        DISCORD_ALLOWED_USERS = "137629736993030144";
+        DISCORD_HOME_CHANNEL = "1569317421251039294";
+        DISCORD_REQUIRE_MENTION = "false";
+        DISCORD_IGNORE_NO_MENTION = "false";
+        # Claude Code updates come with `nix flake update`.
+        DISABLE_AUTOUPDATER = "1";
+      };
+
+      # Claude Code (Thijs's Claude plan, logged in by hand) and Codex for the bundled
+      # claude-code / codex skills, plus the basics.
+      extraPackages = with pkgs; [
+        claude-code
+        codex
+        git
+        gh
+        jq
+        ripgrep
+      ];
+
+      # Read-only homelab: metrics, logs and alerts through Grafana.
+      mcpServers.grafana.command = toString grafanaMcp;
+
+      # The dashboard on the LAN address; the router is the only way in (route.nix).
+      backend = {
+        mode = "dashboard";
+        host = lan.address;
+        inherit port;
+      };
     };
   };
 }
