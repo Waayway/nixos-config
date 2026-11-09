@@ -119,4 +119,7 @@ assert lib.hasInfix "[ -s " render && lib.hasInfix "A-Za-z0-9" render;
 # tar's "file changed as we read it" (exit 1) doesn't fail the night
 assert lib.hasInfix "--warning=no-file-changed" backup.script;
 assert lib.hasInfix "[ $? -eq 1 ]" backup.script;
+# the hermes CLI on PATH for the logins (docs/agent.md), sharing the gateway's state
+assert lib.any (p: lib.getName p == "hermes-agent") iris.environment.systemPackages;
+assert iris.environment.variables.HERMES_HOME == "/var/lib/hermes/.hermes";
 pkgs.runCommand "agent" { } "touch $out"

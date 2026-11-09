@@ -49,6 +49,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       user = "hermes";
       group = "hermes";
       stateDir = "/var/lib/hermes";
+      # The `hermes` CLI for every shell, with HERMES_HOME pointing at the gateway's
+      # state: the logins (`sudo -u hermes -i hermes auth add …`) need it.
+      addToSystemPackages = true;
 
       settings = {
         # The ChatGPT plan (Codex OAuth, logged in by hand: docs/agent.md); the first
