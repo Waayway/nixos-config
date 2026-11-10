@@ -44,6 +44,42 @@ the defaults, edit `settings.model` / `fallback_providers` in `hermes.nix`.
 There is no Anthropic or OpenAI API key on purpose: Hermes's own Claude login only
 bills Max "extra usage" credits, never the plan allowance.
 
+## Claude coding workers (ACP, no tmux)
+
+Iris installs `acpx` 0.22.0 (pinned npm tarball and runtime dependency lock in
+`pkgs/acpx/`), nixpkgs' `claude-agent-acp`, and `acpx-claude` in the gateway's
+PATH and the system shell PATH. The adapter uses nixpkgs' `claude-code` and its
+existing login; this setup does not add an API key or change authentication.
+Check `claude auth status --text` for the account actually in use; an ACP success
+alone does not prove which billing allowance paid for it.
+
+Use the wrapper, not bare `acpx claude`: it selects the Nix-installed adapter
+without runtime `npx` downloads, keeps the adapter command name stable across
+package upgrades, and auto-approves ACP tool requests (`--approve-all`), as
+explicitly authorized by Thijs. This is not a filesystem sandbox or a global
+Claude `bypassPermissions` setting. The worker inherits the Hermes user's access.
+
+```sh
+# Run as hermes. Use one named session per task; serialize writers per checkout.
+repo=/var/lib/hermes/workspace/repos/lodestar
+acpx-claude --cwd "$repo" --format json sessions ensure --name task-123
+acpx-claude --cwd "$repo" --format json --timeout 600 prompt -s task-123 \
+  'Read AGENTS.md. Implement the requested change and run the tests. Do not push.'
+# Follow-up retains the conversation; -s belongs after the prompt subcommand.
+acpx-claude --cwd "$repo" --format json prompt -s task-123 'Review your diff.'
+acpx-claude --cwd "$repo" status -s task-123
+acpx-claude --cwd "$repo" cancel -s task-123
+acpx-claude --cwd "$repo" sessions close task-123
+```
+
+The wrapper selects its adapter via `--agent`; do not add a positional `claude`
+argument. Acpx may label this custom command's agent as `codex` in status text;
+the adapter command, not that display label, determines the worker.
+Sessions/state live under `~/.acpx/`, separately from Hermes chat history.
+This is a CLI integration, not a Hermes worker plugin: Hermes must explicitly
+start, inspect, and follow up on tasks. Do not equate process exit with passing
+tests; inspect the diff and actual verification output before reporting success.
+
 ## Logins (by hand, once)
 
 After the first start, and again whenever the bot says a login expired:

@@ -31,6 +31,21 @@ let
     export GRAFANA_SERVICE_ACCOUNT_TOKEN
     exec ${pkgs.mcp-grafana}/bin/mcp-grafana "$@"
   '';
+
+  # Headless Claude worker: use the pinned adapter from PATH, never runtime npx.
+  # Keep the command name stable so acpx's session scope survives package upgrades.
+  # Tool requests are approved without prompts, explicitly authorized for Iris.
+  # This is an ACP approval policy, not an OS sandbox or global Claude setting.
+  acpxClaude = pkgs.writeShellApplication {
+    name = "acpx-claude";
+    runtimeInputs = [
+      pkgs.acpx
+      pkgs.claude-agent-acp
+    ];
+    text = ''
+      exec acpx --agent claude-agent-acp --approve-all "$@"
+    '';
+  };
 in
 lib.optionalAttrs hostPlatform.isLinux {
   options.homelab.agent.enable = lib.mkEnableOption "Hermes Agent (Discord bot)";
@@ -43,8 +58,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       }
     ];
 
-    # Make `op` available to the agent's shell tools as well as the service.
-    environment.systemPackages = [ pkgs._1password-cli ];
+    # Make the coding tools available to ordinary shells as well as the service.
+    environment.systemPackages = [
+      pkgs._1password-cli
+      pkgs.acpx
+      pkgs.claude-agent-acp
+      acpxClaude
+    ];
 
     services.hermes-agent = {
       enable = true;
@@ -128,6 +148,9 @@ lib.optionalAttrs hostPlatform.isLinux {
         gh
         jq
         ripgrep
+        acpx
+        claude-agent-acp
+        acpxClaude
       ];
 
       # Read-only homelab: metrics, logs and alerts through Grafana.

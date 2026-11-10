@@ -79,7 +79,26 @@ assert lib.all (n: lib.any (p: lib.getName p == n) h.extraPackages) [
   "gh"
   "jq"
   "ripgrep"
+  "acpx"
+  "claude-agent-acp"
+  "acpx-claude"
 ];
+# ACP tools are available to both the gateway and ordinary shells, only on Iris.
+assert lib.all (n: lib.any (p: lib.getName p == n) iris.environment.systemPackages) [
+  "acpx"
+  "claude-agent-acp"
+  "acpx-claude"
+];
+assert lib.all (
+  n:
+  !(lib.any (
+    p:
+    lib.elem (lib.getName p) [
+      "acpx"
+      "acpx-claude"
+    ]
+  ) nixosConfigurations.${n}.config.environment.systemPackages)
+) others;
 assert h.environment.DISABLE_AUTOUPDATER == "1";
 assert
   h.mcpServers ? grafana
