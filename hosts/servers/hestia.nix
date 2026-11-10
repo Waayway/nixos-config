@@ -22,12 +22,25 @@
   # traffic once enrolled. `tag:hestia` still needs adding to the Tailscale
   # policy's tagOwners (owned by tag:nixos) before it can actually join with
   # this tag.
-  options = { };
+  options = {
+    hosting.traefik = {
+      enable = true;
+      servicePrefix = "hestia-";
+      # Smoke test for the tailnet path (Service -> Traefik -> backend); drop once a
+      # real app is routed.
+      routes.whoami.backend = "http://127.0.0.1:8000";
+    };
+  };
 
   config =
     { lib, modulesPath, ... }:
     {
       imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
+
+      services.whoami = {
+        enable = true;
+        port = 8000;
+      };
 
       bootloader = "grub";
       boot.loader.grub.device = lib.mkForce "/dev/sda";
