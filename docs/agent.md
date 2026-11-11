@@ -83,6 +83,24 @@ This is a CLI integration, not a Hermes worker plugin: Hermes must explicitly
 start, inspect, and follow up on tasks. Do not equate process exit with passing
 tests; inspect the diff and actual verification output before reporting success.
 
+## Per-project packages (direnv)
+
+Toolchains are not installed on iris. Each project in
+`/var/lib/hermes/workspace/repos/<project>` declares what it needs in its own
+`flake.nix` (a `devShell`) and an `.envrc` containing `use flake`.
+`modules/server/agent/direnv.nix` enables direnv with nix-direnv (cached shells that
+survive garbage collection).
+
+```sh
+cd /var/lib/hermes/workspace/repos/<project>
+echo 'use flake' > .envrc
+direnv allow                      # an .envrc does nothing until allowed (nothing is trusted in advance)
+direnv exec . cargo build         # non-interactive shells (the agent's tools): run a command inside
+```
+
+Interactive shells load the environment on `cd` through the shell hook. A change to
+`flake.nix` or `.envrc` needs `direnv allow` again.
+
 ## Logins (by hand, once)
 
 After the first start, and again whenever the bot says a login expired:
