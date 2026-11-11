@@ -29,11 +29,13 @@ goes to the home channel `1569317421251039294`. To limit it to some channels, se
 
 ## Models
 
-- Main: the ChatGPT plan through Codex OAuth (`openai-codex`, default `gpt-6-sol`).
-- No fallback provider yet: summaries and image reading use the main model too. Free
-  OpenRouter models as fallback were designed and skipped for now (2026-11-09); to add
-  them, put the key in 1Password `iris-openrouter`/`credential`, add it to
-  `secrets.nix` (`need OPENROUTER_API_KEY …`) and set `fallback_providers` in
+- Main: Thijs's Claude plan through Anthropic OAuth (`anthropic`, default
+  `claude-sonnet-5-5`).
+- Fallback: the ChatGPT plan through Codex OAuth (`openai-codex`, `gpt-6-sol`), used if
+  Anthropic is unavailable. Side tasks (summaries, image reading) run on the main model
+  too. Free OpenRouter as a second fallback was designed and skipped for now
+  (2026-11-09); to add it, put the key in 1Password `iris-openrouter`/`credential`, add
+  it to `secrets.nix` (`need OPENROUTER_API_KEY …`) and extend `fallback_providers` in
   `hermes.nix`.
 - Coding: Hermes's bundled `claude-code` skill runs Claude Code on iris, on Thijs's
   Claude plan. The `codex` CLI is there too.
@@ -41,8 +43,9 @@ goes to the home channel `1569317421251039294`. To limit it to some channels, se
 Switch models at runtime with `/model` in Discord or `hermes model` on iris. To change
 the defaults, edit `settings.model` / `fallback_providers` in `hermes.nix`.
 
-There is no Anthropic or OpenAI API key on purpose: Hermes's own Claude login only
-bills Max "extra usage" credits, never the plan allowance.
+There is no Anthropic or OpenAI API key on purpose: both providers above are OAuth
+logins against a plan allowance (Claude Max "extra usage" credits for Anthropic, the
+ChatGPT plan for Codex), never a pay-per-token key.
 
 ## Claude coding workers (ACP, no tmux)
 
@@ -86,6 +89,7 @@ After the first start, and again whenever the bot says a login expired:
 
 ```sh
 ssh iris
+sudo -u hermes -i hermes auth add anthropic      # device code / OAuth URL for the Claude plan
 sudo -u hermes -i hermes auth add openai-codex   # device code: open the URL, enter the code
 sudo -u hermes -i claude                          # Claude plan: open the URL, paste the code back
 ```

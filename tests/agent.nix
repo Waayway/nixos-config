@@ -28,10 +28,15 @@ assert iris.services.hermes-agent.stateDir == "/var/lib/hermes";
 assert iris.services.hermes-agent.user == "hermes";
 assert !(lib.elem "wheel" (iris.users.users.hermes.extraGroups or [ ]));
 assert lib.all (n: !nixosConfigurations.${n}.config.services.hermes-agent.enable) others;
-# models: the ChatGPT plan only (OpenRouter skipped for now): no fallback, side tasks on
-# the main model, no OpenRouter key
-assert h.settings.model.provider == "openai-codex";
-assert !(h.settings ? fallback_providers) || h.settings.fallback_providers == [ ];
+# models: Claude plan is primary (Anthropic OAuth); at least one fallback is
+# configured, none of it a redundant copy of the primary provider or carrying a
+# plaintext key (OAuth plan logins only, docs/agent.md) instead of a device-code login.
+assert h.settings.model.provider == "anthropic";
+assert lib.isString h.settings.model.default && h.settings.model.default != "";
+assert !(h.settings.model ? api_key) && !(h.settings.model ? key_env);
+assert h.settings.fallback_providers != [ ];
+assert lib.all (f: f.provider != h.settings.model.provider) h.settings.fallback_providers;
+assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_providers;
 assert !(h.settings ? auxiliary);
 assert !(secrets ? irisOpenrouter) && !(lib.hasInfix "OPENROUTER" render);
 # Discord: Thijs only, every message, cron output to the home channel

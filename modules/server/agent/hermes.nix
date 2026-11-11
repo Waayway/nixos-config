@@ -77,14 +77,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       addToSystemPackages = true;
 
       settings = {
-        # The ChatGPT plan (Codex OAuth, logged in by hand: docs/agent.md); the first
-        # model upstream lists for "ChatGPT or Codex Subscription". The only provider
-        # for now: no fallback, side tasks (summaries, vision) on this model too. Free
-        # OpenRouter as fallback is designed but skipped (docs/agent.md).
+        # Main: Thijs's Claude plan (Anthropic OAuth, logged in by hand: docs/agent.md).
+        # Falls back to the ChatGPT plan (Codex OAuth) if Anthropic is unavailable. Both
+        # are OAuth logins against a plan allowance, never a pay-per-token API key.
         model = {
-          provider = "openai-codex";
-          default = "gpt-6-sol";
+          provider = "anthropic";
+          default = "claude-sonnet-5-5";
         };
+        fallback_providers = [
+          {
+            provider = "openai-codex";
+            model = "gpt-6-sol";
+          }
+        ];
         # Behind the router (Traefik, Kanidm gate): the only peer whose forwarded
         # headers count, and the name the dashboard accepts as Host.
         dashboard = {
