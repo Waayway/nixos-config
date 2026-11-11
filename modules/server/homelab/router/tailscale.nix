@@ -46,17 +46,6 @@ lib.optionalAttrs hostPlatform.isLinux {
       ) published;
     };
 
-    # `serve set-config` fails while the node is logged out: retry until it's in.
-    systemd.services.tailscale-serve = lib.mkIf config.services.tailscale.serve.enable {
-      after = [
-        "tailscaled.service"
-        "tailscaled-autoconnect.service"
-      ];
-      serviceConfig = {
-        Restart = "on-failure";
-        RestartSec = "10s";
-      };
-      unitConfig.StartLimitIntervalSec = 0;
-    };
+    # tailscale-serve ordering: modules/server/networking/tailscale-serve.nix.
   };
 }
