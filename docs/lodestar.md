@@ -274,3 +274,7 @@ Read-only SSH (2026-11-11): grant `tag:iris` → every server tag except `tag:ir
 tcp:22 and SSH rule to the same tags as user `iris` (accept; no root, no host users),
 with `sshTests` denying `root`, host users, and laptops and iris itself. A new server tag
 goes into both lists.
+
+hestia additions (2026-11-11): Service `hestia-whoami` in the Services grant and
+auto-approved for `tag:hestia` (hestia advertises its own Services, not the router).
+Every new hestia route needs both entries.
