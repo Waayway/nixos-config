@@ -6,9 +6,9 @@
   ...
 }:
 let
-  # 1.104.5 (Serve and SSH stalls on lossy networks) ahead of nixpkgs (NixOS/nixpkgs#582547,
-  # same vendorHash). Only while the pinned unstable is older; drop once it has 1.104.5.
-  pinned = "1.104.5";
+  # 1.104.6 (magicsock EADDRNOTAVAIL retries, wireguard-go duplicate handshake fix) ahead
+  # of nixpkgs. Only while the pinned unstable is older; drop once it has 1.104.6.
+  pinned = "1.104.6";
   tailscale =
     if lib.versionOlder upkgs.tailscale.version pinned then
       upkgs.tailscale.overrideAttrs {
@@ -17,8 +17,10 @@ let
           owner = "tailscale";
           repo = "tailscale";
           tag = "v${pinned}";
-          hash = "sha256-aq4pBe75wNRFDEa3kSDa/pBLsZws5mOUOjHDUycpmXM=";
+          hash = "sha256-oF3izFlknJRuEYp3rw1urN4XKZPvjtda6lsIw9arRvs=";
         };
+        # go.mod bumped wireguard-go in 1.104.6.
+        vendorHash = "sha256-IJ0m56UP0RyMBE5eQeQ082EMJZfvrgE37lfPHE2ujCA=";
       }
     else
       upkgs.tailscale;
