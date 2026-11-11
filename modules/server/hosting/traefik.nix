@@ -1,8 +1,8 @@
 # The app-hosting node's front door (docs/plans/2026-11-10-lodestar-hosting-platform-design.md).
 # A sibling of homelab/router, not a generalisation of it: its own Traefik, tailnet only for
 # now. Each route is published as a Tailscale Service (`svc:<servicePrefix><name>`) that
-# Tailscale terminates TLS for and forwards to Traefik's loopback entrypoint, which routes by
-# Host header. Traefik also watches /var/lib/traefik/dynamic, so a branch deployment can add
+# Tailscale terminates TLS for and reverse-proxies to Traefik's loopback entrypoint (TLS with
+# Traefik's default self-signed cert, hence https+insecure), which routes by Host header. Traefik also watches /var/lib/traefik/dynamic, so a branch deployment can add
 # or drop a route by writing or deleting a file there, without a rebuild. NixOS only.
 {
   config,
@@ -14,7 +14,7 @@
 let
   cfg = config.hosting.traefik;
   dynamicDir = "${config.services.traefik.dataDir}/dynamic";
-  entryPoint = "127.0.0.1:8080";
+  entryPoint = "127.0.0.1:8443";
   format = pkgs.formats.toml { };
 
   host = name: "${cfg.servicePrefix}${name}.${cfg.tailnetDomain}";
@@ -74,8 +74,13 @@ lib.optionalAttrs hostPlatform.isLinux {
           sendAnonymousUsage = false;
         };
         log.level = "INFO";
-        # Loopback only: reached through the Tailscale Services (tcp:443 -> here).
-        entryPoints.tailnet.address = entryPoint;
+        # Loopback only: reached through the Tailscale Services (tcp:443 -> here). TLS on
+        # every router of this entrypoint (also the agent-written ones), with Traefik's
+        # default self-signed certificate: only Tailscale's proxy sees it.
+        entryPoints.tailnet = {
+          address = entryPoint;
+          http.tls = { };
+        };
         providers.file = {
           directory = dynamicDir;
           watch = true;
@@ -94,11 +99,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       services = lib.mapAttrs' (
         name: _:
         lib.nameValuePair "${cfg.servicePrefix}${name}" {
-          # tls-terminated-tcp: Tailscale terminates TLS with the node's certificate and
-          # hands Traefik plain HTTP. Not http:// (plain HTTP on :443, no TLS) or
-          # https:// (Tailscale would also speak TLS to Traefik); the target's scheme
-          # sets both sides (ipn/conffile/serveconf.go, cmd/tailscale/cli/serve_v2.go).
-          endpoints."tcp:443" = "tls-terminated-tcp://${entryPoint}";
+          # The target's scheme sets both sides (cmd/tailscale/cli/serve_v2.go): http://
+          # serves plain HTTP on :443; https+insecure:// terminates TLS with the Service's
+          # certificate and proxies to Traefik's self-signed TLS. tls-terminated-tcp:// would
+          # hand Traefik plain TCP, but 1.104.6's set-config rejects it for a host:port
+          # ("supported schemes: [tcp unix]"), and Traefik can't listen on a unix socket.
+          endpoints."tcp:443" = "https+insecure://${entryPoint}";
         }
       ) cfg.routes;
     };
