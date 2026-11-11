@@ -94,8 +94,11 @@ lib.optionalAttrs hostPlatform.isLinux {
       services = lib.mapAttrs' (
         name: _:
         lib.nameValuePair "${cfg.servicePrefix}${name}" {
-          # http:// makes Tailscale terminate TLS with the node's own certificate.
-          endpoints."tcp:443" = "http://${entryPoint}";
+          # tls-terminated-tcp: Tailscale terminates TLS with the node's certificate and
+          # hands Traefik plain HTTP. Not http:// (plain HTTP on :443, no TLS) or
+          # https:// (Tailscale would also speak TLS to Traefik); the target's scheme
+          # sets both sides (ipn/conffile/serveconf.go, cmd/tailscale/cli/serve_v2.go).
+          endpoints."tcp:443" = "tls-terminated-tcp://${entryPoint}";
         }
       ) cfg.routes;
     };
