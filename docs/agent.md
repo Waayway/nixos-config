@@ -118,9 +118,18 @@ router). Kanidm first (group `agent-users`), then Hermes's own login: `thijs` an
 ## Homelab access
 
 Read-only, through the Grafana MCP server: Prometheus metrics, Loki logs and alerts, as
-Grafana service account `iris` with role Viewer. iris holds no SSH keys or write
-credentials for other hosts. Write access (applying changes, Lodestar actions) is a
-separate design for later.
+Grafana service account `iris` with role Viewer.
+
+Read-only SSH (2026-11-11): every NixOS server has a user `iris`
+(`modules/server/users/iris.nix`) outside `wheel` and in `systemd-journal`: it can read
+logs, unit status, `/etc` and the Nix store, not secrets or service state, and has no
+sudo. iris logs in with Tailscale SSH (`ssh iris@<host>`; no keys) by the policy rule
+`tag:iris` → the server tags (`tag:router`, `tag:prod`, `tag:identity`, `tag:monitor`,
+`tag:cache`, `tag:manager`, `tag:hestia`) as `iris` only, plus a `tcp:22` grant to the
+same tags. Not `tag:nixos`: iris carries it too, and on iris `iris` is the wheel host
+user. Laptops and iris itself are not reachable. A new server tag must be added to both
+rules. Changes go through this repo, never through this
+login. Write access (applying changes, Lodestar actions) is a separate design for later.
 
 ## Backups and restore
 
