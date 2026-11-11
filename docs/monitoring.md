@@ -112,6 +112,6 @@ took the check down after ~6.5 minutes and back up 2 minutes after it was cleare
 
 It applies through Lodestar like the other servers (4 GB is enough to evaluate the
 flake). Starting over: clone template 9000 to VM 140 (2 vCPU, 4 GB, 16 GB root on
-`local-lvm`, `cpu: host`, `onboot`), add a 64 GB `store-lvm` disk and format it
+`store-lvm`, `cpu: host`, `onboot`), add a 64 GB `store-lvm` disk and format it
 `mkfs.ext4 -L monitor-data`, place the opnix token (`/etc/opnix-token`), switch to
 `#monitor`, reboot, clone `stable` into `~monitor/.flake`. History starts empty.

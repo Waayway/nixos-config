@@ -25,7 +25,10 @@ Homelab: Proxmox host `pve` (`ssh pve`, root, on the tailnet; LAN
 10.0.10.0/24, gateway 10.0.10.1). Other VMs there still run Rocky/Debian and are
 being migrated to NixOS (see `docs/plans/2026-10-12-fleet-manager-design.md`).
 VM sizes (vCPU, RAM) and `onboot` are set on `pve` (`qm config <id>`), not in this
-repo. Tailscale policy edits go through the API with the 1Password Homelab item
+repo. **VM disks go on `store-lvm`** (1 TiB iSCSI LUN from TrueNAS;
+`qm clone 9000 <id> --full --storage store-lvm`). `local-lvm` (338 GB NVMe thin
+pool) is only for VMs that must run while TrueNAS is down: truenas (130), router
+(110), vpn (118). store-lvm isn't backed up and stalls while TrueNAS restarts. Tailscale policy edits go through the API with the 1Password Homelab item
 `tailscale-policy-authkey` (`docs/lodestar.md`). `docs/homelab.md` has the inventory.
 Not managed by this repo: the Hetzner `primary-server`, the old work laptop
 (`14m2max`), the Jenkins VM.

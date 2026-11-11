@@ -73,6 +73,12 @@ Open items:
   - `sda` 500 GB = iSCSI LUN from TrueNAS (`iqn.2005-10.org.freenas.ctl:proxmox-vms`)
     → VG `nfs-vg` → storage `store-lvm` (thick LVM, `saferemove 0`). The LUN was
     grown to **1 TiB** on 2026-10-20 (it was 97% full at 500 GB).
+- **Where VM disks go** (decided 2026-11-11): `store-lvm` by default; it has the room
+  (352 GB free on 2026-11-11, local-lvm 42 GB). `local-lvm` only for truenas (130),
+  which can't sit on its own LUN, and router (110) and vpn (118), so the front door
+  and VPN stay up while TrueNAS reboots. Cost: store-lvm VMs stall while TrueNAS
+  restarts and start only after it (truenas starts first), and the zvol isn't backed
+  up, so keep state on NFS datasets or rebuildable.
 - PCI passthrough: AMD chipset SATA (02:00.1) and Marvell 88SE9215 SATA (04:00.0)
   → TrueNAS; Intel Arc A380 (mapping `ArcA380`) → prod. `/etc/modprobe.d/vfio-arc.conf`
   binds the Arc to vfio; it worked at the reboot after it was added, confirm on the
@@ -87,22 +93,22 @@ Open items:
 
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
-| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm) | Nextcloud, Jellyfin, Immich, WhenTo (containers) |
-| 101 | iris | running, onboot | NixOS (this repo) | 4 / 6 GB | 40 GB (local-lvm) | Hermes Agent, Discord bot; dashboard `agent.vanwaaij.com` (`docs/agent.md`) |
+| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm → store-lvm) | Nextcloud, Jellyfin, Immich, WhenTo (containers) |
+| 101 | iris | running, onboot | NixOS (this repo) | 4 / 6 GB | 128 GB (store-lvm); old 40 GB disk on local-lvm is `unused0`, delete | Hermes Agent, Discord bot; dashboard `agent.vanwaaij.com` (`docs/agent.md`) |
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
 | 110 | router | running, onboot | NixOS (this repo) | 2 / 2 GB | 16 GB (local-lvm) | front door: Traefik, split DNS, Tailscale Services |
 | 111 | identity | running, onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | Kanidm (`id.vanwaaij.com`), sign-in for apps |
 | 118 | vpn (was 110) | running, onboot | Rocky 10.1 | 1 / 1 GB | 16 GB (local-lvm) | WireGuard (wg-easy) |
 | 120 | media | **shut down**, onboot 0 | Rocky 10.1 | 4 / 8 GB | 128 GB (store-lvm) | old Jellyfin/Immich (`hostpci` removed) |
-| 140 | monitor | running, onboot | NixOS (this repo) | 2 / 4 GB | 16 GB (local-lvm) + 64 GB data (store-lvm) | Grafana, Prometheus, Loki, alerts (`docs/monitoring.md`) |
+| 140 | monitor | running, onboot | NixOS (this repo) | 2 / 4 GB | 16 GB (local-lvm → store-lvm) + 64 GB data (store-lvm) | Grafana, Prometheus, Loki, alerts (`docs/monitoring.md`) |
 | 130 | truenas | running, onboot, starts first | TrueNAS 26.0.0-**BETA.2** | 4 / 16 GB + 2 SATA HBAs | 32 GB (local-lvm) | NFS + iSCSI storage |
 | 170 | nixos-manager | running, onboot (set 2026-10-20) | NixOS (this repo) | 8 / 8 GB | 64 GB (store-lvm) | Lodestar server, Linux builder |
-| 171 | cache | planned | NixOS (this repo) | see design | 16 GB (local-lvm) | Lodestar builder + build cache on a TrueNAS share (`docs/plans/2026-10-29-build-cache-design.md`) |
-| 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm; move to store-lvm aborted, see below) | Minecraft + BlueMap |
+| 171 | cache | running, onboot | NixOS (this repo) | 8 / 8 GB | 64 GB (local-lvm → store-lvm, move started 2026-11-11) | Lodestar builder + build cache on a TrueNAS share (`docs/plans/2026-10-29-build-cache-design.md`) |
+| 200 | minecraft | stopped | Rocky 10.1 | 4 / 12 GB | 128 GB (local-lvm → store-lvm, see below) | Minecraft + BlueMap |
 | 201 | archipelago | running, onboot (set 2026-10-20) | Rocky 10.1, no guest agent | 2 / 8 GB | 64 GB (store-lvm) | Archipelago multiworld (`ap.vanwaaij.com`) |
 | 230 | router-test | running, not onboot | NixOS (this repo) | 1 / 2 GB | 16 GB (store-lvm) | router's test twin, test Service `test-whoami-test` |
-| 9000 | nixos-26.05-template | template | NixOS | 2 / 2 GB | 4.3 GB (store-lvm) | base image |
+| 9000 | nixos-26.05-template | template | NixOS | 2 / 2 GB | 4.3 GB (local-lvm) | base image; clone with `--full --storage store-lvm` |
 
 The Garage LXC (140) that older notes mention no longer exists; `/store/garage`
 on TrueNAS is empty.
@@ -118,7 +124,7 @@ VM 101 no longer exists.
 - NixOS from this repo (`hosts/servers/prod.nix`), q35 machine with the Arc A380
   passed through (`hostpci`, mapping `ArcA380`), `10.0.10.100`, tailnet
   `100.121.0.124` (tags `tag:nixos`, `tag:prod`), Lodestar agent. 4 vCPU, 16 GB, 64 GB
-  on `local-lvm` (the move to store-lvm is not done yet). Backends only; the router is
+  on `local-lvm`, to move to store-lvm (decided 2026-11-11). Backends only; the router is
   the only way in from outside. On q35 the NIC is `enp6s18`, not `ens18`: set
   `homelab.lan.interface` per host (the default is `ens18`).
 - Containers via `virtualisation.oci-containers` (modules `modules/server/services/{nextcloud,
@@ -410,7 +416,7 @@ done, fixed (with date).
 |---|---|---|---|---|
 | 1 | **No backups at all**, on-site or off-site. A failed pool, a bad TrueNAS beta update or ransomware loses Nextcloud and photos. | Nightly encrypted restic backups of every ZFS dataset + DB dumps to the Storage Box; Storage Box snapshots; repo passwords in 1Password; local ZFS snapshots for fast restores; Backrest for browsing. | 0, 2–4 | Fixed 2026-10-13 (see "Backups today") |
 | 2 | **Production storage on TrueNAS 26.0.0-BETA.2.** | Export the config, switch the update train to stable, upgrade to 26.0 stable when it ships; no further betas. | 5.11 | Open |
-| 3 | **Circular storage dependency**: VM disks on an iSCSI LUN served by a VM on the same host. | New NixOS VMs go on `local-lvm` (stateless, ~32 GB each); drop the iSCSI storage and zvol once the last Rocky VM is gone. Note: identity (111) and nixos-manager (170) are on store-lvm; prod's move to store-lvm and Minecraft's (partial) move go the other way, so decide one direction. | 5.3, 6, 7.1 | Open |
+| 3 | **Circular storage dependency**: VM disks on an iSCSI LUN served by a VM on the same host. | Decided 2026-11-11: keep the iSCSI storage and put VM disks on `store-lvm` (1 TiB vs. 338 GB local); only truenas, router and vpn stay on `local-lvm` so the front door survives a TrueNAS restart. Moves: cache (171), prod (100), monitor root (140), minecraft (200); delete iris's `unused0`. | 5.3, 6, 7.1 | Decided; moves in progress |
 | 4 | **Disk space**: `local-lvm` at 86% (threshold 80%) and orphaned disks; `store-lvm` was 97% full. | store-lvm LUN grown to 1 TiB (2026-10-20). Inspect and delete the orphaned disks (105-disk-0..3, 120-disk-0, 170-disk-0), VM 101, the partial `nfs-vg/vm-200-disk-0`; move the template to `local-lvm`. | 5.1, 5.2 | Done 2026-10-21 (orphans deleted, local-lvm 47%); template move still open |
 | 5 | **NFS exported to `*`** with `sec=sys`; SMB permissions unchecked. | Exports per client IP, read-only where possible; review SMB users/ACLs. (`store/authentication` is already limited to 10.0.10.111.) | 5.10 | Open |
 | 6 | **Secrets in plain text** (`.env`, `config.yaml`). | Now: `chmod 600`, tighten the Cloudflare token to DNS-edit on `vanwaaij.com` only. Migration: everything into the 1Password Homelab vault, delivered by opnix (replaces sops-nix); rotate each secret as it moves. | 1, 5.6, 6 | Partly done: NixOS hosts use opnix; Rocky VMs open |
@@ -425,7 +431,7 @@ done, fixed (with date).
 | 15 | **Hairpin NAT** worked around with `extra_hosts` in Nextcloud. | Split DNS `vanwaaij.com` to the router. | 7.6 | Fixed 2026-10-19 (split DNS on the router) |
 | 16 | **Apollo**: the Lodestar apply fails with "activate failed (exit 1)" since before this work (also on 42f68c8d). The Mac is offline, so the cause is unknown. | Read the activation log when apollo is online. | - | Open |
 | 17 | **deploy-box (105)** is shut down with `onboot 0`; its disks are orphaned. | Retire it with the other Rocky leftovers (final cleanup). Orphaned disks deleted 2026-10-21. | - | Open |
-| 18 | **Minecraft (200) disk move** to store-lvm aborted during the GPU shutdown; the config is on local-lvm and a partial copy `nfs-vg/vm-200-disk-0` takes space on store-lvm. | Partial copy removed 2026-10-21; retry the move (or leave it on local-lvm, see #3). prod (100) is also still on local-lvm. | - | Open |
+| 18 | **Minecraft (200) disk move** to store-lvm aborted during the GPU shutdown; the config is on local-lvm and a partial copy `nfs-vg/vm-200-disk-0` takes space on store-lvm. | Partial copy removed 2026-10-21; retry the move (store-lvm, see #3). prod (100) is also still on local-lvm. | - | Open |
 | 19 | **Arc A380 passthrough** depends on `/etc/modprobe.d/vfio-arc.conf` on pve (not in this repo). | Confirmed once after a reboot (prod has the GPU); confirm on the next pve reboot. | - | Fixed, re-check on next reboot |
 | 20 | **Subnet route**: pve, not the router, is primary for 10.0.10.0/24 after the reboot (both advertise). | None needed (failover works); decide whether the router should be primary. | - | Open (cosmetic) |
 | 21 | **Tailscale re-login** (new node key) leaves CoreDNS, `tailscale-serve` and `tailscaled-set` stale until a reboot; no restart on address change. | Restart these units when the Tailscale address changes. | - | Open |
