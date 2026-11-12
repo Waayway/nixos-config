@@ -97,6 +97,10 @@ lib.optionalAttrs hostPlatform.isLinux {
           trusted_proxies = [ "10.0.10.110" ];
         };
 
+        # The browser tools: the Chromium Hermes downloads is a generic-Linux binary that
+        # NixOS cannot execute (stub-ld, exit 127), so point it at nixpkgs' ungoogled-chromium.
+        browser.executable_path = lib.getExe pkgs.ungoogled-chromium;
+
         # Iris is a coding/ops agent on Discord, not a general assistant: trim the
         # bundled skill catalog down to the agent and software-development ones
         # (plus web's blocked-page-recovery and the creative claude-design skill
