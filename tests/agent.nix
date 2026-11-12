@@ -37,6 +37,14 @@ assert !(h.settings.model ? api_key) && !(h.settings.model ? key_env);
 assert h.settings.fallback_providers != [ ];
 assert lib.all (f: f.provider != h.settings.model.provider) h.settings.fallback_providers;
 assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_providers;
+# voice replies in Discord (/voice on, /voice tts): zero-cost local STT + Edge TTS,
+# no paid voice key needed.
+assert h.settings.stt.provider == "local";
+assert h.settings.tts.provider == "edge";
+assert
+  !(h.environment ? ELEVENLABS_API_KEY)
+  && !(h.environment ? GROQ_API_KEY)
+  && !(h.environment ? VOICE_TOOLS_OPENAI_KEY);
 assert !(h.settings ? auxiliary);
 assert !(secrets ? irisOpenrouter) && !(lib.hasInfix "OPENROUTER" render);
 # Discord: Thijs only, every message, cron output to the home channel

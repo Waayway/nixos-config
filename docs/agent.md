@@ -47,6 +47,25 @@ There is no Anthropic or OpenAI API key on purpose: both providers above are OAu
 logins against a plan allowance (Claude Max "extra usage" credits for Anthropic, the
 ChatGPT plan for Codex), never a pay-per-token key.
 
+## Voice
+
+Spoken replies in Discord (not a live voice-channel bot, just TTS on normal text
+messages): `settings.stt`/`settings.tts` in `hermes.nix` pick local Whisper STT
+(`stt.provider = "local"`) and free Edge TTS (`tts.provider = "edge"`) — both
+dependency groups (`voice`, `edge-tts`) already ship in the default `hermes-agent`
+package, so no `extraDependencyGroups` was needed to turn this on.
+
+Turn it on per conversation from Discord itself (not a `hermes.nix` setting):
+- `/voice on` — speak only when you replied with a voice message
+- `/voice tts` — speak every reply
+- `/voice off` — text only (default)
+
+Send a voice message in Discord (DM or the home channel, since
+`DISCORD_REQUIRE_MENTION=false`) to talk to iris by voice from a phone — no separate
+app needed, Discord already has push notifications and voice messages. A live
+Discord voice-channel bot (`/voice join`) is a separate, heavier mode (needs
+`Connect`/`Speak` permissions and privileged intents) and is not set up here.
+
 ## Claude coding workers (ACP, no tmux)
 
 Iris installs `acpx` 0.22.0 (pinned npm tarball and runtime dependency lock in
