@@ -70,6 +70,15 @@
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Orakel Theater (modules/server/hosting/orakel.nix), imported by hestia only.
+    # >>> SWITCH BEFORE MERGE: the branch is not on GitHub yet and the repo is private.
+    # Until the owner pushes it (and grants the build hosts read access), evaluate with
+    #   --override-input orakel "git+file:///var/lib/hermes/workspace/repos/orakel-nix2?submodules=1"
+    # then set `ref` to the branch that was merged and run `nix flake lock --update-input orakel`.
+    # No `inputs.nixpkgs.follows` (cut-over runbook F5): hestia then builds the same store
+    # paths the orakel flake's own checks built and tested.
+    orakel.url = "git+ssh://git@github.com/vanWaaijProductions/orakel-theater?ref=pr/orakel-arcanum-migration&submodules=1";
   };
 
   # Machines live in systems.nix, our own programs (packages) in programs.nix.
