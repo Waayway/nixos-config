@@ -6,11 +6,13 @@
   ...
 }:
 # Encrypted restic backups to the Hetzner Storage Box, driven from this host
-# (nixos-manager). Design: docs/plans/2026-10-12-homelab-backup-design.md.
+# (nixos-manager; hestia for orakel). Design: docs/plans/2026-10-12-homelab-backup-design.md.
+# The TrueNAS part is per repository (`truenas`): a host without TrueNAS (hestia) only has
+# local repositories and needs neither `truenas.enable` nor TrueNAS reachability.
 #
 # Per repository, `restic-<name>.service`:
 #   1. pings Healthchecks /start;
-#   2. backs up local paths and SQLite copies of this host (host "nixos-manager");
+#   2. backs up local paths and SQLite copies of this host (restic host = its hostname);
 #   3. copies a static, pinned restic to TrueNAS if needed and runs it there over
 #      SSH against the newest `backup-*` ZFS snapshot of each dataset (host
 #      "truenas"; modules/server/backup/restic-truenas.sh). The repo password goes over
@@ -24,6 +26,7 @@ let
   inherit (lib) mkOption types;
   secretPaths = config.services.onepassword-secrets.secretPaths;
   tn = config.truenas;
+  inherit (config.networking) hostName;
 
   # Runs on TrueNAS: the dynamically linked nixpkgs restic doesn't.
   resticStatic = "${pkgs.pkgsStatic.restic}/bin/.restic-wrapped";
@@ -70,7 +73,9 @@ let
         pkgs.sqlite
         pkgs.curl
         pkgs.coreutils
-      ];
+      ]
+      # setpriv
+      ++ lib.optional repo.local.sqliteAsOwner pkgs.util-linux;
       runtimeEnv = repoEnv name;
       text = ''
         r() { restic -o sftp.command=${lib.escapeShellArg sftpCommand} "$@"; }
@@ -91,16 +96,33 @@ let
         r unlock
 
         ${lib.optionalString (repo.local.sqlite != { } || repo.local.paths != [ ]) ''
-          echo "== local (nixos-manager)"
+          echo "== local (${hostName})"
           state=/var/lib/restic-${name}
           rm -rf "$state/sqlite"
           mkdir -p "$state/sqlite"
           ${lib.concatStrings (
-            lib.mapAttrsToList (db: path: ''
-              sqlite3 ${lib.escapeShellArg path} ".backup '$state/sqlite/${db}.db'"
-            '') repo.local.sqlite
+            lib.mapAttrsToList (
+              db: path:
+              if repo.local.sqliteAsOwner then
+                ''
+                  # As the file's owner: a WAL database whose app is stopped would otherwise
+                  # get root-owned -wal/-shm files that the app then cannot open.
+                  owner=$(stat -c %U ${lib.escapeShellArg path})
+                  group=$(stat -c %G ${lib.escapeShellArg path})
+                  tmp=$(mktemp -d "$state/sqlite/.${db}.XXXXXX")
+                  chown "$owner:$group" "$tmp"
+                  setpriv --reuid="$owner" --regid="$group" --clear-groups \
+                    sqlite3 ${lib.escapeShellArg path} ".backup '$tmp/${db}.db'"
+                  mv "$tmp/${db}.db" "$state/sqlite/${db}.db"
+                  rmdir "$tmp"
+                ''
+              else
+                ''
+                  sqlite3 ${lib.escapeShellArg path} ".backup '$state/sqlite/${db}.db'"
+                ''
+            ) repo.local.sqlite
           )}
-          r backup --host nixos-manager --tag nix --tag ${name} --compression auto \
+          r backup --host ${hostName} --tag nix --tag ${name} --compression auto \
             "$state/sqlite" ${lib.escapeShellArgs repo.local.paths}
         ''}
 
@@ -199,6 +221,14 @@ let
             type = types.attrsOf types.str;
             default = { };
             description = "SQLite databases on this host, by name; copied with `.backup`.";
+          };
+          sqliteAsOwner = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              Run each `.backup` as the database file's owner and group (setpriv) instead of
+              root, so a stopped app's WAL database never gets root-owned -wal/-shm files.
+            '';
           };
         };
         snapshotPrefix = mkOption {

@@ -83,6 +83,17 @@ lib.optionalAttrs hostPlatform.isLinux {
       default = true;
       description = "Run the staging instance (runbook Q4: staging stays on this host).";
     };
+
+    backup.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = cfg.production.enable;
+      defaultText = lib.literalExpression "config.hosting.orakel.production.enable";
+      description = ''
+        Hourly restic backups of production's database (sqlite `.backup`) and uploads to the
+        Storage Box, repository `orakel` (docs/orakel-restore.md). Staging (the anonymised
+        copy plus test data) is not backed up.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable (
@@ -137,6 +148,48 @@ lib.optionalAttrs hostPlatform.isLinux {
           })
         ];
       }
+
+      (lib.mkIf cfg.backup.enable {
+        # modules/server/backup/restic.nix, local repository only: no TrueNAS on this host.
+        backup.restic = {
+          enable = true;
+          # The homelab's Storage Box sub-account (modules/server/backup/homelab.nix) and its
+          # key item `storagebox-backup`. Owner question: a sub-account of its own, so this
+          # public-facing host cannot touch the homelab's repositories.
+          storageBox = {
+            user = "u592252-sub2";
+            host = "u592252-sub2.your-storagebox.de";
+            hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIICf9svRenC/PLKIL9nk6K/pxQgoiFC41wTNvoIncOxs";
+          };
+          # Its own Healthchecks check `homelab-orakel-backup` (modules/server/monitoring/alerts.nix);
+          # the item holds the check's ping URL, https://hc-ping.com/<ping key>/homelab-orakel-backup.
+          healthchecksReference = "op://Homelab/healthchecks-orakel-backup/url";
+          repos.orakel = {
+            # Password item `restic-orakel` (field `password`), the module's default.
+            local = {
+              sqlite.orakel = "${config.services.orakel.dataDir or "/var/lib/orakel"}/orakel.db";
+              paths = [ "${config.services.orakel.dataDir or "/var/lib/orakel"}/uploads" ];
+              # As user orakel: a root-owned -wal/-shm would stop the backend from opening
+              # its database after a stop (runbook P8).
+              sqliteAsOwner = true;
+            };
+            # Runbook Q5: RPO one hour.
+            timerConfig.OnCalendar = "hourly";
+            pruneOpts = [
+              "--keep-hourly"
+              "48"
+              "--keep-daily"
+              "14"
+              "--keep-weekly"
+              "8"
+              "--keep-monthly"
+              "12"
+            ];
+            # 1% of the (small) repository per hourly run.
+            checkOpts = [ "--read-data-subset=1%" ];
+          };
+        };
+      })
 
       (lib.optionalAttrs haveModule {
         services.orakel = {

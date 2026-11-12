@@ -5,11 +5,19 @@
   ...
 }:
 # The homelab's restic repositories (modules/server/backup/restic.nix), on the host
-# that sets `backup.restic.enable` (nixos-manager). Everything on the ZFS pools
+# that sets `backup.restic.homelab.enable` (nixos-manager; defaults to `truenas.enable`, so
+# a host with only its own repositories, like hestia, gets none of these). Everything on the ZFS pools
 # except the VM disks (store/proxmox-vms); database dumps land in
 # store/internal/db-dumps before the 02:00 snapshot.
 lib.optionalAttrs hostPlatform.isLinux {
-  config = lib.mkIf config.backup.restic.enable {
+  options.backup.restic.homelab.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = config.truenas.enable;
+    defaultText = lib.literalExpression "config.truenas.enable";
+    description = "The homelab's repositories (store, archive: TrueNAS datasets), the Storage Box sub-account and Backrest on this host.";
+  };
+
+  config = lib.mkIf (config.backup.restic.enable && config.backup.restic.homelab.enable) {
     backup.restic = {
       # Hetzner Storage Box, sub-account in 1Password: Homelab/Hetzner Personal storage.
       storageBox = {
