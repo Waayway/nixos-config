@@ -69,3 +69,61 @@ on a switch).
 4. **DNS** for `staging.hetorakeltheater.nl` (runbook F1/G11) and, at the window, for
    `hetorakeltheater.nl` (owner).
 5. **`tag:hestia`** in the Tailscale policy (hosts/servers/hestia.nix).
+
+## Backups and monitoring
+
+- **Backups:** production's database (`sqlite3 .backup`, as user orakel) and `uploads/`,
+  hourly to the Storage Box, repository `orakel`; restore and rehearsal in
+  `docs/orakel-restore.md`. Staging is not backed up. Stop `restic-orakel.timer` during the
+  cut-over window (same page).
+- **Monitoring** (`docs/monitoring.md`): the monitor probes `https://hetorakeltheater.nl/`,
+  `/api/health` and `https://staging.hetorakeltheater.nl/api/health` by their public names;
+  alert `homelab-public-site` when one is down for 5 minutes or its certificate expires
+  within 14 days. `homelab-orakel-backup` goes down when no successful backup arrived for
+  1 h 30 min. hestia itself is monitored like every server (node exporter, journal to Loki)
+  once it has a `homelab.lan.address`; it has none yet, so for now only the public probes
+  and the backup check watch it.
+- **Not automated yet:** an alert on `ADMIN ALERT` lines in the orakel journal. Until then,
+  the runbook's first-48-h watch: `journalctl -u orakel-backend -f -o cat | grep -E 'ADMIN
+  ALERT|payments: webhook:|ERROR|panic'`.
+
+## The ledger-conversion boot (runbook Q1, P9/P10)
+
+`acknowledgeLedgerConversion` is never set in this repo. The one boot that converts the old
+database's migration ledger uses a runtime drop-in, gone at the next reboot and removed by
+hand right after:
+
+```sh
+sudo mkdir -p /run/systemd/system/orakel-backend.service.d
+printf '[Service]\nEnvironment=ACKNOWLEDGE_LEDGER_CONVERSION=1\n' |
+  sudo tee /run/systemd/system/orakel-backend.service.d/50-cutover-ack.conf
+sudo systemctl daemon-reload && sudo systemctl start orakel-backend
+# … check the log lines of runbook P9, then:
+sudo rm /run/systemd/system/orakel-backend.service.d/50-cutover-ack.conf
+sudo systemctl daemon-reload && sudo systemctl restart orakel-backend
+```
+
+For the staging rehearsal (S6/S7) the unit is `orakel-staging-backend`.
+
+## Rolling back
+
+- **One generation (config or package regression):** on hestia,
+  `sudo nixos-rebuild switch --rollback` (or pick the previous generation in GRUB from the
+  Hetzner console). This restores units, Traefik config and the orakel binaries; it does
+  **not** touch `/var/lib/orakel`: a database already migrated by a newer binary stays
+  migrated (restore from backup if the old binary refuses it, `docs/orakel-restore.md`).
+  Then revert the commit in git so the next Lodestar apply does not bring it back.
+- **The cut-over itself:** the runbook's levels (§4: L-pre, L0 fix forward, L1 DNS back to
+  `primary-server`, L2 restore). nixos-config plays no part in L1 beyond leaving hestia
+  running.
+- **Public ingress only:** `hosting.traefik.public.enable = false` closes 80/443 and drops
+  the public routers; the tailnet side keeps working.
+
+## Who does what
+
+| Who | What |
+|---|---|
+| OWNER | Pushes the orakel branch and decides access for the build hosts; points `inputs.orakel` at it and locks it; creates the 1Password items; DNS (staging, then production at the window); `tag:hestia` in the Tailscale policy; merges, promotes (`lodestar promote`), go/no-go calls |
+| OPERATOR | Applies through Lodestar; the runbook's commands on hestia (`orakel-ctl`, the ACK drop-in, `restic-orakel`, restores) |
+| nixos-config | Units, Traefik, certificates, secrets wiring, backups, probes and alerts (this page) |
+| orakel repo | The packages and the `services.orakel` module (`nix/module.nix`), `orakel-ctl` |
