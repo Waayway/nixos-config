@@ -101,6 +101,18 @@ lib.optionalAttrs hostPlatform.isLinux {
         # NixOS cannot execute (stub-ld, exit 127), so point it at nixpkgs' ungoogled-chromium.
         browser.executable_path = lib.getExe pkgs.ungoogled-chromium;
 
+        # Voice replies in Discord (/voice on or /voice tts), zero-cost default: local
+        # Whisper STT, free Edge TTS. Both dependency groups ship in the default package
+        # already (docs/agent.md), so no extraDependencyGroups needed here.
+        stt = {
+          provider = "local";
+          local.model = "base";
+        };
+        tts = {
+          provider = "edge";
+          edge.voice = "en-US-AriaNeural";
+        };
+
         # Iris is a coding/ops agent on Discord, not a general assistant: trim the
         # bundled skill catalog down to the agent and software-development ones
         # (plus web's blocked-page-recovery and the creative claude-design skill
