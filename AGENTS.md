@@ -222,6 +222,11 @@ lodestar` here.
   generation is active. VMs need `cpu: host` (the SDK's WebAssembly core is
   20× slower without SSE4.1). Create items with the CLI:
   `op --account KVKXJLIAFVBK5GYLWVS37CJCTE item create --vault Homelab …`.
+- **Private GitHub repos on servers:** `modules/server/secrets/github.nix` hands every server the
+  fine-grained read-only token from the 1Password item `github-readonly` (field `credential`) through
+  an `/etc/gitconfig` credential helper and an `ssh://git@github.com/` to https rewrite, so a flake
+  input like `git+ssh://git@github.com/<org>/<private-repo>` evaluates on servers. Apply it to every
+  server before promoting a commit that adds a private input. Renew the token yearly.
 - **nix-darwin activation order:** system settings → Homebrew →
   post-activation → home-manager. If Homebrew fails, home-manager never runs.
   ThermalForge compiles from source and needs the full Xcode app. Writing
