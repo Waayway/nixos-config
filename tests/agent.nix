@@ -63,6 +63,16 @@ assert
     );
   in
   seedLines != [ ] && lib.last seedLines != "";
+# Discord voice channels need libopus on the service's dynamic linker path
+# (discord.py dlopens "libopus.so.0" directly; NixOS doesn't populate ldconfig
+# the way Debian does) or playback is silently disabled — joins and listens
+# fine, plays back nothing. Checked by substring, not exact string equality,
+# since makeLibraryPath may include more than one store path.
+assert
+  let
+    ldPath = iris.systemd.services.hermes-agent.environment.LD_LIBRARY_PATH or "";
+  in
+  ldPath != "" && lib.hasInfix "libopus" ldPath;
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)
