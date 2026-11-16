@@ -63,16 +63,22 @@ assert
     );
   in
   seedLines != [ ] && lib.last seedLines != "";
-# Discord voice channels need libopus on the service's dynamic linker path
-# (discord.py dlopens "libopus.so.0" directly; NixOS doesn't populate ldconfig
-# the way Debian does) or playback is silently disabled — joins and listens
-# fine, plays back nothing. Checked by substring, not exact string equality,
-# since makeLibraryPath may include more than one store path.
+# Discord voice channels: Hermes's own opus probe (plugins.platforms.discord.
+# adapter_opus) only tries ctypes.util.find_library("opus") on Linux, which
+# needs ldconfig/gcc and a populated /etc/ld.so.cache — neither exists on
+# this host, so it always fails and playback stays silently disabled, even
+# though the bot joins and listens fine. Fixed by preloading opus ourselves
+# via a sitecustomize.py on PYTHONPATH, checked here by real content, not a
+# literal echo: it must actually call discord.opus.load_opus with a libopus
+# store path, not just mention "libopus" somewhere.
 assert
   let
-    ldPath = iris.systemd.services.hermes-agent.environment.LD_LIBRARY_PATH or "";
+    pythonPath = iris.systemd.services.hermes-agent.environment.PYTHONPATH or "";
+    sitecustomize = if pythonPath == "" then "" else builtins.readFile "${pythonPath}/sitecustomize.py";
   in
-  ldPath != "" && lib.hasInfix "libopus" ldPath;
+  pythonPath != ""
+  && lib.hasInfix "discord.opus.load_opus" sitecustomize
+  && lib.hasInfix "libopus" sitecustomize;
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)
