@@ -226,14 +226,46 @@ lib.optionalAttrs hostPlatform.isLinux {
       };
     };
 
-    # Discord voice channels (/voice join): the Python discord.py voice stack
-    # dlopens "libopus.so.0" directly, bypassing ldconfig — which NixOS doesn't
-    # populate the way Debian/Ubuntu does anyway. Without this, iris joins the
-    # channel fine (and even listens — STT still works) but plays back nothing:
-    # "Opus codec not found — voice channel playback disabled" in the logs,
-    # which is why Thijs heard silence after /voice join.
-    systemd.services.hermes-agent.environment.LD_LIBRARY_PATH = lib.makeLibraryPath [
-      pkgs.libopus
-    ];
+    # Discord voice channels (/voice join): the bot joined and listened fine
+    # (STT still worked) but played nothing back — "Opus codec not found —
+    # voice channel playback disabled" in the logs every service start.
+    #
+    # Root cause (read the actual source, not just the warning text —
+    # modules/server/agent/plugins doesn't apply here, this is in the sealed
+    # hermes-agent-env venv itself, plugins.platforms.discord.adapter_opus):
+    # on Linux it only ever tries `ctypes.util.find_library("opus")`, which
+    # shells out to `ldconfig`/`gcc`/`ld` to search. iris has no
+    # /etc/ld.so.cache at all (NixOS doesn't maintain one the way
+    # Debian/Ubuntu does) and the service's sandboxed PATH doesn't even
+    # include those tools — so the probe always returns None and the
+    # fallback dlopen is never attempted. A first attempt at fixing this
+    # (LD_LIBRARY_PATH alone) did nothing, because that env var is never
+    # consulted by this lookup path; only a real dlopen call would see it.
+    #
+    # Fix: preload libopus ourselves before Hermes's own probe runs, via a
+    # `sitecustomize.py` injected through PYTHONPATH (Python auto-imports it
+    # from any directory on sys.path at startup) — calls
+    # discord.opus.load_opus(...) directly, so when adapter_opus.py's
+    # load_opus_codec() checks `discord.opus.is_loaded()` first thing, it's
+    # already True and the broken probe is never reached. Doesn't touch the
+    # sealed venv itself, just adds a sibling directory to its import path.
+    systemd.services.hermes-agent.environment.PYTHONPATH = toString (
+      pkgs.writeTextDir "sitecustomize.py" ''
+        """Preload libopus for Discord voice playback.
+
+        Hermes's own probe (plugins.platforms.discord.adapter_opus) only tries
+        ctypes.util.find_library("opus"), which needs ldconfig/gcc and a
+        populated /etc/ld.so.cache — neither exists on this NixOS host. Preload
+        it directly here instead, before that probe ever runs.
+        """
+        try:
+            import discord.opus
+
+            if not discord.opus.is_loaded():
+                discord.opus.load_opus("${pkgs.libopus}/lib/libopus.so.0")
+        except Exception:
+            pass
+      ''
+    );
   };
 }
