@@ -242,27 +242,67 @@ lib.optionalAttrs hostPlatform.isLinux {
     # (LD_LIBRARY_PATH alone) did nothing, because that env var is never
     # consulted by this lookup path; only a real dlopen call would see it.
     #
-    # Fix: preload libopus ourselves before Hermes's own probe runs, via a
-    # `sitecustomize.py` injected through PYTHONPATH (Python auto-imports it
-    # from any directory on sys.path at startup) — calls
-    # discord.opus.load_opus(...) directly, so when adapter_opus.py's
-    # load_opus_codec() checks `discord.opus.is_loaded()` first thing, it's
-    # already True and the broken probe is never reached. Doesn't touch the
-    # sealed venv itself, just adds a sibling directory to its import path.
+    # A second, much bigger bug found afterwards, still visible in the "it
+    # works but nothing happens" symptom (bot joined, heard real audio —
+    # "frames ok=313" — but no transcript, no reply at all): every log had
+    # `Plugin 'gemini-stt' skipped: requires hermes >=0.22.2, running 0.0.0`
+    # — gemini-stt, our ONLY stt.provider, never actually loaded, on any
+    # deploy since it was added. `hermes --version`/install-stamp.json's
+    # baseVersion is genuinely "0.0.0": this flake input is an unstamped
+    # checkout with no git tag history, so the Nix build's install-stamp
+    # script couldn't `git describe` and fell back to that placeholder.
+    # `git describe` against upstream directly resolves the pinned commit to
+    # `v0.23.0+canary...-671-g8c1a9c0b` — comfortably past gemini-stt's
+    # ">=0.22.2" gate — so this is a cosmetic Nix-packaging gap, not a real
+    # feature gap; patched below rather than waiting on an upstream fix or
+    # risking a `nix flake update hermes-agent` across the whole fleet.
+    #
+    # Fix (both issues, same mechanism): preload/patch before Hermes's own
+    # code runs, via a `sitecustomize.py` injected through PYTHONPATH
+    # (Python auto-imports it from any directory on sys.path at startup).
+    # Doesn't touch the sealed venv itself, just adds a sibling import path.
+    # - Opus: calls discord.opus.load_opus(...) directly, so when
+    #   adapter_opus.py's load_opus_codec() checks `discord.opus.is_loaded()`
+    #   first thing, it's already True and the broken probe is never reached.
+    # - Plugin gate: replaces plugins_manifest.running_hermes_version (only
+    #   in that module's namespace — hermes --version's own display is
+    #   untouched) with the real git-describe-derived version, but ONLY when
+    #   the stamped version is still the known-bad "0.0.0" placeholder, so
+    #   this self-disables the moment upstream's packaging stamps a real
+    #   version correctly.
     systemd.services.hermes-agent.environment.PYTHONPATH = toString (
       pkgs.writeTextDir "sitecustomize.py" ''
-        """Preload libopus for Discord voice playback.
+        """Preload libopus; fix the plugin requires_hermes version gate.
 
-        Hermes's own probe (plugins.platforms.discord.adapter_opus) only tries
-        ctypes.util.find_library("opus"), which needs ldconfig/gcc and a
+        Hermes's own opus probe (plugins.platforms.discord.adapter_opus) only
+        tries ctypes.util.find_library("opus"), which needs ldconfig/gcc and a
         populated /etc/ld.so.cache — neither exists on this NixOS host. Preload
         it directly here instead, before that probe ever runs.
+
+        Separately: this flake input's install-stamp.json reports
+        baseVersion "0.0.0" (no tag history in the fetched tree, so the Nix
+        build's `git describe` failed) even though the pinned commit
+        (upstream 8c1a9c0b) resolves to v0.23.0+canary...-671 via `git
+        describe` run directly against upstream — comfortably past any
+        requires_hermes gate a plugin declares today. Without this, every
+        requires_hermes-gated plugin (gemini-stt included) is silently
+        skipped on load, which is a much bigger bug than it looks: STT
+        quietly never worked since that plugin was added, with no error
+        surfaced anywhere except a load-time WARNING log line.
         """
         try:
             import discord.opus
 
             if not discord.opus.is_loaded():
                 discord.opus.load_opus("${pkgs.libopus}/lib/libopus.so.0")
+        except Exception:
+            pass
+
+        try:
+            import hermes_cli.plugins_manifest as _pm
+
+            if _pm.running_hermes_version() == "0.0.0":
+                _pm.running_hermes_version = lambda: "0.23.0"
         except Exception:
             pass
       ''

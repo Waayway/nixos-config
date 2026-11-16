@@ -78,7 +78,11 @@ assert
   in
   pythonPath != ""
   && lib.hasInfix "discord.opus.load_opus" sitecustomize
-  && lib.hasInfix "libopus" sitecustomize;
+  && lib.hasInfix "libopus" sitecustomize
+  # The plugin requires_hermes version-gate fix lives in the same file (same
+  # mechanism); check it's actually there too, not just the opus half.
+  && lib.hasInfix "running_hermes_version" sitecustomize
+  && lib.hasInfix "plugins_manifest" sitecustomize;
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)
