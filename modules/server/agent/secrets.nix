@@ -54,6 +54,8 @@ let
       echo HERMES_DASHBOARD_BASIC_AUTH_USERNAME=thijs
       need HERMES_DASHBOARD_BASIC_AUTH_PASSWORD ${secretPaths.irisDashboardPassword}
       need HERMES_DASHBOARD_BASIC_AUTH_SECRET ${secretPaths.irisDashboardSecret}
+      # Gemini STT plugin (hermes.nix settings.stt); the only paid-per-use key on iris.
+      need GEMINI_API_KEY ${secretPaths.irisGemini}
     } > "$tmp"
     chown hermes:hermes "$tmp"
     mv "$tmp" ${envFile}
@@ -79,6 +81,9 @@ lib.optionalAttrs hostPlatform.isLinux {
       irisDashboardPassword = secret "op://Homelab/iris-dashboard/password";
       # HMAC key of the dashboard's sessions (survive restarts).
       irisDashboardSecret = secret "op://Homelab/iris-dashboard/secret";
+      # Gemini API key for the gemini-stt plugin (settings.stt). The only pay-per-use
+      # key on iris on purpose — every other provider is a plan OAuth login.
+      irisGemini = secret "op://Homelab/iris-gemini/credential";
     };
 
     systemd.services = lib.genAttrs units (_: {

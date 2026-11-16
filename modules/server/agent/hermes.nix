@@ -101,6 +101,24 @@ lib.optionalAttrs hostPlatform.isLinux {
         # NixOS cannot execute (stub-ld, exit 127), so point it at nixpkgs' ungoogled-chromium.
         browser.executable_path = lib.getExe pkgs.ungoogled-chromium;
 
+        # Voice replies in Discord (/voice on or /voice tts): STT via the community
+        # ajk0x00/hermes-gemini-stt plugin (Gemini Flash, ~EUR2/mo at Thijs's usage —
+        # accepted over free local Whisper for quality; pinned commit, no extra Python
+        # deps per its README). TTS stays free Edge TTS (ships in the default package).
+        # GEMINI_API_KEY comes from opnix (secrets.nix), not config.yaml.
+        stt = {
+          provider = "gemini";
+          gemini = {
+            model = "gemini-3.8-flash";
+            language = "en";
+          };
+        };
+        tts = {
+          provider = "edge";
+          edge.voice = "en-US-AriaNeural";
+        };
+        plugins.enabled = [ "gemini-stt" ];
+
         # Iris is a coding/ops agent on Discord, not a general assistant: trim the
         # bundled skill catalog down to the agent and software-development ones
         # (plus web's blocked-page-recovery and the creative claude-design skill
@@ -160,6 +178,19 @@ lib.optionalAttrs hostPlatform.isLinux {
         acpx
         claude-agent-acp
         acpxClaude
+      ];
+
+      # Gemini STT (settings.stt above): a directory plugin, pinned to a reviewed commit.
+      # No extraPythonPackages needed — its README declares httpx only, already a Hermes
+      # core dependency. Declarative install per docs/getting-started/nix-setup.
+      extraPlugins = [
+        (pkgs.fetchFromGitHub {
+          name = "hermes-gemini-stt";
+          owner = "ajk0x00";
+          repo = "hermes-gemini-stt";
+          rev = "e279880389dcdedd5106bd97e390bc8eeb2a88ca";
+          hash = "sha256-Dz/BVmKlnwT1rSuRHQdPCZecZpXw0TGGCSw4LMd4hyU=";
+        })
       ];
 
       # Read-only homelab: metrics, logs and alerts through Grafana.
