@@ -57,12 +57,29 @@ STT (transcribing voice messages) is the community `ajk0x00/hermes-gemini-stt` p
 (`settings.stt.provider = "gemini"`, model `gemini-3.8-flash`), installed declaratively
 via `services.hermes-agent.extraPlugins` (pinned to a reviewed commit, no
 `extraPythonPackages` needed — its only dependency, `httpx`, already ships with
-Hermes) and turned on via `settings.plugins.enabled = [ "gemini-stt" ]`. This is the
+Hermes) and turned on via `settings.plugins.enabled`. This is the
 one pay-per-use key on iris on purpose: free local Whisper was tried first
 (`stt.provider = "local"`) but the quality at the free tiers (`base`, even `large-v3`)
 wasn't good enough; Gemini Flash's cost at Thijs's usage (~EUR2/month) was accepted
 instead. `GEMINI_API_KEY` comes from opnix (`secrets.nix`, 1Password item
 `iris-gemini`), never a plaintext value in `hermes.nix`.
+
+Transcription quality for project-specific names/terms (e.g. "Orakel" was heard as
+"Oracle") is improved with a vocabulary/context hint forwarded to every voice
+message. Hermes has a core, *static* `settings.stt.prompt` config key for this, but
+a plain config value means every edit needs a Nix change and a redeploy — so instead
+this uses our own `local-stt-vocab` plugin
+(`modules/server/agent/plugins/local-stt-vocab`), via Hermes's `pre_transcription`
+hook:
+- Its bundled `default-vocabulary.md` is the Nix-committed **starting default** only.
+- On first use it copies that into a **local, writable file outside the Nix store**
+  (`plugin_data_dir("local-stt-vocab")/voice-vocabulary.md` — i.e.
+  `$HERMES_HOME/plugin-data/local-stt-vocab/voice-vocabulary.md`) and never touches
+  that copy again, so edits survive every future rebuild.
+- Any agent session on iris edits that live file directly (`write_file`/`patch`, no
+  PR, no rebuild) to add or remove a term; it takes effect on the very next
+  transcription. Both files share the same format: the last non-blank line is read
+  verbatim as the prompt.
 
 Turn spoken replies on per conversation from Discord itself (not a `hermes.nix`
 setting):

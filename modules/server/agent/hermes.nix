@@ -106,6 +106,14 @@ lib.optionalAttrs hostPlatform.isLinux {
         # accepted over free local Whisper for quality; pinned commit, no extra Python
         # deps per its README). TTS stays free Edge TTS (ships in the default package).
         # GEMINI_API_KEY comes from opnix (secrets.nix), not config.yaml.
+        #
+        # Project-name mis-transcription ("Orakel" -> "Oracle") is fixed with a
+        # vocabulary hint, via our own local-stt-vocab plugin (modules/server/agent/
+        # plugins/local-stt-vocab, see docs/agent.md): it seeds a LOCAL file outside
+        # the Nix store from its bundled default-vocabulary.md on first use, then on
+        # every transcription returns that live file's content as settings.stt.prompt's
+        # dynamic counterpart (the pre_transcription hook). Agents edit the live file
+        # directly — no PR, no rebuild — Nix only ever supplies the starting default.
         stt = {
           provider = "gemini";
           gemini = {
@@ -117,7 +125,10 @@ lib.optionalAttrs hostPlatform.isLinux {
           provider = "edge";
           edge.voice = "en-US-AriaNeural";
         };
-        plugins.enabled = [ "gemini-stt" ];
+        plugins.enabled = [
+          "gemini-stt"
+          "local-stt-vocab"
+        ];
 
         # Iris is a coding/ops agent on Discord, not a general assistant: trim the
         # bundled skill catalog down to the agent and software-development ones
@@ -183,6 +194,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       # Gemini STT (settings.stt above): a directory plugin, pinned to a reviewed commit.
       # No extraPythonPackages needed — its README declares httpx only, already a Hermes
       # core dependency. Declarative install per docs/getting-started/nix-setup.
+      #
+      # local-stt-vocab is ours (modules/server/agent/plugins/local-stt-vocab): a local
+      # Nix path, not fetchFromGitHub, since the code lives in this repo. It bundles its
+      # own starting default (default-vocabulary.md) and copies that out to a writable
+      # file (plugin_data_dir) the first time it runs — Nix never overwrites that live
+      # copy again, so an agent's edits survive every future rebuild.
       extraPlugins = [
         (pkgs.fetchFromGitHub {
           name = "hermes-gemini-stt";
@@ -191,6 +208,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           rev = "e279880389dcdedd5106bd97e390bc8eeb2a88ca";
           hash = "sha256-Dz/BVmKlnwT1rSuRHQdPCZecZpXw0TGGCSw4LMd4hyU=";
         })
+        ./plugins/local-stt-vocab
       ];
 
       # Read-only homelab: metrics, logs and alerts through Grafana.
