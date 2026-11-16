@@ -225,5 +225,15 @@ lib.optionalAttrs hostPlatform.isLinux {
         inherit port;
       };
     };
+
+    # Discord voice channels (/voice join): the Python discord.py voice stack
+    # dlopens "libopus.so.0" directly, bypassing ldconfig — which NixOS doesn't
+    # populate the way Debian/Ubuntu does anyway. Without this, iris joins the
+    # channel fine (and even listens — STT still works) but plays back nothing:
+    # "Opus codec not found — voice channel playback disabled" in the logs,
+    # which is why Thijs heard silence after /voice join.
+    systemd.services.hermes-agent.environment.LD_LIBRARY_PATH = lib.makeLibraryPath [
+      pkgs.libopus
+    ];
   };
 }
