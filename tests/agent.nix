@@ -43,9 +43,26 @@ assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_provide
 # a plaintext Nix value.
 assert h.settings.stt.provider == "gemini";
 assert h.settings.tts.provider == "edge";
-assert h.settings.plugins.enabled != [ ] && lib.elem "gemini-stt" h.settings.plugins.enabled;
+assert
+  h.settings.plugins.enabled != [ ]
+  && lib.elem "gemini-stt" h.settings.plugins.enabled
+  && lib.elem "local-stt-vocab" h.settings.plugins.enabled;
 assert h.extraPlugins != [ ] && lib.any (p: lib.hasInfix "gemini" (lib.getName p)) h.extraPlugins;
 assert !(h.settings.stt.gemini ? api_key) && !(h.settings.stt.gemini ? key_env);
+# No static settings.stt.prompt here: the vocabulary hint is dynamic now, supplied
+# per-request by local-stt-vocab's pre_transcription hook from a local file outside
+# the Nix store (so an agent can edit it without a PR/rebuild). What the Nix build
+# CAN check is its own bundled default seed: real content exists, with the expected
+# last-line format the plugin's own parser depends on.
+assert
+  let
+    seedLines = builtins.filter (l: l != "") (
+      lib.splitString "\n" (
+        builtins.readFile ../modules/server/agent/plugins/local-stt-vocab/default-vocabulary.md
+      )
+    );
+  in
+  seedLines != [ ] && lib.last seedLines != "";
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)

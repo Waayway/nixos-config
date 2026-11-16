@@ -1,0 +1,12 @@
+name: local-stt-vocab
+version: 1.0.0
+description: >-
+  Local, agent-editable vocabulary/context hint for STT transcription
+  (settings.stt.prompt's dynamic counterpart via the pre_transcription hook).
+provides_hooks:
+  - pre_transcription
+license: MIT
+homepage: https://github.com/Waayway/nixos-config/tree/stable/modules/server/agent/plugins/local-stt-vocab
+tags:
+  - stt
+  - voice
