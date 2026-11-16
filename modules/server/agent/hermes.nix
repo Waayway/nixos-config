@@ -195,11 +195,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       # No extraPythonPackages needed — its README declares httpx only, already a Hermes
       # core dependency. Declarative install per docs/getting-started/nix-setup.
       #
-      # local-stt-vocab is ours (modules/server/agent/plugins/local-stt-vocab): a local
-      # Nix path, not fetchFromGitHub, since the code lives in this repo. It bundles its
-      # own starting default (default-vocabulary.md) and copies that out to a writable
-      # file (plugin_data_dir) the first time it runs — Nix never overwrites that live
-      # copy again, so an agent's edits survive every future rebuild.
+      # local-stt-vocab is ours (modules/server/agent/plugins/local-stt-vocab): wrapped
+      # in a trivial derivation (extraPlugins needs real `package`s — a bare path fails
+      # system.build.toplevel's type check, caught the hard way on the builder) since the
+      # code lives in this repo, not a separate GitHub one. It bundles its own starting
+      # default (default-vocabulary.md) and copies that out to a writable file
+      # (plugin_data_dir) the first time it runs — Nix never overwrites that live copy
+      # again, so an agent's edits survive every future rebuild.
       extraPlugins = [
         (pkgs.fetchFromGitHub {
           name = "hermes-gemini-stt";
@@ -208,7 +210,9 @@ lib.optionalAttrs hostPlatform.isLinux {
           rev = "e279880389dcdedd5106bd97e390bc8eeb2a88ca";
           hash = "sha256-Dz/BVmKlnwT1rSuRHQdPCZecZpXw0TGGCSw4LMd4hyU=";
         })
-        ./plugins/local-stt-vocab
+        (pkgs.runCommandLocal "local-stt-vocab" { } ''
+          cp -r ${./plugins/local-stt-vocab} $out
+        '')
       ];
 
       # Read-only homelab: metrics, logs and alerts through Grafana.
