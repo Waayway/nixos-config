@@ -37,14 +37,20 @@ assert !(h.settings.model ? api_key) && !(h.settings.model ? key_env);
 assert h.settings.fallback_providers != [ ];
 assert lib.all (f: f.provider != h.settings.model.provider) h.settings.fallback_providers;
 assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_providers;
-# voice replies in Discord (/voice on, /voice tts): zero-cost local STT + Edge TTS,
-# no paid voice key needed.
-assert h.settings.stt.provider == "local";
+# voice replies in Discord (/voice on, /voice tts): STT is the community gemini-stt
+# plugin (Gemini Flash, pay-per-use — the one deliberate exception, see secrets.nix);
+# TTS stays free Edge TTS. The plugin is declared and enabled, and the key is never
+# a plaintext Nix value.
+assert h.settings.stt.provider == "gemini";
 assert h.settings.tts.provider == "edge";
+assert h.settings.plugins.enabled != [ ] && lib.elem "gemini-stt" h.settings.plugins.enabled;
+assert h.extraPlugins != [ ] && lib.any (p: lib.hasInfix "gemini" (lib.getName p)) h.extraPlugins;
+assert !(h.settings.stt.gemini ? api_key) && !(h.settings.stt.gemini ? key_env);
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)
-  && !(h.environment ? VOICE_TOOLS_OPENAI_KEY);
+  && !(h.environment ? VOICE_TOOLS_OPENAI_KEY)
+  && !(h.environment ? GEMINI_API_KEY);
 assert !(h.settings ? auxiliary);
 assert !(secrets ? irisOpenrouter) && !(lib.hasInfix "OPENROUTER" render);
 # Discord: Thijs only, every message, cron output to the home channel
@@ -77,12 +83,14 @@ assert lib.all (n: secrets.${n}.owner == "hermes" && secrets.${n}.mode == "0400"
   "irisGrafana"
   "irisDashboardPassword"
   "irisDashboardSecret"
+  "irisGemini"
 ];
 assert secrets.irisDiscord.reference == "op://Homelab/Iris Discord Bot Token/credential";
 assert lib.all (n: secrets ? ${n}) [
   "irisGrafana"
   "irisDashboardPassword"
   "irisDashboardSecret"
+  "irisGemini"
 ];
 # tools and the read-only homelab view
 assert lib.all (n: lib.any (p: lib.getName p == n) h.extraPackages) [
@@ -148,6 +156,7 @@ assert lib.all (n: lib.hasInfix "need ${n} " render) [
   "DISCORD_BOT_TOKEN"
   "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"
   "HERMES_DASHBOARD_BASIC_AUTH_SECRET"
+  "GEMINI_API_KEY"
 ];
 assert lib.hasInfix "[ -s " render && lib.hasInfix "A-Za-z0-9" render;
 # tar's "file changed as we read it" (exit 1) doesn't fail the night

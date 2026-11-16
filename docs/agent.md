@@ -50,12 +50,22 @@ ChatGPT plan for Codex), never a pay-per-token key.
 ## Voice
 
 Spoken replies in Discord (not a live voice-channel bot, just TTS on normal text
-messages): `settings.stt`/`settings.tts` in `hermes.nix` pick local Whisper STT
-(`stt.provider = "local"`) and free Edge TTS (`tts.provider = "edge"`) — both
-dependency groups (`voice`, `edge-tts`) already ship in the default `hermes-agent`
-package, so no `extraDependencyGroups` was needed to turn this on.
+messages): `settings.tts` picks free Edge TTS (`tts.provider = "edge"`, ships in the
+default package, no extra dependency group needed).
 
-Turn it on per conversation from Discord itself (not a `hermes.nix` setting):
+STT (transcribing voice messages) is the community `ajk0x00/hermes-gemini-stt` plugin
+(`settings.stt.provider = "gemini"`, model `gemini-3.8-flash`), installed declaratively
+via `services.hermes-agent.extraPlugins` (pinned to a reviewed commit, no
+`extraPythonPackages` needed — its only dependency, `httpx`, already ships with
+Hermes) and turned on via `settings.plugins.enabled = [ "gemini-stt" ]`. This is the
+one pay-per-use key on iris on purpose: free local Whisper was tried first
+(`stt.provider = "local"`) but the quality at the free tiers (`base`, even `large-v3`)
+wasn't good enough; Gemini Flash's cost at Thijs's usage (~EUR2/month) was accepted
+instead. `GEMINI_API_KEY` comes from opnix (`secrets.nix`, 1Password item
+`iris-gemini`), never a plaintext value in `hermes.nix`.
+
+Turn spoken replies on per conversation from Discord itself (not a `hermes.nix`
+setting):
 - `/voice on` — speak only when you replied with a voice message
 - `/voice tts` — speak every reply
 - `/voice off` — text only (default)
