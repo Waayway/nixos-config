@@ -71,12 +71,14 @@
         options = [
           "subvol=@root"
           "noatime"
+          "compress=zstd:1"
         ];
       };
 
       fileSystems."/swap" = {
         device = "/dev/disk/by-uuid/8fcbec72-7472-47c8-9a05-ee8a2c8699f0";
         fsType = "btrfs";
+        # No compression here: btrfs cannot compress a swapfile.
         options = [ "subvol=@swap" ];
       };
 
@@ -86,6 +88,7 @@
         options = [
           "subvol=@home"
           "noatime"
+          "compress=zstd:1"
         ];
       };
 
@@ -95,6 +98,7 @@
         options = [
           "subvol=@nix"
           "noatime"
+          "compress=zstd:1"
         ];
       };
 
@@ -109,6 +113,9 @@
 
       swapDevices = [ ];
 
+      # Compression (compress=zstd:1) is only on the boot drive above, on purpose: add it to
+      # another drive's options by hand if it should have it too.
+      #
       # More drives: add each one here, by UUID (`lsblk -f`), with `nofail` so a missing or
       # slow drive never stops the boot, e.g. a games drive:
       #
