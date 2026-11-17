@@ -63,7 +63,7 @@ Builds on `2026-10-27-hyprland-lua-quickshell-design.md`.
    - The file survives Quickshell restarts and is there before Quickshell
      starts, so there is no startup race.
    Users of the primary: the Quickshell bar and notification popups,
-   workspaces 1-5 (below), the cursor/focus at session start.
+   the gaming workspace (below), the cursor/focus at session start.
 4. **The bar never restarts.** Quickshell has one `PanelWindow` with
    `screen: primaryScreen`, where `primaryScreen` is the entry of
    `Quickshell.screens` whose `name` matches the file (read with
@@ -71,7 +71,11 @@ Builds on `2026-10-27-hyprland-lua-quickshell-design.md`.
    while the file is missing or names a screen Quickshell doesn't have yet.
    A change of primary just moves the window. Nothing in the monitor path
    restarts the shell.
-5. **Workspaces follow monitors by rule**, not by script: workspaces 1-5 go
+5. **Superseded 2026-11-18: no workspace is pinned to a monitor any more.** Every workspace
+   can be on every monitor; the only rule left is that the gaming workspace opens on the
+   primary, and Super+Shift+Tab swaps what the two monitors show
+   (`hl.dsp.workspace.swap_monitors`). What follows is the original design.
+   **Workspaces follow monitors by rule**, not by script: workspaces 1-5 go
    to the primary, 6-10 + the named workspaces to the highest-priority other
    output when there is one (on hephaestus: the lg). The rules are re-issued by
    `refresh()` when the primary changes; Hyprland moves workspaces off a

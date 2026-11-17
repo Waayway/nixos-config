@@ -1,8 +1,9 @@
 -- Known monitors, matched by description (stable across ports and docks; see
 -- `hyprctl monitors all`). Plain data: monitor_policy.lua applies it.
 --
--- `priority` picks the primary monitor (bar, notifications, workspaces 1-5):
--- the enabled monitor with the highest one wins. Unknown monitors get
+-- `priority` picks the primary monitor (bar, notifications, and where the gaming
+-- workspace opens; no other workspace is tied to a monitor): the enabled monitor with
+-- the highest one wins, and Super+Shift+Tab swaps it with the next one. Unknown monitors get
 -- `unknown_priority`. `internal = true` marks a laptop panel, which the policy
 -- switches off while an external monitor is connected.
 --

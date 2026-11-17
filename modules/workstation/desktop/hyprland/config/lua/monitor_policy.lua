@@ -1,6 +1,6 @@
--- Monitor policy: laptop panel on/off, the primary monitor, and which monitor
--- workspaces live on. Runs inside Hyprland on monitor/lid events; nothing
--- reloads the config or restarts the bar.
+-- Monitor policy: laptop panel on/off, the primary monitor, and where the gaming
+-- workspace opens. Runs inside Hyprland on monitor/lid events; nothing reloads the
+-- config or restarts the bar.
 --
 -- Rules:
 --   * The laptop panel is on while the lid is open, next to any externals;
@@ -13,8 +13,11 @@
 --     ties by left-most, then widest. Written to
 --     $XDG_RUNTIME_DIR/hypr/primary-monitor (connector name, e.g. DP-7) and
 --     sent as a `custom>>primary>>DP-7` socket2 event; Quickshell reads it.
---   * Workspaces 1-5 and the gaming workspace on the primary; 6-10 and the other
---     named ones on the best other monitor, or on the primary when there's only one.
+--   * No workspace belongs to a monitor: every workspace can be shown on every
+--     monitor, and a workspace opens on the monitor you are on. The one default is
+--     the gaming workspace, which opens on the primary (large) monitor, where
+--     gamescope should be. It is only a default: Super+Shift+Tab (binds.lua) swaps
+--     what the two monitors show, and a workspace you move stays where you put it.
 
 local M = {}
 
@@ -22,16 +25,13 @@ local MONITOR_KEYS = {
     "mode", "position", "scale", "bitdepth", "cm", "sdr_min_luminance", "sdr_max_luminance",
     "sdrbrightness", "sdrsaturation", "transform", "vrr", "mirror",
 }
-local NAMED_WORKSPACES = { "󰝚", "󰭹", "󰊴" }
--- The gaming workspace is on the primary (largest, highest priority) monitor, where gamescope
--- opens, not on the secondary one like the other named workspaces.
-local GAMING_WORKSPACE = NAMED_WORKSPACES[3]
+-- The gaming workspace (rules.lua, Super+G). Its glyph is the same as in rules.lua.
+local GAMING_WORKSPACE = "󰊴"
 
 local config
 local state = {
     panel_on = nil,
     primary = nil,
-    secondary = nil,
     -- output selector -> monitor spec, for every laptop panel we know of
     internal = {},
     pending = false,
@@ -112,40 +112,10 @@ local function ranked(monitors)
     return monitors
 end
 
-local function place_workspaces(primary, secondary)
-    local function target(ws)
-        if ws.special then
-            return nil
-        end
-        local n = tonumber(ws.name)
-        if n and n >= 1 and n <= 5 then
-            return primary
-        end
-        if ws.name == GAMING_WORKSPACE then
-            return primary
-        end
-        return secondary or primary
-    end
-
-    -- Rules for workspaces that don't exist yet.
-    for i = 1, 10 do
-        hl.workspace_rule({ workspace = tostring(i), monitor = i <= 5 and primary or (secondary or primary) })
-    end
-    for _, name in ipairs(NAMED_WORKSPACES) do
-        hl.workspace_rule({
-            workspace = "name:" .. name,
-            monitor = name == GAMING_WORKSPACE and primary or (secondary or primary),
-        })
-    end
-
-    -- Move the ones that do.
-    for _, ws in ipairs(hl.get_workspaces()) do
-        local to = target(ws)
-        if to and ws.monitor and ws.monitor.name ~= to then
-            local sel = tonumber(ws.name) and ws.id or ("name:" .. ws.name)
-            hl.dispatch(hl.dsp.workspace.move({ workspace = sel, monitor = to }))
-        end
-    end
+-- Where the gaming workspace opens when it does not exist yet: the primary monitor.
+-- Nothing is moved: a workspace that is already open stays on the monitor it is on.
+local function place_workspaces(primary)
+    hl.workspace_rule({ workspace = "name:" .. GAMING_WORKSPACE, monitor = primary })
 end
 
 -- With no real output left (undocking with the panel off), Hyprland adds a
@@ -200,15 +170,28 @@ function M.refresh()
     end
     ranked(candidates)
     local primary = candidates[1].name
-    local secondary = candidates[2] and candidates[2].name or nil
 
     if primary ~= state.primary then
+        state.primary = primary
         publish(primary)
+        place_workspaces(primary)
     end
-    if primary ~= state.primary or secondary ~= state.secondary then
-        state.primary, state.secondary = primary, secondary
-        place_workspaces(primary, secondary)
+end
+
+-- The two monitors Super+Shift+Tab swaps: the primary and the next one in the same
+-- ranking, among the monitors that are on right now. nil when there is only one.
+function M.swap_pair()
+    local enabled = {}
+    for _, m in ipairs(hl.get_monitors()) do
+        if is_real(m) then
+            enabled[#enabled + 1] = m
+        end
     end
+    if #enabled < 2 then
+        return nil
+    end
+    ranked(enabled)
+    return enabled[1].name, enabled[2].name
 end
 
 -- The panel should be on: if no internal output is enabled by now, reload.

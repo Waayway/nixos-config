@@ -1,5 +1,5 @@
 -- Every keybind. https://wiki.hypr.land/configuring/core/binds/
-return function(vars)
+return function(vars, policy)
     local function mod(keys)
         return vars.mod .. " + " .. keys
     end
@@ -52,6 +52,16 @@ return function(vars)
             end
         end)
     end
+
+    -- Swap what the two monitors show (the primary and the next one): the workspace on
+    -- one goes to the other and the other way round. Nothing is pinned to a monitor, so
+    -- both keep working either way.
+    hl.bind(mod("SHIFT + Tab"), function()
+        local a, b = policy.swap_pair()
+        if a then
+            hl.dispatch(hl.dsp.workspace.swap_monitors({ monitor1 = a, monitor2 = b }))
+        end
+    end)
 
     -- Named workspaces (rules.lua)
     hl.bind(mod("S"), hl.dsp.focus({ workspace = "name:󰝚" }))

@@ -50,12 +50,22 @@ a game without gamescope. Heroic: Settings, Advanced, Wrapper command `scb` with
 argument `--`; ScopeBuddy recognises Heroic's launch command (not tried here yet).
 
 **Which monitor.** The nested gamescope is a window on Hyprland, so Hyprland decides where
-it opens. The gaming workspace is pinned to the primary monitor (the highest `priority` in
+it opens. The gaming workspace opens on the primary monitor (the highest `priority` in
 `monitors.lua`, the Acer 4K 144 Hz on hephaestus; falls back to the next monitor when it
 is off), and the rules in `rules.lua` send `gamescope` there. A Proton game started
 without `scb` (class `steam_app_*`) goes to the same workspace. Only running games go
 there: Steam itself, Heroic and the browser are on whatever workspace you put them on
 (Super+1, Super+2, ...), and Super+G switches to the gaming one.
+
+**Workspaces and monitors.** No workspace belongs to a monitor: every workspace can be
+shown on every monitor, and one opens on the monitor you are on. The only default is the
+gaming workspace, which opens on the primary monitor, and a gaming workspace you have
+already moved stays where you put it. **Super+Shift+Tab** swaps what the primary and the
+next monitor show (Hyprland's `swap_monitors`), so both keep working either way round; with
+a single monitor it does nothing. The pair is the primary plus the next one in the same
+`priority` ranking, so with the TV connected as well it swaps the Acer and the TV, not the
+LG (change the priorities in `monitors.lua` if that is the wrong way round).
+`Super+Alt+<n>` still moves the current workspace to the nth monitor from the left.
 
 **The one `-O`.** On Hyprland ScopeBuddy has no idea which monitor is the primary one, and
 the auto variables abort the launch ("Primary display not supported", checked against the
