@@ -38,7 +38,9 @@ Gamescope is not started by hand. ScopeBuddy (`scb`) wraps a game's command, sta
 gamescope around it with the defaults in `~/.config/scopebuddy/scb.conf` (written from
 `scopebuddy_home.nix`), and fixes the Steam overlay and Steam Input inside nested
 gamescope. The defaults: fullscreen, `--mangoapp` (MangoHud's overlay, which Companion
-can drive), and the resolution of the primary monitor.
+can drive), and ScopeBuddy's three auto variables, `SCB_AUTO_RES`, `SCB_AUTO_HDR` and
+`SCB_AUTO_VRR`: it reads the monitor's current resolution, HDR and VRR state and adds
+`-W/-H`, `--hdr-enabled` and `--adaptive-sync` to match.
 
 **Steam launch option, per game:** `scb -- %command%`. Steam has no global launch option,
 so this is typed once per game (Properties, General, Launch Options). It is the same line
@@ -51,13 +53,30 @@ argument `--`; ScopeBuddy recognises Heroic's launch command (not tried here yet
 it opens. The gaming workspace is pinned to the primary monitor (the highest `priority` in
 `monitors.lua`, the Acer 4K 144 Hz on hephaestus; falls back to the next monitor when it
 is off), and the rules in `rules.lua` send `gamescope` there. A Proton game started
-without `scb` (class `steam_app_*`) goes to the same workspace. `scb.conf` reads the primary
-monitor's name from `$XDG_RUNTIME_DIR/hypr/primary-monitor` (written by
-`monitor_policy.lua`) and sizes gamescope to its current mode with `wlr-randr`.
+without `scb` (class `steam_app_*`) goes to the same workspace. Only running games go
+there: Steam itself, Heroic and the browser are on whatever workspace you put them on
+(Super+1, Super+2, ...), and Super+G switches to the gaming one.
 
-Left out on purpose: `--adaptive-sync` and `--hdr-enabled`. Nested, they do nothing:
-Hyprland does VRR (`vrr = 2`, fullscreen only) and HDR itself. `capSysNice` for gamescope
-is off now: a capability wrapper inside Steam's sandbox is a known way to get a game that
+**The one `-O`.** On Hyprland ScopeBuddy has no idea which monitor is the primary one, and
+the auto variables abort the launch ("Primary display not supported", checked against the
+real script) unless gamescope is given `-O <connector>`. So `scb.conf` passes it, taken
+from `$XDG_RUNTIME_DIR/hypr/primary-monitor` (written by `monitor_policy.lua`), not
+hardcoded, so it follows the large monitor. If that file is missing the auto variables
+are switched off and gamescope starts plain instead of the game failing.
+
+**To tweak at the machine.** Not set up yet, and not tested here:
+
+- HDR: `--hdr-enabled` needs the Gamescope WSI layer for games to see HDR
+  (`ENABLE_GAMESCOPE_WSI=1`, per gamescope's own help text), and the HDR state ScopeBuddy
+  reads on Hyprland is a stub in 1.5.0, so `SCB_AUTO_HDR` may add nothing until you add
+  `--hdr-enabled` yourself. Hyprland's own HDR (the `cm`/`bitdepth` monitor keys in
+  `monitors.lua`) also has to be on for it to show.
+- VRR: `SCB_AUTO_VRR` reads wlr-randr's adaptive_sync flag; with Hyprland's `vrr = 2`
+  (only while fullscreen) that flag may be off when the game starts.
+- Whatever else the CachyOS setup had (Proton Wayland, per-game `AppID/*.conf` files):
+  put the stable ones in `scopebuddy_home.nix`.
+
+`capSysNice` for gamescope is off: a capability wrapper inside Steam's sandbox is a known way to get a game that
 does not start, and scx and ananicy cover the priorities.
 
 ## CachyOS compared
