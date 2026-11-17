@@ -6,6 +6,7 @@
     enable = true;
     settings = {
       user.name = "Thijs van Waaij";
+      user.email = "43408024+Waayway@users.noreply.github.com";
       push.autoSetupRemote = true;
       pull.rebase = false;
     };
