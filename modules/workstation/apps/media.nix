@@ -41,6 +41,10 @@ tools.mkAppCategory args {
     tidal = {
       darwinCasks = [ "tidal" ];
     };
+    # TIDAL on Linux: SONE, an open-source native client (Tauri/Rust, GStreamer): lossless
+    # and Hi-Res, gapless, MPRIS, tray, Discord presence, scrobbling. Started with the
+    # session on hephaestus (workstation.autostart). docs/gaming.md compares the options.
+    sone.linux = [ pkgs.sone ];
     obs = {
       linux = [ pkgs.obs-studio ];
       darwinCasks = [ "obs" ];
