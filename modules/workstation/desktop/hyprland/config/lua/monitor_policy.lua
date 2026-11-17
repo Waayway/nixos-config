@@ -13,8 +13,8 @@
 --     ties by left-most, then widest. Written to
 --     $XDG_RUNTIME_DIR/hypr/primary-monitor (connector name, e.g. DP-7) and
 --     sent as a `custom>>primary>>DP-7` socket2 event; Quickshell reads it.
---   * Workspaces 1-5 on the primary; 6-10 and the named ones on the best other
---     monitor, or on the primary when there's only one.
+--   * Workspaces 1-5 and the gaming workspace on the primary; 6-10 and the other
+--     named ones on the best other monitor, or on the primary when there's only one.
 
 local M = {}
 
@@ -23,6 +23,9 @@ local MONITOR_KEYS = {
     "sdrbrightness", "sdrsaturation", "transform", "vrr", "mirror",
 }
 local NAMED_WORKSPACES = { "󰝚", "󰭹", "󰊴" }
+-- The gaming workspace is on the primary (largest, highest priority) monitor, where gamescope
+-- opens, not on the secondary one like the other named workspaces.
+local GAMING_WORKSPACE = NAMED_WORKSPACES[3]
 
 local config
 local state = {
@@ -118,6 +121,9 @@ local function place_workspaces(primary, secondary)
         if n and n >= 1 and n <= 5 then
             return primary
         end
+        if ws.name == GAMING_WORKSPACE then
+            return primary
+        end
         return secondary or primary
     end
 
@@ -126,7 +132,10 @@ local function place_workspaces(primary, secondary)
         hl.workspace_rule({ workspace = tostring(i), monitor = i <= 5 and primary or (secondary or primary) })
     end
     for _, name in ipairs(NAMED_WORKSPACES) do
-        hl.workspace_rule({ workspace = "name:" .. name, monitor = secondary or primary })
+        hl.workspace_rule({
+            workspace = "name:" .. name,
+            monitor = name == GAMING_WORKSPACE and primary or (secondary or primary),
+        })
     end
 
     -- Move the ones that do.

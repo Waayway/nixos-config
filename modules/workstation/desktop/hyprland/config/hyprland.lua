@@ -20,6 +20,8 @@ load("env")
 load("look")(theme)
 load("input")
 load("rules")
+-- Gaming tweaks must never take the rest of the config down with them.
+pcall(load, "games")
 load("binds")(vars)
 load("monitor_policy").setup(load("monitors"))
 load("autostart")(vars)
