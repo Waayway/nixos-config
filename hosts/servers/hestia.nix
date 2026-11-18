@@ -29,13 +29,30 @@
       # Smoke test for the tailnet path (Service -> Traefik -> backend); drop once a
       # real app is routed.
       routes.whoami.backend = "http://127.0.0.1:8000";
+      # Internet-facing side (80/443, Let's Encrypt HTTP-01) for the sites below.
+      public = {
+        enable = true;
+        # Same contact as the homelab router's resolver. `acme.staging = true` for a rehearsal.
+        acme.email = "thijs@vanwaaij.com";
+      };
     };
+    # Orakel Theater production + staging (docs/orakel-hosting.md).
+    hosting.orakel.enable = true;
   };
 
   config =
-    { lib, modulesPath, ... }:
     {
-      imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
+      lib,
+      modulesPath,
+      inputs,
+      ...
+    }:
+    {
+      imports = [
+        (modulesPath + "/profiles/qemu-guest.nix")
+        # Only here, not for every host: a private input (modules/server/hosting/orakel.nix).
+        inputs.orakel.nixosModules.default
+      ];
 
       services.whoami = {
         enable = true;
