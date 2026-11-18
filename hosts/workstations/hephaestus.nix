@@ -27,10 +27,10 @@
     # docs/gaming.md).
     programs.games.enable = true;
     # Started with the Hyprland session (modules/workstation/desktop/hyprland/autostart.nix):
-    # Steam in the tray, and SONE (TIDAL) on the music workspace.
+    # Steam in the tray, and High Tide (TIDAL) on the music workspace.
     workstation.autostart = [
       "steam -silent"
-      "sone"
+      "high-tide"
     ];
     # TrueNAS at /store and /archive (automounted, boot never waits for it).
     workstation.storage.homelab.enable = true;

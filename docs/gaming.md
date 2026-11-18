@@ -28,7 +28,7 @@ and the measuring section says how to check it.
   It comes from nixpkgs-unstable; the stable nixpkgs does not have it.
 - `modules/workstation/desktop/hyprland/autostart.nix` (`workstation.autostart`): commands
   started with the Hyprland session, per host. hephaestus starts `steam -silent` (Steam in
-  the tray) and `sone` (TIDAL, below).
+  the tray) and `high-tide` (TIDAL, below).
 - `modules/workstation/storage/homelab.nix` (`workstation.storage.homelab.enable`):
   TrueNAS at `/store` and `/archive`, automounted on first access.
 
@@ -181,29 +181,36 @@ Hyprland can stay installed and selectable from tuigreet.
 
 ## TIDAL
 
-SONE, started with the session onto the music workspace (`workstation.autostart`,
-`rules.lua`; `silent`, so logging in does not jump to it). It is the `sone` app in
+High Tide, started with the session onto the music workspace (`workstation.autostart`,
+`rules.lua`; `silent`, so logging in does not jump to it). It is the `high-tide` app in
 `workstation.apps.media`, so every host with `media` enabled gets it, the laptop too.
 
-Picked from what is packaged in nixpkgs (all of them need a TIDAL subscription):
+**Why not a web view.** The first pick here was SONE, described as "native". Only its
+backend is Rust: the interface is a React page in a Tauri webview, so it is a browser and
+lags like one. tidal-hifi is Electron, the same thing. The candidates below are the ones
+packaged in nixpkgs that draw their own interface with a real toolkit (all need a TIDAL
+subscription):
 
-- **SONE** (`pkgs.sone`, Tauri/Rust + GStreamer, GPL-3.0, active): lossless and Hi-Res up
-  to 24-bit/192 kHz, gapless, exclusive-ALSA bit-perfect output (optional; PipeWire
-  otherwise), MPRIS (media keys and Companion), tray, miniplayer, Discord presence,
-  scrobbling. The most complete open client and the only one with a native bit-perfect path.
-- **High Tide** (`pkgs.high-tide`, GTK4/libadwaita, GPL-3.0, very active): the cleanest
-  looking, fewer features. The one to try if SONE's web UI feels foreign.
-- **tidal-hifi** (Electron around the web player, MIT): works, the most widely used, but
-  it is a browser: heavier, resamples to 48 kHz, and slow to start. Its local API is the
-  one reason to still consider it. (This repo had it with the TidaLuna mod before; commit
-  f7478db replaced both with OxiTide.)
-- **OxiTide** is installed through Flatpak on every `media` host as before. It is freeware,
-  not open source, so it was not considered a candidate.
+- **High Tide** (`pkgs.high-tide`, GTK4/libadwaita with Python, GPL-3.0, very active):
+  the most mature of the open ones. Quality selectable, GStreamer playback with an optional
+  ALSA output, MPRIS, background playback, Discord presence. Needs a keyring for the
+  login, which hephaestus has (gnome-keyring).
+- **Tonearm** (`pkgs.tonearm`, GTK4/libadwaita with Go, GPL-3.0, beta since January):
+  a compiled binary, so likely the lightest on start-up and memory. Gapless, MPRIS,
+  background playback, lyrics, plays at the highest quality it is offered (24-bit/48 kHz).
+  Younger, fewer settings. Swap it in if High Tide is still too slow: `pkgs.tonearm` in
+  `media.nix`, the command `tonearm`, the class `dev.dergs.Tonearm` in `rules.lua`.
+- **SONE** (`pkgs.sone`, Tauri webview), **tidal-hifi** (Electron): the web-view ones,
+  left out. (This repo had tidal-hifi with the TidaLuna mod before; commit f7478db
+  replaced both with OxiTide.)
+- **OxiTide** is installed through Flatpak on every `media` host as before: Rust and GTK4,
+  freeware but not open source, so it was not considered a candidate.
 
-Not tested on hardware: whether SONE starts cleanly at login, whether its window class is
-`sone` (the desktop file says so) and the exclusive-ALSA mode next to PipeWire. If SONE
-disappoints, swap `pkgs.sone` for `pkgs.high-tide` in `media.nix` and the class in
-`rules.lua`.
+Not tested on hardware: whether High Tide's window class is its application id
+(`io.github.nokse22.high-tide`; the workspace rule depends on it, check with
+`hyprctl clients`), and the keyring. The session starts through greetd's `initial_session`,
+which logs in without a password, so gnome-keyring may still be locked when High Tide
+starts and ask for its password once.
 
 ## Extra drives
 

@@ -3,8 +3,9 @@
 -- Named workspaces: apps that get their own. The Quickshell bar always shows
 -- these (quickshell/config/modules/Workspaces.qml keeps the same list).
 hl.window_rule({ name = "spotify-workspace", match = { class = "^(spotify)$" }, workspace = "name:󰝚" })
--- SONE (TIDAL) starts with the session on hephaestus: `silent` keeps it from taking focus.
-hl.window_rule({ name = "sone-workspace", match = { class = "^(sone)$" }, workspace = "name:󰝚 silent" })
+-- High Tide (TIDAL) starts with the session on hephaestus: `silent` keeps it from taking
+-- focus. Its class is its application id.
+hl.window_rule({ name = "high-tide-workspace", match = { class = "^(io.github.nokse22.high-tide)$" }, workspace = "name:󰝚 silent" })
 hl.window_rule({ name = "discord-workspace", match = { class = "^(discord)$" }, workspace = "name:󰭹" })
 -- Only a running game goes to the gaming workspace (monitor_policy.lua keeps it on the
 -- primary, large monitor): the nested gamescope window ScopeBuddy opens (`scb -- %command%`
