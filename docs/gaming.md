@@ -60,12 +60,15 @@ there: Steam itself, Heroic and the browser are on whatever workspace you put th
 **Workspaces and monitors.** No workspace belongs to a monitor: every workspace can be
 shown on every monitor, and one opens on the monitor you are on. The only default is the
 gaming workspace, which opens on the primary monitor, and a gaming workspace you have
-already moved stays where you put it. **Super+Shift+Tab** swaps what the primary and the
-next monitor show (Hyprland's `swap_monitors`), so both keep working either way round; with
-a single monitor it does nothing. The pair is the primary plus the next one in the same
-`priority` ranking, so with the TV connected as well it swaps the Acer and the TV, not the
-LG (change the priorities in `monitors.lua` if that is the wrong way round).
-`Super+Alt+<n>` still moves the current workspace to the nth monitor from the left.
+already moved stays where you put it. **Super+Shift+Tab** turns the workspaces the monitors show one step around, left to right
+(Hyprland's `swap_monitors`, called in a row). With two monitors that is a plain swap, so
+both keep working either way round; with three or more it is a rotation, so the one on the
+last monitor wraps to the first and there is no pair to choose. **Super+Ctrl+Shift+Tab**
+turns the other way. With a single monitor it does nothing. Other people solve three
+monitors with one bind per pair (Hyprland discussion #3364), with linked switching that moves
+all monitors together (gist `workspaces.sh`, the hyprspaces plugin), or by changing the
+workspace model (split-monitor-workspaces); rotation is the one that is still a swap on two
+monitors. `Super+Alt+<n>` still moves the current workspace to the nth monitor from the left.
 
 **The one `-O`.** On Hyprland ScopeBuddy has no idea which monitor is the primary one, and
 the auto variables abort the launch ("Primary display not supported", checked against the

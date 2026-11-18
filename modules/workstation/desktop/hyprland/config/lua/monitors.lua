@@ -3,9 +3,9 @@
 --
 -- `priority` picks the primary monitor (bar, notifications, and where the gaming
 -- workspace opens; no other workspace is tied to a monitor): the enabled monitor with
--- the highest one wins, and Super+Shift+Tab swaps it with the next one. Unknown monitors get
--- `unknown_priority`. `internal = true` marks a laptop panel, which the policy
--- switches off while an external monitor is connected.
+-- the highest one wins. Unknown monitors get `unknown_priority`. `internal = true`
+-- marks a laptop panel, which the policy switches off while an external monitor is
+-- connected.
 --
 -- Monique (or any experiment) can go in monitors.local.lua next to this file
 -- (git-ignored); it's applied after these and wins.

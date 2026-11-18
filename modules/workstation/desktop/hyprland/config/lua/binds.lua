@@ -53,14 +53,14 @@ return function(vars, policy)
         end)
     end
 
-    -- Swap what the two monitors show (the primary and the next one): the workspace on
-    -- one goes to the other and the other way round. Nothing is pinned to a monitor, so
-    -- both keep working either way.
+    -- Turn the workspaces the monitors show one step around, left to right: with two
+    -- monitors that is a swap, with three it is a rotation. Nothing is pinned to a monitor,
+    -- so every workspace keeps working wherever it lands. Add Ctrl for the other direction.
     hl.bind(mod("SHIFT + Tab"), function()
-        local a, b = policy.swap_pair()
-        if a then
-            hl.dispatch(hl.dsp.workspace.swap_monitors({ monitor1 = a, monitor2 = b }))
-        end
+        policy.rotate_workspaces(false)
+    end)
+    hl.bind(mod("CTRL + SHIFT + Tab"), function()
+        policy.rotate_workspaces(true)
     end)
 
     -- Named workspaces (rules.lua)

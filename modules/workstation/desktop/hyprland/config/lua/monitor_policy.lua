@@ -16,8 +16,9 @@
 --   * No workspace belongs to a monitor: every workspace can be shown on every
 --     monitor, and a workspace opens on the monitor you are on. The one default is
 --     the gaming workspace, which opens on the primary (large) monitor, where
---     gamescope should be. It is only a default: Super+Shift+Tab (binds.lua) swaps
---     what the two monitors show, and a workspace you move stays where you put it.
+--     gamescope should be. It is only a default: Super+Shift+Tab (binds.lua) turns the
+--     workspaces the monitors show one step around, and a workspace you move stays
+--     where you put it.
 
 local M = {}
 
@@ -178,20 +179,38 @@ function M.refresh()
     end
 end
 
--- The two monitors Super+Shift+Tab swaps: the primary and the next one in the same
--- ranking, among the monitors that are on right now. nil when there is only one.
-function M.swap_pair()
-    local enabled = {}
+-- Super+Shift+Tab: turn the workspaces the monitors show one step around, left to right
+-- (the one on the last monitor wraps to the first); `backward` turns the other way. With
+-- two monitors that is a plain swap, with three or more it is a rotation, so there is no
+-- pair to choose. Built from swap_monitors alone: swapping the first monitor with each of
+-- the others in turn rotates forward, and in reverse order rotates backward. Monitors are
+-- taken as they are when the key is pressed, so hotplug needs nothing here. Returns false
+-- when there is only one monitor.
+function M.rotate_workspaces(backward)
+    local row = {}
     for _, m in ipairs(hl.get_monitors()) do
         if is_real(m) then
-            enabled[#enabled + 1] = m
+            row[#row + 1] = m
         end
     end
-    if #enabled < 2 then
-        return nil
+    if #row < 2 then
+        return false
     end
-    ranked(enabled)
-    return enabled[1].name, enabled[2].name
+    table.sort(row, function(a, b)
+        if a.x ~= b.x then
+            return a.x < b.x
+        end
+        return a.y < b.y
+    end)
+    local first = row[1].name
+    local from, to, step = 2, #row, 1
+    if backward then
+        from, to, step = #row, 2, -1
+    end
+    for i = from, to, step do
+        hl.dispatch(hl.dsp.workspace.swap_monitors({ monitor1 = first, monitor2 = row[i].name }))
+    end
+    return true
 end
 
 -- The panel should be on: if no internal output is enabled by now, reload.

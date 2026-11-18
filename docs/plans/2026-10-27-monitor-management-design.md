@@ -74,7 +74,7 @@ Builds on `2026-10-27-hyprland-lua-quickshell-design.md`.
 5. **Superseded 2026-11-18: no workspace is pinned to a monitor any more.** Every workspace
    can be on every monitor; the only rule left is that the gaming workspace opens on the
    primary, and Super+Shift+Tab swaps what the two monitors show
-   (`hl.dsp.workspace.swap_monitors`). What follows is the original design.
+   (`hl.dsp.workspace.swap_monitors`, rotated when there are three or more). What follows is the original design.
    **Workspaces follow monitors by rule**, not by script: workspaces 1-5 go
    to the primary, 6-10 + the named workspaces to the highest-priority other
    output when there is one (on hephaestus: the lg). The rules are re-issued by
