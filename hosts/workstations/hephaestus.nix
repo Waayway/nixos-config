@@ -116,17 +116,35 @@
       # Compression (compress=zstd:1) is only on the boot drive above, on purpose: add it to
       # another drive's options by hand if it should have it too.
       #
-      # More drives: add each one here, by UUID (`lsblk -f`), with `nofail` so a missing or
-      # slow drive never stops the boot, e.g. a games drive:
-      #
-      # fileSystems."/mnt/games" = {
-      #   device = "/dev/disk/by-uuid/<uuid>";
-      #   fsType = "ext4";                 # or btrfs/xfs/ntfs3
-      #   options = [ "nofail" "noatime" ];
-      # };
-      #
-      # Steam: add /mnt/games as a library folder (Steam, Settings, Storage). Proton needs
-      # a Linux filesystem (ext4, btrfs, xfs), not NTFS, for the compatdata of a game.
+      # The other drives. `nofail` and a short device timeout so a missing drive never holds
+      # up the boot. Each is a whole btrfs filesystem with no subvolumes; after the first
+      # mount, `sudo chown waayway: <mountpoint>` once so your user can write to it.
+      # Steam: add /mnt/games as a library folder (Steam, Settings, Storage); Proton needs a
+      # Linux filesystem (ext4, btrfs, xfs), not NTFS, for the compatdata of a game.
+      fileSystems."/mnt/games" = {
+        # nvme2n1p1, 1.8T NVMe
+        device = "/dev/disk/by-uuid/746eb8f9-52ab-4578-b17d-9dc1de235d14";
+        fsType = "btrfs";
+        options = [
+          "nofail"
+          "noatime"
+          "x-systemd.device-timeout=5s"
+        ];
+      };
+
+      fileSystems."/mnt/data" = {
+        # sda1, 1.1T SATA
+        device = "/dev/disk/by-uuid/9b29a20d-e671-4b37-bdf5-2d488577b179";
+        fsType = "btrfs";
+        options = [
+          "nofail"
+          "noatime"
+          "x-systemd.device-timeout=5s"
+        ];
+      };
+
+      # The Windows disks (sdb, nvme1n1) are not mounted. They share the same filesystem
+      # UUIDs, so by-uuid cannot tell them apart; use /dev/disk/by-id/ if one is ever needed.
     };
 
 }
