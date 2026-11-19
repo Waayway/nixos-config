@@ -26,6 +26,8 @@
     # The gaming PC: Steam, Heroic and the CachyOS-style tuning (modules/workstation/games/,
     # docs/gaming.md).
     programs.games.enable = true;
+    # The Steam Controller's mouse in desktop mode on Hyprland (steam-controller.nix).
+    programs.games.steamController.enable = true;
     # Started with the Hyprland session (modules/workstation/desktop/hyprland/autostart.nix):
     # Steam in the tray, and High Tide (TIDAL) on the music workspace.
     workstation.autostart = [

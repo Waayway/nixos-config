@@ -212,6 +212,53 @@ Not tested on hardware: whether High Tide's window class is its application id
 which logs in without a password, so gnome-keyring may still be locked when High Tide
 starts and ask for its password once.
 
+## Steam on Hyprland
+
+**Windows.** Steam is an XWayland client (class `steam`) and Hyprland tiles every window by
+default, so the Friends List, Settings, chat and update dialogs were tiled next to the main
+window. `hyprland/config/lua/steam.lua` floats everything except the main window (title
+`Steam` or `Steam Big Picture Mode`). Static rules only see the title a window has when it
+opens, hence `initial_class` and `initial_title`; and the widely copied `negative:Steam`
+would keep "Steam Settings" and "Sign in to Steam" tiled (their titles contain "Steam"), so the
+main window is matched by its whole title. Also in there: the "Launching..." splash is
+centred, notification toasts do not take focus, and XWayland ghost windows without class
+or title do not take focus (the last one is from CachyOS's Hyprland defaults).
+Where it came from: Hyprland's wiki for the rule syntax, the r/hyprland thread
+"Floating Steam Properties", CachyOS's `cachyos-hypr-noctalia` rules and caelestia's.
+Not run in Hyprland here: `hyprctl reload`, `hyprctl configerrors`, then `hyprctl clients`
+shows the real titles if one still tiles (add it to the rule).
+
+## Steam Controller
+
+The Steam Controller (2026): in desktop mode on Hyprland Steam cannot create its virtual
+mouse, so the trackpad cursor is invisible or dead as soon as Steam runs, while games still
+work (ValveSoftware/steam-for-linux#13185, open; Hyprland discussion #14426; the NixOS wiki
+page on Steam). `programs.games.steamController.enable` (on for hephaestus,
+`steam-controller.nix`) turns on `programs.steam.extest`, which translates Steam's X11 input
+into uinput events, and adds `hidapi` to Steam's environment, which the wiki asks for with
+this controller. The udev rules and the uinput module are already there through
+`programs.steam`.
+
+Caveats from that issue, not checked here: the trackpads stop while Steam's settings or
+Steam Input menu is open (leave the window and they come back); one report says a
+controller update made Steam crash when the controller turns on, with a hand-built extest
+(nixpkgs has 1.0.2, upstream is at 1.0.4). If Steam misbehaves set
+`programs.games.steamController.enable = false`. If the cursor moves but cannot be seen,
+Hyprland's `cursor.no_hardware_cursors = true` is the other thing people tried (a report
+says it stopped working on the Lua builds). `~/.steam/steam/logs/controller.txt` shows what
+Steam thinks the controller is. If it is the original 2015 controller, tell me: it is a
+different problem.
+
+## MangoHud
+
+`modules/workstation/games/mangohud/MangoHud.conf` (preset order, keybinds, log folder) and
+`presets.conf` (the compact top bar, the full-detail layout, off), linked to
+`~/.config/MangoHud/` by `mangohud_home.nix`. Both `mangohud %command%` and gamescope's
+`--mangoapp` read them. They are live: edit them in `~/.flake`, Shift_L+F4 reloads. Keys:
+Shift_R+F10 cycles the presets, Shift_R+F12 toggles the HUD, Shift_L+F2 logs to
+`~/mangologs`. A file goverlay already wrote there is moved to `*.before-nix` on the first
+switch.
+
 ## Extra drives
 
 Two btrfs drives are mounted in `hosts/workstations/hephaestus.nix`, named as on the old
