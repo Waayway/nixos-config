@@ -121,7 +121,7 @@
       # mount, `sudo chown waayway: <mountpoint>` once so your user can write to it.
       # Steam: add /mnt/games as a library folder (Steam, Settings, Storage); Proton needs a
       # Linux filesystem (ext4, btrfs, xfs), not NTFS, for the compatdata of a game.
-      fileSystems."/mnt/games" = {
+      fileSystems."/mnt/bep" = {
         # nvme2n1p1, 1.8T NVMe
         device = "/dev/disk/by-uuid/746eb8f9-52ab-4578-b17d-9dc1de235d14";
         fsType = "btrfs";
@@ -132,7 +132,7 @@
         ];
       };
 
-      fileSystems."/mnt/data" = {
+      fileSystems."/mnt/games" = {
         # sda1, 1.1T SATA
         device = "/dev/disk/by-uuid/9b29a20d-e671-4b37-bdf5-2d488577b179";
         fsType = "btrfs";
