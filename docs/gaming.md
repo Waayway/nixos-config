@@ -228,6 +228,30 @@ Where it came from: Hyprland's wiki for the rule syntax, the r/hyprland thread
 Not run in Hyprland here: `hyprctl reload`, `hyprctl configerrors`, then `hyprctl clients`
 shows the real titles if one still tiles (add it to the rule).
 
+**Blurry or pixelated.** Steam only runs through XWayland, and Hyprland scales an XWayland
+window by stretching its bitmap, so on a monitor with scale 2 (the Acer; 1.6 on the LG, 2.5 on
+the TV) the client is soft. People fix it with two settings that only work together:
+Hyprland's `xwayland.force_zero_scaling` (XWayland windows are drawn at the real pixels:
+sharp but 1x, so tiny) and `STEAM_FORCE_DESKTOPUI_SCALING` (Steam draws its own interface
+bigger). `programs.games.steamScale = 2;` on hephaestus does both: it sets the variable in
+Steam's environment (checked in the built profile, next to extest's and Proton-GE's) and
+creates `/etc/hypr/xwayland-zero-scaling`, which `lua/xwayland.lua` turns into the Hyprland
+setting, so the laptop is not affected. **Needs a log out and in**, XWayland starts with the
+session.
+
+What it costs: there is one scale for all monitors, so Steam is the right size on the Acer
+(2), 25% too big but sharp on the LG (1.6) and a bit small on the TV (2.5); change the number
+to favour another. Every XWayland-only program is drawn at 1x and is tiny (Wayland-native
+ones are not: Firefox, Discord, High Tide, the bar). Proton games started outside gamescope
+now see the monitor's real resolution instead of the scaled one, which is what they want.
+Possible follow-ups, not done: the cursor over Steam may look small (it cannot see
+NixOS's cursor themes inside its container, and zero scaling makes it 1x; the NixOS wiki
+page on Steam has an `XCURSOR_PATH` fix), and Steam may forget its library folders after
+the first start with the variable (re-add `/mnt/games`; reported by steamtinkerlaunch's
+notes). A native Wayland Steam does not exist: Valve's issue #7224 is open, and patching
+`steamwebhelper` to Wayland, which people try, breaks the store and menus. Settings, Interface
+in Steam also has its own scale slider.
+
 ## Steam Controller
 
 The Steam Controller (2026): in desktop mode on Hyprland Steam cannot create its virtual

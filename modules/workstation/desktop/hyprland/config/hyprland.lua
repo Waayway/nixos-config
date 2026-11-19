@@ -23,6 +23,7 @@ load("rules")
 -- Gaming tweaks must never take the rest of the config down with them.
 pcall(load, "games")
 pcall(load, "steam")
+pcall(load, "xwayland")
 local policy = load("monitor_policy")
 load("binds")(vars, policy)
 policy.setup(load("monitors"))

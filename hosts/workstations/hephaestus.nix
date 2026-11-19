@@ -28,6 +28,9 @@
     programs.games.enable = true;
     # The Steam Controller's mouse in desktop mode on Hyprland (steam-controller.nix).
     programs.games.steamController.enable = true;
+    # Steam without the blur: Hyprland draws XWayland at real pixels and Steam scales itself
+    # to match the primary monitor, the Acer at scale 2 (steam-scaling.nix).
+    programs.games.steamScale = 2;
     # Started with the Hyprland session (modules/workstation/desktop/hyprland/autostart.nix):
     # Steam in the tray, and High Tide (TIDAL) on the music workspace.
     workstation.autostart = [
