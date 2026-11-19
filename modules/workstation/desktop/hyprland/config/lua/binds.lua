@@ -1,5 +1,5 @@
 -- Every keybind. https://wiki.hypr.land/configuring/core/binds/
-return function(vars)
+return function(vars, policy)
     local function mod(keys)
         return vars.mod .. " + " .. keys
     end
@@ -52,6 +52,16 @@ return function(vars)
             end
         end)
     end
+
+    -- Turn the workspaces the monitors show one step around, left to right: with two
+    -- monitors that is a swap, with three it is a rotation. Nothing is pinned to a monitor,
+    -- so every workspace keeps working wherever it lands. Add Ctrl for the other direction.
+    hl.bind(mod("SHIFT + Tab"), function()
+        policy.rotate_workspaces(false)
+    end)
+    hl.bind(mod("CTRL + SHIFT + Tab"), function()
+        policy.rotate_workspaces(true)
+    end)
 
     -- Named workspaces (rules.lua)
     hl.bind(mod("S"), hl.dsp.focus({ workspace = "name:󰝚" }))
