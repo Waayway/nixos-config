@@ -214,9 +214,13 @@ starts and ask for its password once.
 
 ## Extra drives
 
-The host file has a commented template for more drives (`hosts/workstations/hephaestus.nix`).
-Add each by UUID with `nofail`, then add the folder as a Steam library. Keep Proton game
-data off NTFS.
+Two btrfs drives are mounted in `hosts/workstations/hephaestus.nix`, named as on the old
+setup: `/mnt/bep` (1.8T NVMe) and `/mnt/games` (1.1T SATA). By UUID, `nofail` with a 5 second
+device timeout so a missing drive never holds up the boot, and no compression (only the boot
+drive has `compress=zstd:1`). After the first switch run `sudo chown waayway: /mnt/bep
+/mnt/games` once, then add the folder as a Steam library (Steam, Settings, Storage). Keep
+Proton game data off NTFS. The two Windows disks are not mounted; they share filesystem
+UUIDs, so use `/dev/disk/by-id/` if one is ever needed.
 
 ## NFS
 
