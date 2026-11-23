@@ -19,6 +19,16 @@
 # If that file is missing (no Hyprland, or no monitor yet) the auto variables are switched
 # off and gamescope starts plain, rather than the game failing to launch.
 #
+# VRR: SCB_AUTO_VRR asks wlr-randr whether adaptive sync is on *at launch*, but Hyprland
+# runs the monitors with vrr = 2 (only while something is fullscreen, games.lua), so at
+# launch it reads off and gamescope never gets --adaptive-sync. It is passed always
+# instead: gamescope then asks for VRR and Hyprland grants it once the window is
+# fullscreen; on a monitor without VRR the flag does nothing.
+#
+# gamemode: the conf is sourced after scopebuddy has put Steam's %command% in $command, so
+# the conf can prefix it with gamemoderun (programs.gamemode, games/tuning.nix). Launch
+# options stay `scb -- %command%`.
+#
 # HDR: SCB_AUTO_HDR reads the desktop's HDR state, which on Hyprland is a stub (1.5.0) and
 # would be off anyway (the desktop stays SDR). So HDR follows the monitor instead:
 # monitor_policy.lua writes primary-monitor-hdr (1 for monitors with `hdr = true` in
@@ -41,8 +51,8 @@ lib.optionalAttrs hostPlatform.isLinux {
       if [ -n "$primary" ]; then
         SCB_AUTO_RES=1
         SCB_AUTO_HDR=1
-        SCB_AUTO_VRR=1
-        SCB_GAMESCOPE_ARGS="--mangoapp -f -O $primary"
+        SCB_AUTO_VRR=0
+        SCB_GAMESCOPE_ARGS="--mangoapp -f -O $primary --adaptive-sync"
         if [ "$hdr" = 1 ]; then
           SCB_GAMESCOPE_ARGS="$SCB_GAMESCOPE_ARGS --hdr-enabled"
           export DXVK_HDR=1
@@ -52,6 +62,11 @@ lib.optionalAttrs hostPlatform.isLinux {
         SCB_AUTO_HDR=0
         SCB_AUTO_VRR=0
         SCB_GAMESCOPE_ARGS="--mangoapp -f"
+      fi
+
+      # gamemode for every game; it wraps the game inside gamescope, not gamescope itself.
+      if command -v gamemoderun >/dev/null; then
+        command="gamemoderun $command"
       fi
     '';
   };

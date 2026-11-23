@@ -14,7 +14,9 @@
 #     levels, I/O classes and scheduling policies)
 #   - zram swap with zstd, and the vm.* settings that go with it
 #   - the sysctls Proton and Wine expect (vm.max_map_count) and the split-lock one
-#   - gamemode, so `gamemoderun %command%` renices a game
+#   - gamemode (scb.conf wraps every game in gamemoderun): performance CPU governor while
+#     a game runs; ananicy-cpp already sets the nice levels
+#   - a 12G Mesa shader cache (default 1G) so big games keep their shaders
 #   - ntsync, the kernel's NT sync primitives, which current Proton uses when it finds them
 # Not here: a kernel built for x86-64-v3 or with BORE (docs/gaming.md, "Going further").
 # Everything below is plain NixOS and reversible: switch `programs.games.tuning.enable`
@@ -88,5 +90,11 @@ lib.optionalAttrs hostPlatform.isLinux {
     # gamemode's polkit rule only lets the `gamemode` group run its root helpers
     # (CPU governor, split_lock_mitigate); without it every pkexec call is refused.
     users.users.${user.name}.extraGroups = [ "gamemode" ];
+
+    # Mesa's shader cache (~/.cache/mesa_shader_cache) is capped at 1 GB for all games
+    # together; one big game can exceed that and then recompiles on every launch. With
+    # Steam's shader pre-caching off every game shares this cache. 12G is the CachyOS
+    # wiki's value for AMD.
+    environment.sessionVariables.MESA_SHADER_CACHE_MAX_SIZE = "12G";
   };
 }
