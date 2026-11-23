@@ -88,6 +88,11 @@ stdenv.mkDerivation rec {
 
     substituteInPlace companion/lib/Instance/NodePath.ts \
       --replace-fail "if (!(await fs.pathExists(nodePath))) return null" "return '${lib.getExe nodejs_26}'"
+    # every module runs on node 26 here (above), whose permission model also blocks the
+    # network; upstream only skips --allow-net for node22 modules because they get node 22,
+    # so without this the node22 ones (discord-api, most of the store) can't connect
+    substituteInPlace companion/lib/Instance/NodePath.ts \
+      --replace-fail "if (manifest.runtime.type !== 'node22') args.push('--allow-net')" "args.push('--allow-net')"
 
     # allow all surface modules (builtin and user-downloaded) to find libudev, by adding
     # LD_LIBRARY_PATH to the env whitelist companion uses when spawning module child processes
