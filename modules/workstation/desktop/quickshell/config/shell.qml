@@ -1,5 +1,5 @@
 //@ pragma UseQApplication
-// Quickshell: the bar, notifications and the power menu, all on the primary
+// Quickshell: the bar, notifications, the power menu and the screen-share picker, all on the primary
 // monitor (services/Primary.qml). ~/.config/quickshell is a link to this folder
 // (quickshell_home.nix); Quickshell reloads on save.
 import Quickshell
@@ -7,6 +7,7 @@ import qs.bar
 import qs.notifications
 import qs.services
 import qs.session
+import qs.share
 
 ShellRoot {
     // One set of windows per primary screen. When the primary changes or its
@@ -29,6 +30,9 @@ ShellRoot {
                 screen: scope.modelData
             }
             PowerMenu {
+                screen: scope.modelData
+            }
+            SharePicker {
                 screen: scope.modelData
             }
         }
