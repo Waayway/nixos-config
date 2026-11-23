@@ -54,6 +54,7 @@
       containers.enable = true;
       electronics.enable = true;
       audio.enable = true;
+      fabrication.enable = true;
     };
   };
 

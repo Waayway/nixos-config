@@ -21,6 +21,7 @@
       media.enable = true;
       office.enable = true;
       utilities.enable = true;
+      fabrication.enable = true;
     };
     hardware = {
       bluetooth.enable = true;

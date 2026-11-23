@@ -20,6 +20,7 @@
       media.enable = true;
       office.enable = true;
       utilities.enable = true;
+      fabrication.enable = true;
       # Bitfocus Companion for the Stream Deck (web UI on http://localhost:8000).
       streamdeck.enable = true;
     };
