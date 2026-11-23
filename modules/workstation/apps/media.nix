@@ -1,8 +1,47 @@
 args@{
   pkgs,
+  lib,
   tools,
   ...
 }:
+let
+  blenderVersion = "5.1.1";
+  blenderTarball = pkgs.fetchzip {
+    url = "https://download.blender.org/release/Blender${lib.versions.majorMinor blenderVersion}/blender-${blenderVersion}-linux-x64.tar.xz";
+    hash = "sha256-y8BMPyM7KYI8rd+12zMIcR9rLM/T1NoqCKJ8o5hxlzg=";
+  };
+  blenderOfficial = pkgs.buildFHSEnv {
+    name = "blender";
+    targetPkgs =
+      p: with p; [
+        libGL
+        libsm
+        libice
+        libx11
+        libxext
+        libxfixes
+        libxi
+        libxrender
+        libxxf86vm
+        libxkbcommon
+        wayland
+        libdecor
+        vulkan-loader
+        alsa-lib
+        libpulseaudio
+        libjack2
+        dbus
+        fontconfig
+        freetype
+        zlib
+      ];
+    runScript = "${blenderTarball}/blender";
+    extraInstallCommands = ''
+      install -Dm644 ${blenderTarball}/blender.desktop $out/share/applications/blender.desktop
+      install -Dm644 ${blenderTarball}/blender.svg $out/share/icons/hicolor/scalable/apps/blender.svg
+    '';
+  };
+in
 tools.mkAppCategory args {
   name = "media";
   apps = {
@@ -56,6 +95,15 @@ tools.mkAppCategory args {
     krita = {
       linux = [ pkgs.krita ];
       darwinCasks = [ "krita" ];
+    };
+    # Blender's official Linux build, not nixpkgs': nixpkgs' blender links OSL's LLVM 19 and
+    # its ROCm build loads ROCm's LLVM 22 as well, and Cycles crashes as soon as it uses HIP
+    # (NixOS/nixpkgs#508671). The official build keeps its LLVM to itself and finds HIP at
+    # /opt/rocm/hip (hardware/amd-gpu.nix); tested rendering on the RX 9070 XT, HIP and
+    # HIP RT. Run in an FHS environment for the few system libraries it does not bundle.
+    blender = {
+      linux = [ blenderOfficial ];
+      darwinCasks = [ "blender" ];
     };
     gimp.linux = [ pkgs.gimp ];
     inkscape.linux = [ pkgs.inkscape ];
