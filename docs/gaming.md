@@ -15,6 +15,10 @@ and the measuring section says how to check it.
 - `modules/workstation/games/scopebuddy.nix` and `scopebuddy_home.nix`: ScopeBuddy
   (`scb`), from Bazzite, packaged from the pinned 1.5.0 release, and its defaults file.
   See "Gamescope with ScopeBuddy".
+- `modules/workstation/games/simracing.nix` (`programs.games.simracing.enable`, on in
+  hephaestus): Boxflat (Moza settings app, with its udev rules) and moza-rev, packaged from
+  a pinned commit and run as the user service `moza-rev` for the wheel's RPM LEDs. See
+  "Sim racing".
 - `modules/workstation/games/tuning.nix` (`programs.games.tuning.enable`, default on):
   the CachyOS-style tuning, below. `programs.games.tuning.scheduler = null` turns the
   scheduler off.
@@ -103,6 +107,45 @@ are switched off and gamescope starts plain instead of the game failing.
 
 `capSysNice` for gamescope is off: a capability wrapper inside Steam's sandbox is a known way to get a game that
 does not start, and scx and ananicy cover the priorities.
+
+## Sim racing
+
+Hardware: a Moza wheel on a Moza base (USB), plus an Elgato Stream Deck as a button box
+(see `docs/plans/2026-11-23-simracing-design.md`). `programs.games.simracing.enable`
+installs Boxflat and moza-rev and starts the `moza-rev` user service.
+
+Force feedback needs nothing installed: the kernel driver `hid-universal-pidff` handles
+the base. Boxflat's udev rules (`99-boxflat.rules`) give the logged-in user access to the
+wheel and `/dev/uinput`.
+
+First plug-in: open Boxflat and update the firmware if it offers to, then set force
+feedback and the wheel rotation. For the RPM LEDs set the wheel's RPM **Telemetry Mode**
+to **Telemetry** (not the wheel's own RPM mode), or the LEDs ignore moza-rev.
+
+moza-rev reads each game's UDP telemetry on localhost and drives the LED bar. It idles
+with one "no Moza wheelbase found yet" line until the wheel is there. Check it with
+`journalctl --user -u moza-rev`. `moza-rev configure` finds installed Steam games and
+offers the telemetry edits per game (asks `y/N`, keeps a `.bak`).
+
+Per game:
+
+- **BeamNG.drive:** Options, Other, Protocols, OutGauge: on, IP `127.0.0.1`, port `4444`.
+- **Assetto Corsa:** nothing in the game, its telemetry is always on. The stock launcher
+  often fails on Proton; add `acs.exe` from the install folder as a non-Steam shortcut
+  with a stable Proton, and put a `steam_appid.txt` containing `244210` next to it, or
+  `acs.exe` exits after two seconds. `moza-rev configure` writes that file.
+- **Automobilista 2:** Options, System: UDP Protocol Version **Project CARS 2**, UDP
+  Frequency 1 or higher, then restart the game. AMS2 sends to the broadcast address,
+  which Linux does not loop back to local sockets; this rule fixes it (it is not in the
+  config, and it stops that telemetry going out on the LAN):
+  `sudo iptables -t nat -I OUTPUT -p udp -d 255.255.255.255 --dport 5606 -j DNAT --to-destination 127.0.0.1:5606`
+  (`-D` instead of `-I` removes it).
+- **Forza Horizon and Motorsport 7:** Settings, HUD and Gameplay, Data Out: on, IP
+  `127.0.0.1`, port `9999`.
+- **Assetto Corsa Competizione:** has no RPM in its telemetry, so the LEDs do not work.
+
+If the LEDs misbehave, close Boxflat: it talks to the same serial port. A game that sees
+the wheel twice needs Steam Input turned off for that game.
 
 ## Looks outside Plasma
 
