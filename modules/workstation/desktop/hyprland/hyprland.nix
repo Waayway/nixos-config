@@ -45,11 +45,11 @@ lib.optionalAttrs hostPlatform.isLinux {
 
       # Hypr Ecosystem
       hyprpicker
-      hyprpaper
       hypridle
+      awww # wallpaper daemon with fade transitions (scripts/wallpaper-*.sh)
     ];
 
-    # hyprlock with its PAM service. hypridle, hyprlock and hyprpaper are
+    # hyprlock with its PAM service. hypridle and hyprlock are
     # configured in desktop/hyprland/config/ and started by Hyprland.
     programs.hyprlock.enable = true;
   };

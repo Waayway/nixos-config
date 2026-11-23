@@ -1,10 +1,11 @@
 -- Started once per session. https://wiki.hypr.land/configuring/core/autostart/
--- hypridle/hyprlock/hyprpaper read their .conf files from this folder.
+-- hypridle/hyprlock read their .conf files from this folder; awww draws the
+-- wallpaper (scripts/wallpaper-rotate.sh fades to a new one every 5 minutes).
 return function(vars)
     hl.on("hyprland.start", function()
         hl.exec_cmd("hypridle")
-        hl.exec_cmd("hyprpaper")
-        hl.exec_cmd("sleep 1 && bash " .. vars.scripts .. "/wallpaper-random.sh")
+        hl.exec_cmd("awww-daemon")
+        hl.exec_cmd("bash " .. vars.scripts .. "/wallpaper-rotate.sh")
         hl.exec_cmd("nm-applet --indicator")
         hl.exec_cmd("qs") -- bar + notifications, ~/.config/quickshell
         hl.exec_cmd("hyprlock")

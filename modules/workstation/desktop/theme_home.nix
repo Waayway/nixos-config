@@ -129,7 +129,7 @@ lib.optionalAttrs hostPlatform.isLinux (
         return {
         ${lib.concatStrings (lib.mapAttrsToList (n: v: "  ${n} = \"${v}\",\n") palette)}}
       '';
-      # hyprlock/hypridle/hyprpaper: `source =` it, use as rgb($blue).
+      # hyprlock/hypridle: `source =` it, use as rgb($blue).
       "theme/colors.conf".text = lib.concatStrings (lib.mapAttrsToList (n: v: "\$${n} = ${v}\n") palette);
       # Quickshell: values with '#'.
       "theme/colors.json".text = builtins.toJSON (lib.mapAttrs (_: v: "#${v}") palette);
