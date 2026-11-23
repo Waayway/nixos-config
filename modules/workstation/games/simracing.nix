@@ -3,6 +3,7 @@
   lib,
   pkgs,
   hostPlatform,
+  inputs,
   ...
 }:
 # Sim racing (`programs.games.simracing.enable`): a Moza wheel on Linux. Boxflat is the
@@ -10,6 +11,8 @@
 # logged-in user access to the wheel. moza-rev drives the wheel's RPM LED bar from game
 # telemetry (UDP on localhost); it is not in nixpkgs, so it is packaged here from a pinned
 # commit and run as a user service that idles until a wheelbase is plugged in.
+# With the Stream Deck on (`workstation.apps.streamdeck.enable`) the RACING pages press
+# buttons on a virtual joystick, served by the companion-buttonbox user service.
 # docs/gaming.md has the per-game setup.
 let
   moza-rev = pkgs.rustPlatform.buildRustPackage {
@@ -65,6 +68,22 @@ lib.optionalAttrs hostPlatform.isLinux {
           };
         };
       }
+
+      (lib.mkIf config.workstation.apps.streamdeck.enable {
+        # The `buttonbox` Companion module (loaded by streamdeck.nix) sends presses to this
+        # daemon's socket; it exposes them as the uinput device "Companion Button Box".
+        systemd.user.services.companion-buttonbox = {
+          description = "Virtual joystick for the Stream Deck RACING pages";
+          wantedBy = [ "default.target" ];
+          serviceConfig = {
+            ExecStart =
+              lib.getExe
+                inputs.companion-modules.packages.${pkgs.stdenv.hostPlatform.system}.buttonbox-daemon;
+            Restart = "on-failure";
+            RestartSec = 2;
+          };
+        };
+      })
     ]
   );
 }

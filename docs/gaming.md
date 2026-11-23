@@ -147,6 +147,40 @@ Per game:
 If the LEDs misbehave, close Boxflat: it talks to the same serial port. A game that sees
 the wheel twice needs Steam Input turned off for that game.
 
+### Stream Deck button box
+
+With `workstation.apps.streamdeck.enable` too, the Stream Deck doubles as a button box. The
+`companion-buttonbox` user service (`companion-modules`, `buttonbox-daemon`) creates a
+virtual joystick, "Companion Button Box" (32 buttons), through uinput. The `buttonbox`
+Companion module sends it presses over `$XDG_RUNTIME_DIR/companion-buttonbox.sock`.
+Check it with `systemctl --user status companion-buttonbox`.
+
+Two pages, after GAMING (column 1 of the deck is page up, page number, page down). Hold
+keys (orange) stay pressed while you hold the key; the others tap for about 80 ms.
+
+| Page | Button | Key | Type |
+|---|---|---|---|
+| RACING | 1 | IGN | tap |
+| RACING | 2 | START | hold |
+| RACING | 3 | PIT | tap |
+| RACING | 4 | LIGHTS | tap |
+| RACING | 5 | FLASH | hold |
+| RACING | 6 | WIPER | tap |
+| RACING | 7 | HORN | hold |
+| RACING | 8 | LOOK BACK | hold |
+| RACING | 9 | TC + | tap |
+| RACING | 10 | TC − | tap |
+| RACING | 11 | ABS + | tap |
+| RACING | 12 | ABS − | tap |
+| RACING 2 | 13 | BB + | tap |
+| RACING 2 | 14 | BB − | tap |
+| RACING 2 | 15 | DRS | tap |
+| RACING 2 | 16 | RADIO | hold |
+
+Bind once per game in its controls menu; the device is *Companion Button Box*. The pages
+are in `wdesktop.companionconfig`; `companion-import` replaces the whole Companion config
+with that file (pages, buttons and connections), so export first if you edited in the UI.
+
 ## Looks outside Plasma
 
 Plasma themes everything; on Hyprland each toolkit gets it from `desktop/theme_home.nix`:
