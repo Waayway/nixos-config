@@ -20,12 +20,29 @@ let
   companionModules = "${
     inputs.companion-modules.packages.${upkgs.stdenv.hostPlatform.system}.default
   }/share/companion-modules";
+  # The button layout (pages MUSIC, MUSIC+CALL, GAMING; connections media, mangohud,
+  # discord), exported from Companion. Companion keeps its config in its own database, so
+  # this isn't applied on switch (that would wipe edits made in the web UI): run
+  # `companion-import` to load it (a full import that replaces pages, buttons and
+  # connections). The export holds no secrets: set the Discord client ID/secret in the UI.
+  # To update: export from the web UI (Import/Export, full) and replace the file.
+  companionImport = upkgs.writeShellApplication {
+    name = "companion-import";
+    runtimeInputs = [ upkgs.nodejs_26 ];
+    text = ''
+      COMPANION_DIR=${companion}/share/bitfocus-companion \
+        exec node ${./companion/import.mjs} "''${1:-${./companion/wdesktop.companionconfig}}"
+    '';
+  };
 in
 tools.mkAppCategory args {
   name = "streamdeck";
   apps = {
     companion = {
-      linux = [ companion ];
+      linux = [
+        companion
+        companionImport
+      ];
       linuxConfig = {
         services.udev.extraRules = ''
           # Elgato Stream Deck (all models, vendor 0fd9)
