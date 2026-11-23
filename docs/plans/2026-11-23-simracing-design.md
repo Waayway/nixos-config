@@ -1,8 +1,8 @@
 # Sim racing on hephaestus
 
-Status: draft 2026-11-23, waiting for Thijs's approval.
+Status: approved 2026-11-23 (helper language changed to Rust at review).
 
-Calls made by Claude, not Thijs (check these): Python + evdev for the button-box daemon;
+Calls made by Claude, not Thijs (check these): Rust (over Go) for the button-box daemon;
 the socket path and line protocol; tap length ~80 ms; AMS2 iptables rule as a doc note,
 not config; the button-box service lives in `simracing.nix` and needs both
 `programs.games.simracing.enable` and `workstation.apps.streamdeck.enable`.
@@ -122,8 +122,9 @@ Two repos, like Lodestar: code in `github:Waayway/companion-modules`, values her
 
 **In companion-modules:**
 
-- **`buttonbox-daemon`**: a small user daemon (Python + `python3Packages.evdev`, already
-  used by Boxflat; the builder may pick Rust if it is clearly simpler) that creates one
+- **`buttonbox-daemon`**: a small user daemon in **Rust** (Thijs: Rust or Go, not Python;
+  Rust chosen because Lodestar and moza-rev are Rust; the `evdev` crate's uinput
+  `VirtualDevice`, `rustPlatform.buildRustPackage`, `cargo fmt`) that creates one
   uinput device **"Companion Button Box"** with **32 buttons**, and listens on a Unix socket
   `$XDG_RUNTIME_DIR/companion-buttonbox.sock` for a line protocol: `down <n>`, `up <n>`
   (1–32). On socket disconnect it releases every held button (no stuck pit limiter).
