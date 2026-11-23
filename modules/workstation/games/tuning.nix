@@ -3,6 +3,7 @@
   lib,
   pkgs,
   hostPlatform,
+  user,
   ...
 }:
 # The CachyOS-style part of `programs.games.enable`: what makes a gaming desktop feel
@@ -14,6 +15,7 @@
 #   - zram swap with zstd, and the vm.* settings that go with it
 #   - the sysctls Proton and Wine expect (vm.max_map_count) and the split-lock one
 #   - gamemode, so `gamemoderun %command%` renices a game
+#   - ntsync, the kernel's NT sync primitives, which current Proton uses when it finds them
 # Not here: a kernel built for x86-64-v3 or with BORE (docs/gaming.md, "Going further").
 # Everything below is plain NixOS and reversible: switch `programs.games.tuning.enable`
 # off, or null the scheduler, and the next switch undoes it.
@@ -70,6 +72,11 @@ lib.optionalAttrs hostPlatform.isLinux {
       "kernel.nmi_watchdog" = 0;
     };
 
+    # /dev/ntsync: Proton 10+ and GE-Proton use it instead of esync/fsync when it exists
+    # (better frame pacing in CPU-heavy games). Mainline module, not loaded by default;
+    # the device is world-accessible (0666), so no udev rule.
+    boot.kernelModules = [ "ntsync" ];
+
     programs.gamemode = {
       enable = true;
       enableRenice = true;
@@ -78,5 +85,8 @@ lib.optionalAttrs hostPlatform.isLinux {
         inhibit_screensaver = 1;
       };
     };
+    # gamemode's polkit rule only lets the `gamemode` group run its root helpers
+    # (CPU governor, split_lock_mitigate); without it every pkexec call is refused.
+    users.users.${user.name}.extraGroups = [ "gamemode" ];
   };
 }
