@@ -113,8 +113,8 @@ does not start, and scx and ananicy cover the priorities.
 Hardware: a Moza R5 base (USB) with the ES wheel, SR-P Lite pedals and SR-P Lite clutch, and
 the HGP shifter, plus an Elgato Stream Deck as a button box. The pedals and clutch connect to
 the base; the HGP connects to the base or by USB. All show up as plain HID game controllers.
-The Stream Deck is exposed as the virtual joystick `Companion Button Box` (32 buttons),
-(see `docs/plans/2026-11-23-simracing-design.md`). `programs.games.simracing.enable`
+The Stream Deck is exposed as the virtual joystick `Companion Button Box` (32 buttons;
+design in `docs/plans/2026-11-23-simracing-design.md`). `programs.games.simracing.enable`
 installs Boxflat and moza-rev and starts the `moza-rev` user service.
 
 Force feedback needs nothing installed: the kernel driver `hid-universal-pidff` handles
