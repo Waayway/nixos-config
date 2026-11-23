@@ -17,6 +17,22 @@
         "type": "github"
       }
     },
+    "companion-modules": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795090948,
+        "narHash": "sha256-bsWldfBUPa1axSis6xpioiNOEHOb0Nat89Myi7WE1yg=",
+        "owner": "Waayway",
+        "repo": "companion-modules",
+        "rev": "dd45eef23dd572214eb2e521812745a104095e69",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Waayway",
+        "repo": "companion-modules",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1791754810,
@@ -638,6 +654,7 @@
     },
     "root": {
       "inputs": {
+        "companion-modules": "companion-modules",
         "deploy-rs": "deploy-rs",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager_2",

@@ -66,6 +66,13 @@
       flake = false;
     };
 
+    # Companion modules for the Stream Deck (mangohud, linux-media), built in
+    # modules/workstation/apps/companion-modules_lib.nix. `nix flake update companion-modules`.
+    companion-modules = {
+      url = "github:Waayway/companion-modules";
+      flake = false;
+    };
+
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";

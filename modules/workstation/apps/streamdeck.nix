@@ -1,6 +1,7 @@
 args@{
   upkgs,
   tools,
+  inputs,
   ...
 }:
 # The Stream Deck: Bitfocus Companion, which turns its buttons into actions (MangoHud's
@@ -13,6 +14,10 @@ args@{
 # after the first switch.
 let
   companion = upkgs.callPackage ./companion_lib.nix { };
+  # Our own modules (mangohud, linux-media), loaded through --extra-module-path.
+  companionModules = upkgs.callPackage ./companion-modules_lib.nix {
+    src = inputs.companion-modules;
+  };
 in
 tools.mkAppCategory args {
   name = "streamdeck";
@@ -29,9 +34,14 @@ tools.mkAppCategory args {
         systemd.user.services.bitfocus-companion = {
           description = "Bitfocus Companion (Stream Deck)";
           wantedBy = [ "default.target" ];
+          # Companion writes its own udev rules to ~/.config/companion-nodejs/udev-rules and
+          # nags (Surfaces page) until they're copied to /etc/udev/rules.d, which NixOS
+          # manages. The uaccess rules above already cover the deck; with a sync command
+          # set, Companion runs it instead of comparing files, and `true` does nothing.
+          environment.COMPANION_SYNC_UDEV_RULES_COMMAND = "true";
           serviceConfig = {
             # The web UI listens on every interface by default; only this machine needs it.
-            ExecStart = "${companion}/bin/bitfocus-companion --admin-address 127.0.0.1 --admin-port 8000";
+            ExecStart = "${companion}/bin/bitfocus-companion --admin-address 127.0.0.1 --admin-port 8000 --extra-module-path ${companionModules}";
             Restart = "on-failure";
             RestartSec = 5;
           };
