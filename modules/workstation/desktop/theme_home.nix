@@ -99,8 +99,8 @@ lib.optionalAttrs hostPlatform.isLinux (
     # Cursor for GTK and X11/XWayland (XCURSOR_THEME, XCURSOR_SIZE, ~/.icons/default).
     # Hyprland's own cursor is the hyprcursor in hyprland/config/lua/env.lua; this is the
     # same Rosé Pine design. The theme's name is the folder in the package, not "Rose-Pine".
-    # XWayland windows on a host with programs.games.steamScale get a bigger XCURSOR_SIZE
-    # from hyprland/config/lua/xwayland.lua (they are drawn at real pixels there).
+    # Same size over XWayland windows, also with programs.games.steamScale: Hyprland scales
+    # the X cursor by the monitor's scale itself (hyprland/config/lua/xwayland.lua).
     home.pointerCursor = {
       name = "BreezeX-RosePine-Linux";
       package = pkgs.rose-pine-cursor;

@@ -273,8 +273,10 @@ ones are not: Firefox, Discord, High Tide, the bar). Proton games started outsid
 now see the monitor's real resolution instead of the scaled one, which is what they want.
 The cursor over Steam and other XWayland windows: `home.pointerCursor` (theme_home.nix)
 puts the Rosé Pine XCursor theme in `~/.icons` (Steam's container sees the home folder and
-the store), and `lua/xwayland.lua` sets `XCURSOR_SIZE` to 32 × the scale in the marker
-file, so it is not 1x. Possible follow-up, not done: Steam may forget its library folders after
+the store), at `XCURSOR_SIZE` 32 like everywhere else: Hyprland draws Xwayland's cursor
+(buffer scale 1) at size × the monitor's scale even with `force_zero_scaling`. Raising it to
+32 × the scale drew a 64 px cursor at 128 px into the RX 9070's 64×64 cursor plane, so it
+was cut off. Possible follow-up, not done: Steam may forget its library folders after
 the first start with the variable (re-add `/mnt/games`; reported by steamtinkerlaunch's
 notes). A native Wayland Steam does not exist: Valve's issue #7224 is open, and patching
 `steamwebhelper` to Wayland, which people try, breaks the store and menus. Settings, Interface

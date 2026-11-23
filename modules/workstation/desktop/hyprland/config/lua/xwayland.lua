@@ -5,9 +5,13 @@
 -- XWayland-only program would be tiny, so the laptop does not get this.
 -- XWayland is started with the session: it takes a log out and in, not `hyprctl reload`.
 --
--- The marker's first line is the scale. X programs (Steam, games outside gamescope) draw
--- their own cursor at XCURSOR_SIZE in real pixels, so it is multiplied by it here, or
--- the cursor is tiny over them. Programs started before a change keep the old size.
+-- The marker's first line is the scale (used for Xft.dpi below). XCURSOR_SIZE stays 32
+-- (env.lua): force_zero_scaling does not reach the cursor. Xwayland's cursor surface has
+-- buffer scale 1, so Hyprland draws it at XCURSOR_SIZE x the monitor's scale, just like
+-- the native cursor. Multiplying it here made a 64 px X cursor drawn at 128 px into the
+-- RX 9070's 64x64 cursor plane (DRM_CAP_CURSOR_WIDTH): only its top-left part showed.
+-- Hyprland checks the buffer size against the plane, not the drawn size, so it does not
+-- fall back to a software cursor for this.
 local marker = io.open("/etc/hypr/xwayland-zero-scaling", "r")
 if marker then
     local scale = tonumber(marker:read("*l") or "") or 1
@@ -17,7 +21,6 @@ if marker then
             force_zero_scaling = true,
         },
     })
-    hl.env("XCURSOR_SIZE", tostring(math.floor(32 * scale + 0.5)))
 
     -- Steam's interface is Chromium (CEF), which on X11 takes its scale from Xft.dpi.
     -- STEAM_FORCE_DESKTOPUI_SCALING (steam-scaling.nix) is ignored by the 64-bit client

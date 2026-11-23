@@ -42,7 +42,7 @@ lib.optionalAttrs hostPlatform.isLinux {
           extraEnv.STEAM_FORCE_DESKTOPUI_SCALING = toString config.programs.games.steamScale;
         };
 
-        # First line: the scale, which xwayland.lua also uses for the XWayland cursor size.
+        # First line: the scale, which xwayland.lua turns into Xft.dpi for Steam.
         environment.etc."hypr/xwayland-zero-scaling".text = ''
           ${toString config.programs.games.steamScale}
           Present: hyprland/config/lua/xwayland.lua sets xwayland.force_zero_scaling.
