@@ -14,7 +14,7 @@ args@{
 # after the first switch.
 let
   companion = upkgs.callPackage ./companion_lib.nix { };
-  # Our own modules (mangohud, linux-media) from github:Waayway/companion-modules, loaded
+  # Our own modules (mangohud, linux-media, buttonbox) from github:Waayway/companion-modules, loaded
   # through --extra-module-path. Real files, not symlinks: Companion only lets a module read
   # its own directory.
   companionModules = "${
