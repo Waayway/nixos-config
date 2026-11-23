@@ -24,11 +24,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1795424788,
-        "narHash": "sha256-y34x7M12Ne5Ot+O40YFcByQwHRW26eMOnjSH7deDsAY=",
+        "lastModified": 1795428227,
+        "narHash": "sha256-LlraHSZeq+WEuNpw1Wq7dK+lamjWlrjOxeSS09g2NGE=",
         "owner": "Waayway",
         "repo": "companion-modules",
-        "rev": "cd71c924d9b0817db4f6073fb7783f68f7feb1c6",
+        "rev": "d01e72e8fe3b1762a28c61044ba7e33d2042bbad",
         "type": "github"
       },
       "original": {
