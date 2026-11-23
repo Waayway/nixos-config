@@ -257,7 +257,10 @@ window by stretching its bitmap, so on a monitor with scale 2 (the Acer; 1.6 on 
 the TV) the client is soft. People fix it with two settings that only work together:
 Hyprland's `xwayland.force_zero_scaling` (XWayland windows are drawn at the real pixels:
 sharp but 1x, so tiny) and `STEAM_FORCE_DESKTOPUI_SCALING` (Steam draws its own interface
-bigger). `programs.games.steamScale = 2;` on hephaestus does both: it sets the variable in
+bigger). **Since the 64-bit Steam client (November 2026) the variable is ignored** (the
+string is gone from the client), so `lua/xwayland.lua` also loads `Xft.dpi: 96 × scale` with
+`xrdb` when the session starts; CEF on X11 takes its scale from it, and other X programs get
+the same size. `programs.games.steamScale = 2;` on hephaestus does both: it sets the variable in
 Steam's environment (checked in the built profile, next to extest's and Proton-GE's) and
 creates `/etc/hypr/xwayland-zero-scaling`, which `lua/xwayland.lua` turns into the Hyprland
 setting, so the laptop is not affected. **Needs a log out and in**, XWayland starts with the

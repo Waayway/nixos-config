@@ -10,8 +10,10 @@
 # 2 (or 1.6, 2.5) the whole client is soft. The fix has two halves that only work together:
 #   - Hyprland stops scaling XWayland windows (xwayland.force_zero_scaling), so they are
 #     drawn at the monitor's real pixels: sharp, but at 1x size, which is tiny;
-#   - Steam is told to draw its own interface that much bigger
-#     (STEAM_FORCE_DESKTOPUI_SCALING).
+#   - Steam is told to draw its own interface that much bigger: Xft.dpi = 96 x scale,
+#     loaded with xrdb by hyprland/config/lua/xwayland.lua (Steam's interface is CEF, which
+#     reads it). STEAM_FORCE_DESKTOPUI_SCALING is still set for the old 32-bit client; the
+#     64-bit client Steam moved to in November 2026 ignores it.
 # The first half is a Hyprland setting, and the Hyprland config is shared by every
 # workstation, so it only switches on where this option is set: this module writes
 # /etc/hypr/xwayland-zero-scaling, which hyprland/config/lua/xwayland.lua looks for.

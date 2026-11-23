@@ -18,4 +18,13 @@ if marker then
         },
     })
     hl.env("XCURSOR_SIZE", tostring(math.floor(32 * scale + 0.5)))
+
+    -- Steam's interface is Chromium (CEF), which on X11 takes its scale from Xft.dpi.
+    -- STEAM_FORCE_DESKTOPUI_SCALING (steam-scaling.nix) is ignored by the 64-bit client
+    -- Steam switched to in November 2026, so this is what makes Steam big again. Runs
+    -- before autostart.lua's hook (this file is loaded first), so before `steam -silent`.
+    local dpi = math.floor(96 * scale + 0.5)
+    hl.on("hyprland.start", function()
+        hl.exec_cmd("echo 'Xft.dpi: " .. dpi .. "' | xrdb -merge")
+    end)
 end
