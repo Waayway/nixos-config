@@ -82,17 +82,23 @@ PanelWindow {
                 color: Theme.bgDark
                 clip: true
 
-                ScreencopyView {
+                // Only exists while the picker is open. A hidden ScreencopyView still holds its
+                // screen, and when outputs go away and come back (resume from suspend) Quickshell
+                // 0.3.0 captures the destroyed QScreen and segfaults.
+                Loader {
                     id: preview
                     anchors.fill: parent
-                    captureSource: card.source
-                    live: picker.visible && card.source !== null
-                    constraintSize: Qt.size(card.previewWidth * 2, card.previewWidth * 9 / 8)
+                    active: picker.visible && card.source !== null
+                    sourceComponent: ScreencopyView {
+                        captureSource: card.source
+                        live: true
+                        constraintSize: Qt.size(card.previewWidth * 2, card.previewWidth * 9 / 8)
+                    }
                 }
 
                 Text {
                     anchors.centerIn: parent
-                    visible: !preview.hasContent
+                    visible: !(preview.item && preview.item.hasContent)
                     text: card.fallbackIcon
                     color: Theme.comment
                     font.family: Theme.iconFont
