@@ -18,13 +18,17 @@
       }
     },
     "companion-modules": {
-      "flake": false,
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
       "locked": {
-        "lastModified": 1795090948,
-        "narHash": "sha256-bsWldfBUPa1axSis6xpioiNOEHOb0Nat89Myi7WE1yg=",
+        "lastModified": 1795424788,
+        "narHash": "sha256-y34x7M12Ne5Ot+O40YFcByQwHRW26eMOnjSH7deDsAY=",
         "owner": "Waayway",
         "repo": "companion-modules",
-        "rev": "dd45eef23dd572214eb2e521812745a104095e69",
+        "rev": "cd71c924d9b0817db4f6073fb7783f68f7feb1c6",
         "type": "github"
       },
       "original": {
