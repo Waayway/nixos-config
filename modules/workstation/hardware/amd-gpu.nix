@@ -18,8 +18,13 @@ lib.optionalAttrs hostPlatform.isLinux {
       rocmPackages.clr.icd
     ];
 
-    # LACT: Linux AMDGPU Controller
-    environment.systemPackages = with pkgs; [ lact ];
+    environment.systemPackages = with pkgs; [
+      # LACT: Linux AMDGPU Controller
+      lact
+      # btop shows AMD GPUs only when built with ROCm SMI (it dlopens librocm_smi64);
+      # wins over the plain btop from common/packages.
+      (lib.hiPrio (btop.override { rocmSupport = true; }))
+    ];
     systemd.packages = with pkgs; [ lact ];
     systemd.services.lactd.wantedBy = [ "multi-user.target" ];
 
