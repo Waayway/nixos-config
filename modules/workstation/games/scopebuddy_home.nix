@@ -18,6 +18,15 @@
 #
 # If that file is missing (no Hyprland, or no monitor yet) the auto variables are switched
 # off and gamescope starts plain, rather than the game failing to launch.
+#
+# HDR: SCB_AUTO_HDR reads the desktop's HDR state, which on Hyprland is a stub (1.5.0) and
+# would be off anyway (the desktop stays SDR). So HDR follows the monitor instead:
+# monitor_policy.lua writes primary-monitor-hdr (1 for monitors with `hdr = true` in
+# monitors.lua) and then gamescope gets --hdr-enabled and DXVK/VKD3D get DXVK_HDR=1, so
+# games offer their HDR option. Hyprland switches the monitor to HDR while the fullscreen
+# gamescope asks for it (render.cm_auto_hdr). `SCB_HDR=0 scb -- %command%` turns it off
+# for one game. No vk-hdr-layer or ENABLE_HDR_WSI: Mesa has it built in, and the layer
+# breaks gamescope.
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf (osConfig != null && (osConfig.programs.games.enable or false)) {
     xdg.configFile."scopebuddy/scb.conf".text = ''
@@ -25,13 +34,19 @@ lib.optionalAttrs hostPlatform.isLinux {
       # settings go in ~/.config/scopebuddy/AppID/<steam appid>.conf, which is sourced after
       # this file and is not managed.
 
-      primary="$(cat "''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr/primary-monitor" 2>/dev/null || true)"
+      hypr="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr"
+      primary="$(cat "$hypr/primary-monitor" 2>/dev/null || true)"
+      hdr="''${SCB_HDR:-$(cat "$hypr/primary-monitor-hdr" 2>/dev/null || echo 0)}"
 
       if [ -n "$primary" ]; then
         SCB_AUTO_RES=1
         SCB_AUTO_HDR=1
         SCB_AUTO_VRR=1
         SCB_GAMESCOPE_ARGS="--mangoapp -f -O $primary"
+        if [ "$hdr" = 1 ]; then
+          SCB_GAMESCOPE_ARGS="$SCB_GAMESCOPE_ARGS --hdr-enabled"
+          export DXVK_HDR=1
+        fi
       else
         SCB_AUTO_RES=0
         SCB_AUTO_HDR=0

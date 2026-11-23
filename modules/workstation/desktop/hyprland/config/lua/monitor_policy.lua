@@ -13,6 +13,9 @@
 --     ties by left-most, then widest. Written to
 --     $XDG_RUNTIME_DIR/hypr/primary-monitor (connector name, e.g. DP-7) and
 --     sent as a `custom>>primary>>DP-7` socket2 event; Quickshell reads it.
+--     $XDG_RUNTIME_DIR/hypr/primary-monitor-hdr holds 1 when that monitor has
+--     `hdr = true` in monitors.lua, else 0; ScopeBuddy's scb.conf
+--     (games/scopebuddy_home.nix) starts gamescope with HDR on from it.
 --   * No workspace belongs to a monitor: every workspace can be shown on every
 --     monitor, and a workspace opens on the monitor you are on. The one default is
 --     the gaming workspace, which opens on the primary (large) monitor, where
@@ -86,15 +89,22 @@ local function lid_closed()
     return false
 end
 
-local function publish(name)
-    local dir = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr"
-    local path = dir .. "/primary-monitor"
+local function write_file(path, text)
     local f = io.open(path .. ".tmp", "w")
     if f then
-        f:write(name, "\n")
+        f:write(text, "\n")
         f:close()
         os.rename(path .. ".tmp", path)
     end
+end
+
+local function publish(m)
+    local dir = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hypr"
+    local e = entry_for(m)
+    -- HDR file first: a reader that sees the new primary also sees its HDR flag.
+    write_file(dir .. "/primary-monitor-hdr", (e and e.hdr) and "1" or "0")
+    write_file(dir .. "/primary-monitor", m.name)
+    local name = m.name
     hl.dispatch(hl.dsp.event("primary>>" .. name))
 end
 
@@ -174,7 +184,7 @@ function M.refresh()
 
     if primary ~= state.primary then
         state.primary = primary
-        publish(primary)
+        publish(candidates[1])
         place_workspaces(primary)
     end
 end

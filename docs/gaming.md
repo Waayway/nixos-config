@@ -19,7 +19,12 @@ and the measuring section says how to check it.
   the CachyOS-style tuning, below. `programs.games.tuning.scheduler = null` turns the
   scheduler off.
 - `modules/workstation/desktop/hyprland/config/lua/games.lua`: direct scanout, VRR while
-  fullscreen, tearing and idle-inhibit for Steam and Gamescope windows. Plain files, no
+  fullscreen, tearing and idle-inhibit for Steam and Gamescope windows. Scanout is
+  `render.direct_scanout = 2` (only windows with content type "game"), and the gamescope
+  and `steam_app_*` rules give those windows `content = "game"` themselves (checked:
+  a nested gamescope shows `contentType: game` in `hyprctl clients`). Scanout for every
+  fullscreen window (1) gives black screens with native-Wayland Proton outside gamescope
+  in some games (Hyprland discussion #14843). Plain files, no
   switch needed: `hyprctl reload`, then `hyprctl configerrors` (this applies to every
   machine that uses this Hyprland config, the laptop included).
 - `modules/workstation/apps/streamdeck.nix` (`workstation.apps.streamdeck.enable`): Bitfocus
@@ -79,11 +84,18 @@ are switched off and gamescope starts plain instead of the game failing.
 
 **To tweak at the machine.** Not set up yet, and not tested here:
 
-- HDR: `--hdr-enabled` needs the Gamescope WSI layer for games to see HDR
-  (`ENABLE_GAMESCOPE_WSI=1`, per gamescope's own help text), and the HDR state ScopeBuddy
-  reads on Hyprland is a stub in 1.5.0, so `SCB_AUTO_HDR` may add nothing until you add
-  `--hdr-enabled` yourself. Hyprland's own HDR (the `cm`/`bitdepth` monitor keys in
-  `monitors.lua`) also has to be on for it to show.
+- HDR (set up, not yet tried with a game): the desktop stays SDR (`cm` is the default
+  `srgb`, `bitdepth = 10`), and Hyprland switches the monitor to HDR while a fullscreen
+  window asks for it (`render.cm_auto_hdr`, default 1 on 0.55). A monitor with `hdr = true`
+  in `monitors.lua` (the Acer: about 1060 nits; the LG's 350 nits is not worth it) makes
+  `monitor_policy.lua` write `$XDG_RUNTIME_DIR/hypr/primary-monitor-hdr`, and `scb.conf`
+  then adds `--hdr-enabled` and exports `DXVK_HDR=1`, so the game offers its HDR option.
+  `SCB_HDR=0 scb -- %command%` turns it off for one game. No vk-hdr-layer or
+  `ENABLE_HDR_WSI`: Mesa 25.1+ has it built in and the layer breaks gamescope. If a game
+  only offers HDR while the screen is already in HDR, `quirks.prefer_hdr = 2` (gamescope
+  only) is the next thing to try. Known on AMD: the screen can stay in HDR (very bright)
+  after a fullscreen HDR app closes with `bitdepth = 10`; scRGB games (Control) show
+  wrong colours, HDR10 ones work. Test with `scb -- vkcube` first.
 - VRR: `SCB_AUTO_VRR` reads wlr-randr's adaptive_sync flag; with Hyprland's `vrr = 2`
   (only while fullscreen) that flag may be off when the game starts.
 - Whatever else the CachyOS setup had (Proton Wayland, per-game `AppID/*.conf` files):
@@ -91,6 +103,18 @@ are switched off and gamescope starts plain instead of the game failing.
 
 `capSysNice` for gamescope is off: a capability wrapper inside Steam's sandbox is a known way to get a game that
 does not start, and scx and ananicy cover the priorities.
+
+## Looks outside Plasma
+
+Plasma themes everything; on Hyprland each toolkit gets it from `desktop/theme_home.nix`:
+
+- GTK4/libadwaita (High Tide) and Electron/Chromium (Heroic, Discord) follow the portal's
+  `org.freedesktop.appearance color-scheme`, which xdg-desktop-portal-gtk reads from dconf.
+  `gtk.colorScheme = "dark"` sets it; without it they are light.
+- Qt (Qt5 and Qt6): qt6ct/qt5ct as the platform theme, the Breeze style, and a Tokyo Night
+  palette generated from `tools/color.nix`.
+- Steam draws its own dark interface (CEF). Wine/Proton dialogs have no dark mode; a dark
+  `.reg` colour scheme per prefix (`protontricks <appid> regedit`) is the known fix, not done.
 
 ## CachyOS compared
 
@@ -124,7 +148,7 @@ Probably not. From `hyprland/config/lua/`:
 - Hyprland itself: its compositing cost is small. The cost that matters for a game is
   indirect: every frame is composited and queued, which adds latency and can add
   stutter. Hyprland did not scan a fullscreen game out directly (`render.direct_scanout`
-  defaults to 0), and `general.allow_tearing = true` did nothing without an `immediate`
+  defaults to 0; now 2 with `content = "game"` rules), and `general.allow_tearing = true` did nothing without an `immediate`
   rule per game. `games.lua` fixes both, plus VRR while fullscreen.
 - `vfr` (only redraw on change) is on; leave it.
 
@@ -244,9 +268,10 @@ What it costs: there is one scale for all monitors, so Steam is the right size o
 to favour another. Every XWayland-only program is drawn at 1x and is tiny (Wayland-native
 ones are not: Firefox, Discord, High Tide, the bar). Proton games started outside gamescope
 now see the monitor's real resolution instead of the scaled one, which is what they want.
-Possible follow-ups, not done: the cursor over Steam may look small (it cannot see
-NixOS's cursor themes inside its container, and zero scaling makes it 1x; the NixOS wiki
-page on Steam has an `XCURSOR_PATH` fix), and Steam may forget its library folders after
+The cursor over Steam and other XWayland windows: `home.pointerCursor` (theme_home.nix)
+puts the Rosé Pine XCursor theme in `~/.icons` (Steam's container sees the home folder and
+the store), and `lua/xwayland.lua` sets `XCURSOR_SIZE` to 32 × the scale in the marker
+file, so it is not 1x. Possible follow-up, not done: Steam may forget its library folders after
 the first start with the variable (re-add `/mnt/games`; reported by steamtinkerlaunch's
 notes). A native Wayland Steam does not exist: Valve's issue #7224 is open, and patching
 `steamwebhelper` to Wayland, which people try, breaks the store and menus. Settings, Interface

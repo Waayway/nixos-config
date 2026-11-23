@@ -5,7 +5,10 @@
 -- workspace opens; no other workspace is tied to a monitor): the enabled monitor with
 -- the highest one wins. Unknown monitors get `unknown_priority`. `internal = true`
 -- marks a laptop panel, which the policy switches off while an external monitor is
--- connected.
+-- connected. `hdr = true` marks a monitor worth HDR in games: while it is the primary,
+-- ScopeBuddy starts gamescope with --hdr-enabled (games/scopebuddy_home.nix). The
+-- desktop itself stays SDR; Hyprland switches the monitor to HDR while a fullscreen
+-- window asks for it (render.cm_auto_hdr, default 1).
 --
 -- Monique (or any experiment) can go in monitors.local.lua next to this file
 -- (git-ignored); it's applied after these and wins.
@@ -24,6 +27,8 @@ return {
             position = "1600x0",
             scale = 2,
             bitdepth = 10,
+            -- ~1060 nits, BT.2020 (EDID).
+            hdr = true,
         },
         {
             name = "tv", -- Philips TV downstairs
