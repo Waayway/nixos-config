@@ -73,9 +73,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       fi
     '';
 
-    # Baldur's Gate 3: straight into the game, past the Larian launcher.
+    # Baldur's Gate 3: straight into the game, past the Larian launcher. The Script
+    # Extender is bin/DWrite.dll (deployed by Limo, games/modding.nix); Wine has its own
+    # DWrite, so the native one has to be preferred or the extender never loads.
     xdg.configFile."scopebuddy/AppID/1086940.conf".text = ''
       # Managed by NixOS (modules/workstation/games/scopebuddy_home.nix).
+      export WINEDLLOVERRIDES="''${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}DWrite=n,b"
       command="$command --skip-launcher"
     '';
   };
