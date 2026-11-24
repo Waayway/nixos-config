@@ -45,8 +45,9 @@
       enable = true;
       live = true;
     };
-    # Kokoro TTS for iris's agent voice (modules/server/services/voice-tts.nix); CPU
-    # only, see docs/agent.md Voice section for why not the Arc A380.
+    # Kokoro TTS for iris's agent voice (modules/server/services/voice-tts.nix), on the
+    # Arc A380 via Vulkan (onnxruntime WebGPU EP); `gpu` defaults to true, see
+    # docs/agent.md Voice section for the GPU-vs-CPU evidence.
     homelab.voiceTts.enable = true;
   };
 

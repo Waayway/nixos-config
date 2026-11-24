@@ -140,14 +140,17 @@ lib.optionalAttrs hostPlatform.isLinux {
             language = "en";
           };
         };
-        # Kokoro TTS (English), replacing Edge TTS: an OpenAI-compatible container on
-        # prod's CPU (modules/server/services/voice-tts.nix; docs/agent.md Voice
-        # section has why CPU, not the Arc A380). `base_url`/`model`/`voice` are
+        # Kokoro TTS (English), replacing Edge TTS: an OpenAI-compatible server on
+        # prod's GPU via Vulkan (onnxruntime's WebGPU execution provider on the
+        # passed-through Arc A380; modules/server/services/voice-tts.nix, docs/agent.md
+        # Voice section has the GPU-vs-CPU evidence). `base_url`/`model`/`voice` are
         # Hermes's `tts.openai.*` keys (tools/tts_tool_openai.py in site-packages);
-        # `af_heart` is Kokoro's best-graded American English voice. `address`/`port`
-        # come from voiceTts (homelab.voiceTts, shared with prod's module — see its
-        # comment for why this is a hardcoded literal, not a flake-wide lookup) instead
-        # of repeating prod's LAN address here by hand. Dutch (Piper) is deferred.
+        # `af_heart` is Kokoro's best-graded American English voice -- any of
+        # voices-v1.0.bin's 54 voices is accepted by the server, so switching is this
+        # one line, not a rebuild of voice-tts.nix. `address`/`port` come from voiceTts
+        # (homelab.voiceTts, shared with prod's module — see its comment for why this
+        # is a hardcoded literal, not a flake-wide lookup) instead of repeating prod's
+        # LAN address here by hand. Dutch (Piper) is deferred.
         tts = {
           provider = "openai";
           openai = {

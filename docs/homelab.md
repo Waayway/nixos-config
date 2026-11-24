@@ -93,7 +93,7 @@ Open items:
 
 | ID | Name | State | OS | vCPU / RAM | Disk (storage) | Role |
 |---|---|---|---|---|---|---|
-| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm → store-lvm) | Nextcloud, Jellyfin, Immich, WhenTo, voice-tts (containers) |
+| 100 | prod | running, onboot | NixOS (this repo), q35 | 4 / 16 GB + Arc A380 | 64 GB (local-lvm → store-lvm) | Nextcloud, Jellyfin, Immich, WhenTo (containers), voice-tts (native systemd, Arc A380 via Vulkan) |
 | 101 | iris | running, onboot | NixOS (this repo) | 4 / 6 GB | 128 GB (store-lvm); old 40 GB disk on local-lvm is `unused0`, delete | Hermes Agent, Discord bot; dashboard `agent.vanwaaij.com` (`docs/agent.md`) |
 | 105 | deploy-box (`jenkins-vm`) | **shut down**, onboot 0 | Rocky 10.1 | 2 / 4 GB | 64 GB (store-lvm) | Jenkins, to retire |
 | 108 | Main (was 100) | **shut down**, onboot 0 | Rocky 10.2 | 4 / 8 GB | 128 GB (store-lvm) | old Traefik + Nextcloud, kept for rollback |
@@ -145,10 +145,14 @@ VM 101 no longer exists.
     no Kanidm), registration closed; the first admin is created at `/bootstrap` with the
     one-time key from `sudo docker logs whento`. No SMTP yet: no verification, magic-link
     or reminder mails. Secrets: 1Password Homelab `whento-config` (`env`).
-  - **voice-tts** (`ghcr.io/remsky/kokoro-fastapi-cpu`, pinned by digest): Kokoro TTS
-    for iris's agent voice, CPU only (the Arc A380 can't run it, see `docs/agent.md`
-    Voice section). No public route, no auth; LAN port 8880 restricted to iris's
-    address only. `--cpus=3` so it can't starve Jellyfin/Immich's transcoding.
+  - **voice-tts** (`pkgs/kokoro-tts`, native systemd service, not a container):
+    Kokoro TTS for iris's agent voice, on the Arc A380 via Vulkan (onnxruntime's
+    WebGPU execution provider, Dawn → Vulkan; see `docs/agent.md` Voice section for
+    why this works where OpenVINO/PyTorch-XPU couldn't, and the measured GPU-vs-CPU
+    numbers). No public route, no auth; LAN port 8880 restricted to iris's address
+    only. `CPUQuota=300%` so the per-node CPU fallback ops can't starve
+    Jellyfin/Immich's transcoding. List voices: `curl
+    http://10.0.10.100:8880/v1/audio/voices`.
 - Mounts (`modules/server/homelab/storage.nix`): `/store` = TrueNAS `/mnt/store/internal`,
   `/archive` = `/mnt/archive/shares`, NFS automounts.
 - **Dumps:** nightly 01:30, `<app>-db-dump` timers write
