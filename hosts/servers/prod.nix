@@ -45,6 +45,9 @@
       enable = true;
       live = true;
     };
+    # Kokoro TTS for iris's agent voice (modules/server/services/voice-tts.nix); CPU
+    # only, see docs/agent.md Voice section for why not the Arc A380.
+    homelab.voiceTts.enable = true;
   };
 
   config =

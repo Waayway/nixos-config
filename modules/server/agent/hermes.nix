@@ -20,6 +20,7 @@ let
   cfg = config.homelab.agent;
   lan = config.homelab.lan;
   secretPaths = config.services.onepassword-secrets.secretPaths;
+  voiceTts = config.homelab.voiceTts;
 
   host = "agent.vanwaaij.com";
   port = 9119;
@@ -122,8 +123,8 @@ lib.optionalAttrs hostPlatform.isLinux {
         # Voice replies in Discord (/voice on or /voice tts): STT via the community
         # ajk0x00/hermes-gemini-stt plugin (Gemini Flash, ~EUR2/mo at Thijs's usage —
         # accepted over free local Whisper for quality; pinned commit, no extra Python
-        # deps per its README). TTS stays free Edge TTS (ships in the default package).
-        # GEMINI_API_KEY comes from opnix (secrets.nix), not config.yaml.
+        # deps per its README). GEMINI_API_KEY comes from opnix (secrets.nix), not
+        # config.yaml.
         #
         # Project-name mis-transcription ("Orakel" -> "Oracle") is fixed with a
         # vocabulary hint, via our own local-stt-vocab plugin (modules/server/agent/
@@ -139,9 +140,25 @@ lib.optionalAttrs hostPlatform.isLinux {
             language = "en";
           };
         };
+        # Kokoro TTS (English), replacing Edge TTS: an OpenAI-compatible container on
+        # prod's CPU (modules/server/services/voice-tts.nix; docs/agent.md Voice
+        # section has why CPU, not the Arc A380). `base_url`/`model`/`voice` are
+        # Hermes's `tts.openai.*` keys (tools/tts_tool_openai.py in site-packages);
+        # `af_heart` is Kokoro's best-graded American English voice. `address`/`port`
+        # come from voiceTts (homelab.voiceTts, shared with prod's module — see its
+        # comment for why this is a hardcoded literal, not a flake-wide lookup) instead
+        # of repeating prod's LAN address here by hand. Dutch (Piper) is deferred.
         tts = {
-          provider = "edge";
-          edge.voice = "en-US-AriaNeural";
+          provider = "openai";
+          openai = {
+            base_url = "http://${voiceTts.address}:${toString voiceTts.port}/v1";
+            model = "kokoro";
+            voice = "af_heart";
+            # Kokoro has no auth; the OpenAI SDK still requires a non-empty key. The
+            # exact literal Kokoro-FastAPI's own README uses for this — not a secret,
+            # never resolved through opnix.
+            api_key = "not-needed";
+          };
         };
         plugins.enabled = [
           "gemini-stt"

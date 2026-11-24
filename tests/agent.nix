@@ -19,6 +19,10 @@ let
   mount = iris.fileSystems."/var/lib/hermes-backup";
   render = iris.homelab.agent.secretsEnvScript;
   fwRule = "iptables -w -A nixos-fw -p tcp -s 10.0.10.110 --dport 9119 -j nixos-fw-accept";
+  prod = nixosConfigurations.prod.config;
+  voiceTts = prod.homelab.voiceTts;
+  voiceTtsContainer = prod.virtualisation.oci-containers.containers.voice-tts;
+  voiceTtsFwRule = "iptables -w -A nixos-fw -p tcp -s ${voiceTts.allowFrom} --dport ${toString voiceTts.port} -j nixos-fw-accept";
 in
 assert iris.networking.hostName == "iris";
 assert iris.homelab.agent.enable;
@@ -38,11 +42,33 @@ assert h.settings.fallback_providers != [ ];
 assert lib.all (f: f.provider != h.settings.model.provider) h.settings.fallback_providers;
 assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_providers;
 # voice replies in Discord (/voice on, /voice tts): STT is the community gemini-stt
-# plugin (Gemini Flash, pay-per-use — the one deliberate exception, see secrets.nix);
-# TTS stays free Edge TTS. The plugin is declared and enabled, and the key is never
-# a plaintext Nix value.
+# plugin (Gemini Flash, pay-per-use — the one deliberate exception, see secrets.nix).
+# The plugin is declared and enabled, and the key is never a plaintext Nix value.
 assert h.settings.stt.provider == "gemini";
-assert h.settings.tts.provider == "edge";
+# TTS: Kokoro on prod's CPU, an OpenAI-compatible container
+# (modules/server/services/voice-tts.nix), not Edge TTS anymore. Real invariants, not
+# literal echoes: iris's base_url is built from prod's own LAN address and the
+# container's own published port (so they can't silently drift apart), the container is
+# bound to that LAN address (not 0.0.0.0), pinned by digest, the firewall opens the port
+# to iris's actual LAN address only (not the whole LAN interface the way
+# jellyfin.nix/immich.nix's ports are), and the key is the server's documented
+# placeholder, so a real key pasted in by mistake fails here.
+assert h.settings.tts.provider != "edge";
+assert h.settings.tts.openai.api_key == "not-needed";
+assert prod.homelab.voiceTts.enable;
+assert voiceTts.allowFrom == iris.homelab.lan.address;
+assert
+  h.settings.tts.openai.base_url == "http://${prod.homelab.lan.address}:${toString voiceTts.port}/v1";
+assert
+  voiceTtsContainer.ports
+  == [ "${prod.homelab.lan.address}:${toString voiceTts.port}:${toString voiceTts.port}" ];
+assert lib.hasInfix "@sha256:" voiceTtsContainer.image;
+assert
+  !(lib.elem voiceTts.port (
+    prod.networking.firewall.interfaces.${prod.homelab.lan.interface}.allowedTCPPorts or [ ]
+  ));
+assert !(lib.elem voiceTts.port prod.networking.firewall.allowedTCPPorts);
+assert lib.hasInfix voiceTtsFwRule prod.networking.firewall.extraCommands;
 assert
   h.settings.plugins.enabled != [ ]
   && lib.elem "gemini-stt" h.settings.plugins.enabled

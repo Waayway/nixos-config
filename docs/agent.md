@@ -50,8 +50,60 @@ ChatGPT plan for Codex), never a pay-per-token key.
 ## Voice
 
 Spoken replies in Discord (not a live voice-channel bot, just TTS on normal text
-messages): `settings.tts` picks free Edge TTS (`tts.provider = "edge"`, ships in the
-default package, no extra dependency group needed).
+messages): `settings.tts` points at Kokoro (English), replacing Edge TTS.
+
+### TTS: Kokoro on prod's CPU
+
+`tts.provider = "openai"` with `tts.openai.base_url` pointed at a Kokoro-FastAPI
+container (`ghcr.io/remsky/kokoro-fastapi-cpu`, OpenAI-compatible `/v1/audio/speech`)
+running on **prod**, not iris: `modules/server/services/voice-tts.nix`, enabled in
+`hosts/servers/prod.nix`. Set in `hermes.nix`:
+```nix
+tts = {
+  provider = "openai";
+  openai = {
+    base_url = "http://${voiceTts.address}:${toString voiceTts.port}/v1"; # voiceTts = config.homelab.voiceTts
+    model = "kokoro";
+    voice = "af_heart";
+    api_key = "not-needed"; # Kokoro has none; the OpenAI SDK needs a non-empty string
+  };
+};
+```
+
+**Why prod's CPU, not the Arc A380 it already passes through for Jellyfin/Immich**:
+Kokoro's ONNX graph doesn't run on OpenVINO at all on this hardware — neither its GPU
+nor its own CPU execution provider can compile it (`Interpolate`/dynamic-rank ops the
+graph uses aren't supported by either plugin), and PyTorch's XPU backend finds zero
+Level Zero GPU drivers on this nixpkgs's `intel-compute-runtime` build. Plain CPU
+inference (what the published image runs) is the only path that produced audio when
+benchmarked directly on prod: short replies synthesize in roughly a quarter of their
+spoken length (RTF ≈0.24, plain ONNX Runtime CPU — a different stack than the
+image's PyTorch CPU backend, but the same order of magnitude), using close to all 4
+vCPUs while synthesizing. `--cpus=3` on the container caps that so a burst of TTS
+calls can't starve Jellyfin/Immich's own transcoding.
+
+The container is LAN-only (`homelab.voiceTts.address`/`.port`, no `homelab.routes`
+entry — iris reaches it directly, same `/24`, no router hop) and restricted to iris's
+source address only, via the same iptables pattern
+`modules/server/monitoring/agent.nix` uses to restrict exporter ports to the monitor
+VM (narrower than Jellyfin/Immich's whole-LAN-interface ports). Kokoro-FastAPI has no
+authentication of its own, so that source-IP restriction is the only access control —
+noted here since there's no further hardening planned. The model and voice packs are
+baked into the image at build time; nothing needs to download at container start, so
+no persistent volume was added (see the module's comment for the evidence).
+
+Test it directly from iris once prod is deployed:
+```sh
+curl -s http://10.0.10.100:8880/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"kokoro","voice":"af_heart","input":"Hello from Kokoro.","response_format":"wav"}' \
+  -o /tmp/test.wav
+```
+
+Dutch (Piper) is deferred — the owner speaks both languages, but Kokoro has no Dutch
+voice and this PR only replaces the English path. A future pass would need a small
+language-routing layer in front of both providers (English → Kokoro, Dutch → Piper);
+out of scope here.
 
 STT (transcribing voice messages) is the community `ajk0x00/hermes-gemini-stt` plugin
 (`settings.stt.provider = "gemini"`, model `gemini-3.8-flash`), installed declaratively
