@@ -37,12 +37,15 @@
 # gamescope asks for it (render.cm_auto_hdr). `SCB_HDR=0 scb -- %command%` turns it off
 # for one game. No vk-hdr-layer or ENABLE_HDR_WSI: Mesa has it built in, and the layer
 # breaks gamescope.
+#
+# Per-game arguments: AppID/<steam appid>.conf is sourced after scb.conf, so it can append
+# to $command. The ones below are managed; other AppID files are left to ScopeBuddy.
 lib.optionalAttrs hostPlatform.isLinux {
   config = lib.mkIf (osConfig != null && (osConfig.programs.games.enable or false)) {
     xdg.configFile."scopebuddy/scb.conf".text = ''
       # Managed by NixOS (modules/workstation/games/scopebuddy_home.nix). Per-game
       # settings go in ~/.config/scopebuddy/AppID/<steam appid>.conf, which is sourced after
-      # this file and is not managed.
+      # this file.
 
       hypr="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr"
       primary="$(cat "$hypr/primary-monitor" 2>/dev/null || true)"
@@ -68,6 +71,12 @@ lib.optionalAttrs hostPlatform.isLinux {
       if command -v gamemoderun >/dev/null; then
         command="gamemoderun $command"
       fi
+    '';
+
+    # Baldur's Gate 3: straight into the game, past the Larian launcher.
+    xdg.configFile."scopebuddy/AppID/1086940.conf".text = ''
+      # Managed by NixOS (modules/workstation/games/scopebuddy_home.nix).
+      command="$command --skip-launcher"
     '';
   };
 }
