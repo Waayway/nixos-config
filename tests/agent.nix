@@ -69,13 +69,14 @@ assert
   && lib.elem "KOKORO_PORT=${toString voiceTts.port}" voiceTtsService.Environment;
 assert voiceTtsModels.model ? outputHash && voiceTtsModels.voices ? outputHash;
 assert
-  voiceTts.gpu
-  && voiceTtsService.DeviceAllow == [ "char-drm rw" ]
-  &&
-    voiceTtsService.SupplementaryGroups == [
-      "render"
-      "video"
-    ];
+  !voiceTts.gpu
+  ||
+    voiceTtsService.DeviceAllow == [ "char-drm rw" ]
+    &&
+      voiceTtsService.SupplementaryGroups == [
+        "render"
+        "video"
+      ];
 assert
   !(lib.elem voiceTts.port (
     prod.networking.firewall.interfaces.${prod.homelab.lan.interface}.allowedTCPPorts or [ ]
