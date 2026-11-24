@@ -91,7 +91,62 @@ Send a voice message in Discord (DM or the home channel, since
 `DISCORD_REQUIRE_MENTION=false`) to talk to iris by voice from a phone — no separate
 app needed, Discord already has push notifications and voice messages. A live
 Discord voice-channel bot (`/voice join`) is a separate, heavier mode (needs
-`Connect`/`Speak` permissions and privileged intents) and is not set up here.
+`Connect`/`Speak` permissions and privileged intents); Thijs has used it, but see the
+known bug below — spoken replies currently never play back in the voice channel.
+
+### Fast voice model
+
+Any turn tagged `MessageType.VOICE` (a Discord voice-note reply or a live voice-channel
+turn) runs on `auxiliary.voice_chat` instead of the main Sonnet/Opus model — a
+livetalk-style voice session wants an instant small-talk reply, not full-model latency.
+Set in `hermes.nix`:
+```nix
+auxiliary.voice_chat = {
+  provider = "anthropic";
+  model = "claude-haiku-5-5";
+};
+```
+`claude-haiku-5-5` is the newest Haiku id this Hermes install's live model catalog
+knows for the `anthropic` provider (`~/.hermes/models_dev_cache.json`; the package's
+own bundled fallback catalog, `hermes_cli/models_catalog_static.py`, only has the
+older `claude-haiku-4-5-20251001` and is a disk-cache-unavailable fallback, not the
+account's real catalog). Hermes falls back to the main model by itself once a
+conversation's history no longer fits the cheaper model's context window
+(`agent/voice_turn_route.py`). `delegation.model`/`delegation.provider` are
+deliberately left unset: when the voice turn hands real work off with
+`delegate_task`, the delegated work keeps running on whichever model its own
+channel/session already uses, instead of being forced onto Haiku.
+
+### Bilingual STT
+
+Thijs speaks both Dutch and English, often in the same conversation. The gemini-stt
+plugin's `language_mode` setting (`plugins.entries.gemini-stt.settings.language_mode`,
+read via its own `ctx.get_config`, **not** `stt.gemini.*`, which is Hermes's own
+tree) defaults to `"hint"`: it forces every utterance to be transcribed as
+`stt.gemini.language` (`"en"`). Set to `"auto"` in `hermes.nix` so Gemini detects the
+spoken language per utterance instead — true per-utterance code-switching, one
+Gemini call, no second STT pass. `stt.gemini.language` stays set but is now inert
+(kept as the default if `language_mode` is ever switched back to `"hint"`).
+
+### Diagnostic logging (temporary)
+
+`sitecustomize.py` (same file as the opus/plugin-gate fixes above) also wraps 8
+functions in the voice-reply pipeline (`BasePlatformAdapter._wants_auto_tts`,
+`_synthesize_auto_tts`, `_play_tts_file`; the Discord adapter's `play_tts` and
+`play_in_voice_channel`; `GatewayVoiceMixin._should_send_voice_reply`,
+`_toggle_adapter_auto_tts_set`, `_sync_voice_mode_state_to_adapter`) to log one
+`logger.warning` line per call, prefix `voice-diag:` (visible in both `gateway.log`
+and `errors.log`, since `logger.warning` clears `errors.log`'s WARNING+ threshold),
+with the real inputs, adapter identity (`id(...)`), and the real decision — then
+return/raise exactly what the original did (proven behavior-preserving against the
+live pinned interpreter in `.../cache/scratch/voice-b1/harness.py`). It exists to
+pin down the open bug above: `/voice join` + `/voice on` leave the bot joined and
+listening, but no spoken reply is ever played back, and neither TTS gate logs so
+much as a warning on the failing path — something only a live trace of these 8
+calls' actual inputs (in particular `id(adapter)`, to catch an adapter replaced by
+a reconnect after `/voice on` populated a different instance's enabled-chats set)
+can pin down. **Remove this whole block once that live trace identifies the real
+cause and a real fix lands** — it is diagnostics only, not a fix.
 
 ## Claude coding workers (ACP, no tmux)
 

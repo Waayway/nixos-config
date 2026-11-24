@@ -90,6 +90,24 @@ lib.optionalAttrs hostPlatform.isLinux {
             model = "gpt-6-sol";
           }
         ];
+        # Spoken turns in Discord voice (any MessageType.VOICE turn, see
+        # agent/voice_turn_route.py) run on Haiku instead of the main model: a livetalk-style
+        # voice session wants instant small talk, not Sonnet/Opus latency, and Hermes falls
+        # back to the main model by itself when the conversation no longer fits the cheaper
+        # model's context window. `claude-haiku-5-5` is the newest Haiku id this Hermes
+        # install's live model catalog knows for the direct `anthropic` provider
+        # (`~/.hermes/models_dev_cache.json`, key "anthropic" -> models["claude-haiku-5-5"]:
+        # name "Claude Haiku 5.5", release_date 2026-10-07 — newer than the bundled static
+        # fallback catalog's `claude-haiku-4-5-20251001`,
+        # hermes_cli/models_catalog_static.py's "anthropic" list, which is only a disk-cache-
+        # unavailable fallback, not the account's real catalog). `delegation.model` is
+        # deliberately left unset: handed-off work (delegate_task) must keep running on
+        # whichever model the session/channel it's delegated FROM is already using, not be
+        # forced onto Haiku.
+        auxiliary.voice_chat = {
+          provider = "anthropic";
+          model = "claude-haiku-5-5";
+        };
         # Behind the router (Traefik, Kanidm gate): the only peer whose forwarded
         # headers count, and the name the dashboard accepts as Host.
         dashboard = {
@@ -129,6 +147,19 @@ lib.optionalAttrs hostPlatform.isLinux {
           "gemini-stt"
           "local-stt-vocab"
         ];
+        # Thijs speaks both Dutch and English in the same voice session; the plugin's
+        # default `language_mode: "hint"` sends `stt.gemini.language` above as a fixed hint
+        # (verified in the plugin's own source, _payload.py: `if settings.language_mode ==
+        # "hint"` gates both the transcribe-model `language_codes` list and the general-model
+        # language hint text), which would force every utterance to be read as English.
+        # "auto" drops that hint entirely and lets Gemini's own SYSTEM_INSTRUCTION detect the
+        # spoken language per utterance (_text.py) — true per-utterance code-switching, one
+        # Gemini call, no second STT pass. `stt.gemini.language` above is then inert (kept so
+        # a future switch back to "hint" has a sane default); settings live under
+        # `plugins.entries.<name>.settings` per the plugin's own _settings.py docstring, not
+        # under `stt.gemini.*` (that sub-tree is Hermes's own, read directly by the gateway,
+        # not the plugin).
+        plugins.entries.gemini-stt.settings.language_mode = "auto";
 
         # Iris is a coding/ops agent on Discord, not a general assistant: trim the
         # bundled skill catalog down to the agent and software-development ones
@@ -303,6 +334,223 @@ lib.optionalAttrs hostPlatform.isLinux {
 
             if _pm.running_hermes_version() == "0.0.0":
                 _pm.running_hermes_version = lambda: "0.23.0"
+        except Exception:
+            pass
+
+        # TEMPORARY (docs/agent.md Voice section has the removal note): the owner's voice
+        # replies join a live Discord VC (STT works) but nothing is ever spoken back, with
+        # zero matching log line in gateway.log or errors.log in any /voice session on
+        # record — so the two real TTS gates (_wants_auto_tts / _should_send_voice_reply) and
+        # the adapter-side state they read never even reach a warning on the failing path. A
+        # harness against these same unmodified classes proves the gates work correctly given
+        # the state `/voice join`+`/voice on` are documented to leave behind, so the gap is in
+        # the LIVE adapter's actual runtime state (e.g. a reconnect replacing the adapter
+        # instance after `/voice on` populated the old one's enabled-chats set) diverging from
+        # that documented state — something only a live trace can show. Each wrap below logs
+        # one `logger.warning` (prefix "voice-diag:") per call with the real inputs/adapter
+        # identity (`id(...)`) and the real decision, then returns/raises exactly what the
+        # unmodified original did — proven behavior-preserving in
+        # .../cache/scratch/voice-b1/harness.py against the live pinned interpreter (mocks only
+        # Discord I/O and the TTS tool). Remove this whole block once that live trace pins the
+        # failing condition and the real fix lands.
+        try:
+            import functools as _voice_diag_functools
+            import inspect as _voice_diag_inspect
+            import logging as _voice_diag_logging
+
+            from gateway.platforms.event import MessageType as _VoiceDiagMessageType
+
+            def _voice_diag_wrap(cls, attr, logger_, describe):
+                """Patch cls.attr: log one logger.warning('voice-diag: ...') per call, built by
+                describe(bound_args, result=..., exc=...) from the real inputs and the real
+                outcome, then return/raise exactly what the original did. Temporary (see
+                docs/agent.md Voice section): remove once the Discord speak-back bug is fixed."""
+                raw = cls.__dict__.get(attr)
+                is_static = isinstance(raw, staticmethod)
+                original = raw.__func__ if is_static else getattr(cls, attr)
+                sig = _voice_diag_inspect.signature(original)
+
+                def _bind(args, kwargs):
+                    bound = sig.bind(*args, **kwargs)
+                    bound.apply_defaults()
+                    return bound.arguments
+
+                if _voice_diag_inspect.iscoroutinefunction(original):
+                    @_voice_diag_functools.wraps(original)
+                    async def wrapper(*args, **kwargs):
+                        ba = _bind(args, kwargs)
+                        try:
+                            result = await original(*args, **kwargs)
+                        except Exception as exc:
+                            logger_.warning("voice-diag: %s", describe(ba, exc=exc))
+                            raise
+                        logger_.warning("voice-diag: %s", describe(ba, result=result))
+                        return result
+                else:
+                    @_voice_diag_functools.wraps(original)
+                    def wrapper(*args, **kwargs):
+                        ba = _bind(args, kwargs)
+                        try:
+                            result = original(*args, **kwargs)
+                        except Exception as exc:
+                            logger_.warning("voice-diag: %s", describe(ba, exc=exc))
+                            raise
+                        logger_.warning("voice-diag: %s", describe(ba, result=result))
+                        return result
+                setattr(cls, attr, staticmethod(wrapper) if is_static else wrapper)
+
+            def _voice_diag_outcome(result, exc):
+                return f"result={result!r}" if exc is None else f"exc={exc!r}"
+        except Exception:
+            pass
+
+        try:
+            import gateway.platforms.base as _voice_diag_base
+
+            def _voice_diag_describe_wants_auto_tts(ba, result=None, exc=None):
+                self_, event = ba["self"], ba["event"]
+                chat_id = event.source.chat_id
+                text_content = ba.get("text_content") or ""
+                media_files = ba.get("media_files") or []
+                return (
+                    f"_wants_auto_tts chat_id={chat_id} message_type={event.message_type} "
+                    f"text_len={len(text_content)} media_files={len(media_files)} adapter={id(self_)} "
+                    f"chat_enabled={chat_id in self_._auto_tts_enabled_chats} "
+                    f"chat_disabled={chat_id in self_._auto_tts_disabled_chats} "
+                    f"auto_tts_default={self_._auto_tts_default} {_voice_diag_outcome(result, exc)}"
+                )
+
+            _voice_diag_wrap(
+                _voice_diag_base.BasePlatformAdapter, "_wants_auto_tts",
+                _voice_diag_logging.getLogger("gateway.platforms.base"),
+                _voice_diag_describe_wants_auto_tts)
+        except Exception:
+            pass
+
+        try:
+            import gateway.platforms.base as _voice_diag_base
+
+            def _voice_diag_describe_synthesize_auto_tts(ba, result=None, exc=None):
+                self_ = ba["self"]
+                text_content = ba.get("text_content") or ""
+                return (
+                    f"_synthesize_auto_tts adapter={id(self_)} text_len={len(text_content)} "
+                    f"{_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_base.BasePlatformAdapter, "_synthesize_auto_tts",
+                _voice_diag_logging.getLogger("gateway.platforms.base"),
+                _voice_diag_describe_synthesize_auto_tts)
+        except Exception:
+            pass
+
+        try:
+            import gateway.platforms.base as _voice_diag_base
+
+            def _voice_diag_describe_play_tts_file(ba, result=None, exc=None):
+                self_, event = ba["self"], ba["event"]
+                return (
+                    f"_play_tts_file chat_id={event.source.chat_id} tts_path={ba.get('tts_path')!r} "
+                    f"first={ba.get('first')} adapter={id(self_)} {_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_base.BasePlatformAdapter, "_play_tts_file",
+                _voice_diag_logging.getLogger("gateway.platforms.base"),
+                _voice_diag_describe_play_tts_file)
+        except Exception:
+            pass
+
+        try:
+            import plugins.platforms.discord.adapter as _voice_diag_discord
+
+            def _voice_diag_describe_discord_play_tts(ba, result=None, exc=None):
+                self_, chat_id = ba["self"], ba["chat_id"]
+                guild_id = next(
+                    (gid for gid, ch in self_._voice_text_channels.items() if str(ch) == str(chat_id)),
+                    None)
+                in_vc = self_.is_in_voice_channel(guild_id) if guild_id is not None else None
+                return (
+                    f"play_tts chat_id={chat_id} audio_path={ba.get('audio_path')!r} adapter={id(self_)} "
+                    f"guild_id={guild_id} is_in_voice_channel={in_vc} {_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_discord.DiscordAdapter, "play_tts",
+                _voice_diag_logging.getLogger("plugins.platforms.discord.adapter"),
+                _voice_diag_describe_discord_play_tts)
+        except Exception:
+            pass
+
+        try:
+            import plugins.platforms.discord.adapter as _voice_diag_discord
+
+            def _voice_diag_describe_play_in_voice_channel(ba, result=None, exc=None):
+                self_, guild_id = ba["self"], ba["guild_id"]
+                return (
+                    f"play_in_voice_channel guild_id={guild_id} audio_path={ba.get('audio_path')!r} "
+                    f"adapter={id(self_)} is_in_voice_channel={self_.is_in_voice_channel(guild_id)} "
+                    f"{_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_discord.DiscordAdapter, "play_in_voice_channel",
+                _voice_diag_logging.getLogger("plugins.platforms.discord.adapter"),
+                _voice_diag_describe_play_in_voice_channel)
+        except Exception:
+            pass
+
+        try:
+            import gateway.run_voice as _voice_diag_run_voice
+
+            def _voice_diag_describe_should_send_voice_reply(ba, result=None, exc=None):
+                self_, event = ba["self"], ba["event"]
+                is_voice_input = event.message_type == _VoiceDiagMessageType.VOICE
+                voice_mode = self_._voice_mode.get(self_._voice_key_for_source(event.source))
+                return (
+                    f"_should_send_voice_reply chat_id={event.source.chat_id} "
+                    f"is_voice_input={is_voice_input} already_sent={ba.get('already_sent')} "
+                    f"voice_mode={voice_mode!r} runner={id(self_)} {_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_run_voice.GatewayVoiceMixin, "_should_send_voice_reply",
+                _voice_diag_logging.getLogger("gateway.run"),
+                _voice_diag_describe_should_send_voice_reply)
+        except Exception:
+            pass
+
+        try:
+            import gateway.run_voice as _voice_diag_run_voice
+
+            def _voice_diag_describe_toggle_adapter_auto_tts_set(ba, result=None, exc=None):
+                adapter, chat_id = ba["adapter"], ba.get("chat_id")
+                return (
+                    f"_toggle_adapter_auto_tts_set adapter={id(adapter)} chat_id={chat_id!r} "
+                    f"on={ba.get('on')} enable={ba.get('enable')} "
+                    f"enabled_after={chat_id in getattr(adapter, '_auto_tts_enabled_chats', ())} "
+                    f"disabled_after={chat_id in getattr(adapter, '_auto_tts_disabled_chats', ())} "
+                    f"{_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_run_voice.GatewayVoiceMixin, "_toggle_adapter_auto_tts_set",
+                _voice_diag_logging.getLogger("gateway.run"),
+                _voice_diag_describe_toggle_adapter_auto_tts_set)
+        except Exception:
+            pass
+
+        try:
+            import gateway.run_voice as _voice_diag_run_voice
+
+            def _voice_diag_describe_sync_voice_mode_state_to_adapter(ba, result=None, exc=None):
+                adapter = ba["adapter"]
+                return (
+                    f"_sync_voice_mode_state_to_adapter adapter={id(adapter)} "
+                    f"enabled={sorted(getattr(adapter, '_auto_tts_enabled_chats', ()))!r} "
+                    f"disabled={sorted(getattr(adapter, '_auto_tts_disabled_chats', ()))!r} "
+                    f"auto_tts_default={getattr(adapter, '_auto_tts_default', None)} "
+                    f"{_voice_diag_outcome(result, exc)}")
+
+            _voice_diag_wrap(
+                _voice_diag_run_voice.GatewayVoiceMixin, "_sync_voice_mode_state_to_adapter",
+                _voice_diag_logging.getLogger("gateway.run"),
+                _voice_diag_describe_sync_voice_mode_state_to_adapter)
         except Exception:
             pass
       ''
