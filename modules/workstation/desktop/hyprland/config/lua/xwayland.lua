@@ -12,6 +12,11 @@
 -- RX 9070's 64x64 cursor plane (DRM_CAP_CURSOR_WIDTH): only its top-left part showed.
 -- Hyprland checks the buffer size against the plane, not the drawn size, so it does not
 -- fall back to a software cursor for this.
+--
+-- Keeping XCURSOR_SIZE at 32 is not enough: Steam (Chromium) multiplies it by its own
+-- scale from Xft.dpi below and hands Xwayland a 64 px cursor ("Caching cursor image ...
+-- size 64x64" in the journal), which Hyprland again draws at 128 px. So with the marker
+-- the cursor is drawn in software, where any size fits.
 local marker = io.open("/etc/hypr/xwayland-zero-scaling", "r")
 if marker then
     local scale = tonumber(marker:read("*l") or "") or 1
@@ -19,6 +24,9 @@ if marker then
     hl.config({
         xwayland = {
             force_zero_scaling = true,
+        },
+        cursor = {
+            no_hardware_cursors = 1,
         },
     })
 
