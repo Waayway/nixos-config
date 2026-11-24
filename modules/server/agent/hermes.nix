@@ -145,18 +145,21 @@ lib.optionalAttrs hostPlatform.isLinux {
         # passed-through Arc A380; modules/server/services/voice-tts.nix, docs/agent.md
         # Voice section has the GPU-vs-CPU evidence). `base_url`/`model`/`voice` are
         # Hermes's `tts.openai.*` keys (tools/tts_tool_openai.py in site-packages);
-        # `af_heart` is Kokoro's best-graded American English voice -- any of
-        # voices-v1.0.bin's 54 voices is accepted by the server, so switching is this
-        # one line, not a rebuild of voice-tts.nix. `address`/`port` come from voiceTts
-        # (homelab.voiceTts, shared with prod's module — see its comment for why this
-        # is a hardcoded literal, not a flake-wide lookup) instead of repeating prod's
-        # LAN address here by hand. Dutch (Piper) is deferred.
+        # `voice` is a Kokoro-FastAPI-style blend ("name(weight)+name(weight)+...",
+        # weights optional, normalised to sum to 1) -- the owner's pick over the plain
+        # `af_heart` default, 70/30 toward `af_nova`. Any single voice or blend of
+        # voices-v1.0.bin's 54 voices is accepted by the server (docs/agent.md Voice
+        # section has the syntax), so switching is this one line, not a rebuild of
+        # voice-tts.nix. `address`/`port` come from voiceTts (homelab.voiceTts, shared
+        # with prod's module — see its comment for why this is a hardcoded literal,
+        # not a flake-wide lookup) instead of repeating prod's LAN address here by
+        # hand. Dutch (Piper) is deferred.
         tts = {
           provider = "openai";
           openai = {
             base_url = "http://${voiceTts.address}:${toString voiceTts.port}/v1";
             model = "kokoro";
-            voice = "af_heart";
+            voice = "af_heart(0.7)+af_nova(0.3)";
             # Kokoro has no auth; the OpenAI SDK still requires a non-empty key. The
             # exact literal Kokoro-FastAPI's own README uses for this — not a secret,
             # never resolved through opnix.

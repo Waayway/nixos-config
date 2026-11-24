@@ -61,7 +61,7 @@ lib.optionalAttrs hostPlatform.isLinux {
     defaultVoice = lib.mkOption {
       type = lib.types.str;
       default = "af_heart";
-      description = "Default voice for requests that omit one. Any voice in voices-v1.0.bin is selectable per request (GET /v1/audio/voices lists them); this is a one-line setting to change later, not a hard limit.";
+      description = "Default voice (or Kokoro-FastAPI-style blend, e.g. \"af_heart(0.7)+af_nova(0.3)\") for requests that omit one. Any voice in voices-v1.0.bin is selectable per request (GET /v1/audio/voices lists them); this is a one-line setting to change later, not a hard limit.";
     };
     gpu = lib.mkOption {
       type = lib.types.bool;

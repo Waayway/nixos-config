@@ -64,7 +64,7 @@ tts = {
   openai = {
     base_url = "http://${voiceTts.address}:${toString voiceTts.port}/v1"; # voiceTts = config.homelab.voiceTts
     model = "kokoro";
-    voice = "af_heart"; # any voice in voices-v1.0.bin; a one-line change, not a rebuild
+    voice = "af_heart(0.7)+af_nova(0.3)"; # a blend (see below); a one-line change, not a rebuild
     api_key = "not-needed"; # Kokoro has none; the OpenAI SDK needs a non-empty string
   };
 };
@@ -118,12 +118,25 @@ noted here since there's no further hardening planned. The model (`kokoro-v1.0.o
 and voice pack (`voices-v1.0.bin`) are `fetchurl` pins (thewh1teagle/kokoro-onnx
 release `model-files-v1.1`), fixed-output derivations checked by `tests/agent.nix`.
 
+**Voice blends** (`voice`, Kokoro-FastAPI's own syntax, implemented in `server.py`'s
+`_resolve_voice_style`): `"name1(weight1)+name2(weight2)+..."`. Weights are optional
+per name — `"af_heart+af_nova"` is an equal split — and whatever is given is
+normalised to sum to 1 regardless (`"af_heart(2)+af_nova(1)"` is the same blend as
+`"af_heart(0.7)+af_nova(0.3)"` to one rounding digit). Implemented as a weighted sum
+of each named voice's full style vector (`Kokoro.get_voice_style(name)`), passed to
+`.create()` as an array instead of a name — a plain single name is just a one-term
+"blend" of weight 1, so it resolves to the exact same array `.create()` would have
+used directly; no behavior change for non-blended requests. Unknown names in a blend
+get HTTP 400 with the full voice list (`"valid_voices"`) in the body; malformed
+syntax or a non-positive weight sum are also 400. Parsed blends are cached by their
+exact spec string, so repeat requests for the same blend skip reparsing.
+
 Test it directly from iris once prod is deployed:
 ```sh
 curl -s http://10.0.10.100:8880/v1/audio/voices   # lists all 54 af_*/bf_*/... voices
 curl -s http://10.0.10.100:8880/v1/audio/speech \
   -H 'Content-Type: application/json' \
-  -d '{"model":"kokoro","voice":"af_heart","input":"Hello from Kokoro.","response_format":"wav"}' \
+  -d '{"model":"kokoro","voice":"af_heart(0.7)+af_nova(0.3)","input":"Hello from Kokoro.","response_format":"wav"}' \
   -o /tmp/test.wav
 ```
 

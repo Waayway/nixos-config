@@ -6,12 +6,18 @@ Dawn) first with CPUExecutionProvider as the per-node fallback for ops WebGPU
 doesn't implement, or CPU-only. If WebGPU session init itself raises, this
 falls back to a CPU-only session so the bot keeps a voice (logged as a
 WARNING, not fatal).
+
+The `voice` field accepts a single name (e.g. "af_heart") or a Kokoro-FastAPI
+style blend ("af_heart(0.7)+af_nova(0.3)"; weights optional, missing ones
+default to 1 and the whole set is normalised to sum to 1) -- see
+_resolve_voice_style.
 """
 
 import io
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import time
@@ -58,6 +64,52 @@ LANG_BY_VOICE_PREFIX = {
 
 _inference_lock = threading.Lock()
 
+# Voice blends, Kokoro-FastAPI style: "af_heart(0.7)+af_nova(0.3)". Weights are
+# optional per token (missing = 1, so an all-bare blend like "af_heart+af_nova"
+# is an equal split); all weights are normalised to sum to 1 regardless. A plain
+# single name with no "+" and no "(...)" also matches this (one token, weight 1,
+# normalised to 1) and resolves to the exact same style array .create() would
+# have used for that name directly -- no behavior change for ordinary requests.
+_BLEND_TOKEN_RE = re.compile(r"^([A-Za-z0-9_]+)(?:\(\s*([-+]?[0-9]*\.?[0-9]+)\s*\))?$")
+_blend_cache: dict[str, np.ndarray] = {}
+_blend_cache_lock = threading.Lock()
+
+
+class UnknownVoiceError(ValueError):
+    def __init__(self, name):
+        super().__init__(f"unknown voice {name!r}")
+        self.name = name
+
+
+def _resolve_voice_style(spec: str) -> np.ndarray:
+    cached = _blend_cache.get(spec)
+    if cached is not None:
+        return cached
+
+    names = []
+    weights = []
+    for token in spec.split("+"):
+        match = _BLEND_TOKEN_RE.match(token.strip())
+        if not match:
+            raise ValueError(f"malformed voice spec {token!r} in {spec!r}")
+        name, weight = match.group(1), match.group(2)
+        if name not in VOICE_NAMES:
+            raise UnknownVoiceError(name)
+        names.append(name)
+        weights.append(float(weight) if weight is not None else 1.0)
+
+    total = sum(weights)
+    if total <= 0:
+        raise ValueError(f"voice blend weights must sum to a positive number: {spec!r}")
+
+    blended = sum(
+        (w / total) * _kokoro.get_voice_style(n) for w, n in zip(weights, names)
+    ).astype(np.float32)
+
+    with _blend_cache_lock:
+        _blend_cache[spec] = blended
+    return blended
+
 
 def _build_session():
     providers = ["WebGpuExecutionProvider", "CPUExecutionProvider"] if USE_GPU else ["CPUExecutionProvider"]
@@ -83,19 +135,22 @@ _kokoro = Kokoro.from_session(
     espeak_config=EspeakConfig(lib_path=ESPEAK_LIB_PATH, data_path=ESPEAK_DATA_PATH),
 )
 VOICE_NAMES = sorted(_kokoro.voices.keys())
-if DEFAULT_VOICE not in VOICE_NAMES:
-    raise RuntimeError(f"KOKORO_DEFAULT_VOICE={DEFAULT_VOICE!r} is not in {VOICES_PATH}")
+try:
+    _default_voice_style = _resolve_voice_style(DEFAULT_VOICE)
+except ValueError as error:
+    raise RuntimeError(f"KOKORO_DEFAULT_VOICE={DEFAULT_VOICE!r} is invalid: {error}") from error
 
 # Warm the shader/graph compile cache with one short synth before serving (the
 # one-time ~0.8s Dawn/Vulkan shader-pipeline-compile tax w6 measured).
 _warm_start = time.monotonic()
 with _inference_lock:
-    _kokoro.create("Ready.", voice=DEFAULT_VOICE, speed=1.0, lang="en-us")
+    _kokoro.create("Ready.", voice=_default_voice_style, speed=1.0, lang="en-us")
 log.info("warmed up in %.2fs, %d voices available", time.monotonic() - _warm_start, len(VOICE_NAMES))
 
 
-def _lang_for(voice: str) -> str:
-    return LANG_BY_VOICE_PREFIX.get(voice[0], "en-us")
+def _lang_for(voice_spec: str) -> str:
+    first_name = voice_spec.split("+", 1)[0].split("(", 1)[0].strip()
+    return LANG_BY_VOICE_PREFIX.get(first_name[:1], "en-us")
 
 
 def _pcm_from_floats(samples: np.ndarray) -> bytes:
@@ -170,19 +225,27 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             self._send_json(400, {"error": "'input' is required"})
             return
-        voice = payload.get("voice", DEFAULT_VOICE)
-        if voice not in VOICE_NAMES:
-            self._send_json(400, {"error": f"unknown voice {voice!r}"})
-            return
+        voice_spec = payload.get("voice", DEFAULT_VOICE)
         fmt = payload.get("response_format", "mp3")
         if fmt not in _CONTENT_TYPES:
             self._send_json(400, {"error": f"unsupported response_format {fmt!r}"})
             return
 
         try:
+            voice_style = _resolve_voice_style(voice_spec)
+        except UnknownVoiceError as error:
+            self._send_json(400, {"error": str(error), "valid_voices": VOICE_NAMES})
+            return
+        except ValueError as error:
+            self._send_json(400, {"error": str(error)})
+            return
+
+        try:
             speed = float(payload.get("speed", 1.0))
             with _inference_lock:
-                samples, _sr = _kokoro.create(text, voice=voice, speed=speed, lang=_lang_for(voice))
+                samples, _sr = _kokoro.create(
+                    text, voice=voice_style, speed=speed, lang=_lang_for(voice_spec)
+                )
         except ValueError as error:
             self._send_json(400, {"error": str(error)})
             return
