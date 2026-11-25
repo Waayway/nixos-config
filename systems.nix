@@ -9,7 +9,14 @@ let
   version = "26.05";
   # acpx (modules/server/agent/, docs/agent.md): not in nixpkgs, packaged locally
   # (pkgs/acpx, out of modules/ so umport doesn't pick it up as a module).
-  overlays = [ (final: _prev: { acpx = final.callPackage ./pkgs/acpx/package.nix { }; }) ];
+  # kokoro-tts-server (modules/server/services/voice-tts.nix, docs/agent.md): same
+  # reason, pkgs/kokoro-tts.
+  overlays = [
+    (final: _prev: {
+      acpx = final.callPackage ./pkgs/acpx/package.nix { };
+      kokoro-tts-server = final.callPackage ./pkgs/kokoro-tts/package.nix { };
+    })
+  ];
 
   # System builders (lib/) and helpers for modules (tools/), keyed by file name.
   builders = import ./lib { inherit lib; };

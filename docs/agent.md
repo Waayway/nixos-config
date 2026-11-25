@@ -50,8 +50,106 @@ ChatGPT plan for Codex), never a pay-per-token key.
 ## Voice
 
 Spoken replies in Discord (not a live voice-channel bot, just TTS on normal text
-messages): `settings.tts` picks free Edge TTS (`tts.provider = "edge"`, ships in the
-default package, no extra dependency group needed).
+messages): `settings.tts` points at Kokoro (English), replacing Edge TTS.
+
+### TTS: Kokoro on prod's GPU (Vulkan / onnxruntime WebGPU)
+
+`tts.provider = "openai"` with `tts.openai.base_url` pointed at `kokoro-tts-server`
+(`pkgs/kokoro-tts`, OpenAI-compatible `/v1/audio/speech`, a native systemd service,
+not a container) running on **prod**, not iris: `modules/server/services/voice-tts.nix`,
+enabled in `hosts/servers/prod.nix`. Set in `hermes.nix`:
+```nix
+tts = {
+  provider = "openai";
+  openai = {
+    base_url = "http://${voiceTts.address}:${toString voiceTts.port}/v1"; # voiceTts = config.homelab.voiceTts
+    model = "kokoro";
+    voice = "af_heart(0.7)+af_nova(0.3)"; # a blend (see below); a one-line change, not a rebuild
+    api_key = "not-needed"; # Kokoro has none; the OpenAI SDK needs a non-empty string
+  };
+};
+```
+
+**Why the Arc A380 now, when it couldn't run Kokoro at all before**: the earlier
+OpenVINO/PyTorch-XPU dead ends (Kokoro's ONNX graph has ops OpenVINO's EPs can't
+compile; PyTorch XPU finds zero Level Zero drivers on this nixpkgs) are specific to
+those two backends, not to the GPU itself. `onnxruntime`'s **WebGPU** execution
+provider (Dawn, which dispatches to Vulkan on Linux) runs the same graph on the same
+A380 and **beats** prod's CPU baseline: medium-text RTF 0.197–0.198 vs plain CPU's
+0.230–0.255 (~15–22% faster), while cutting CPU use from a sustained ~390% to a bursty
+<100% (freeing it for Jellyfin/Immich's own transcoding) — backed by `/sys/class/drm`
+GPU-frequency ramps and `/proc/<pid>/fdinfo` VRAM/engine-busy counters during the
+run, not just provider enumeration (w6-report.md has the full evidence). A handful of
+dynamic-rank/sequence ops still fall back to CPU per-node (1815 of ~2254 graph nodes
+ran on WebGPU in the measured run) instead of failing, the same op class that blocked
+OpenVINO entirely.
+
+Two non-obvious packaging decisions (`pkgs/kokoro-tts/*.nix` have the full reasoning):
+- **`onnxruntime-webgpu` (vendored wheel, pinned by hash) is the only onnxruntime
+  build in the whole closure.** It and nixpkgs' plain `onnxruntime` both provide the
+  same top-level `onnxruntime` module; `kokoro-onnx`'s own dependency on plain
+  `onnxruntime` is deliberately never listed in its Nix package (`pythonRemoveDeps`),
+  so nothing ever pulls the CPU-only build in alongside it.
+- **No vendored `espeakng-loader` wheel.** `kokoro-onnx` phonemizes through
+  `phonemizer` + espeak-ng; PyPI's `espeakng-loader` exists only to point phonemizer
+  at a *bundled* `libespeak-ng.so` + a duplicate copy of espeak-ng-data. A 3-line
+  local shim (`espeakng-loader-shim.nix`) points the same two functions at nixpkgs'
+  own `espeak-ng` instead — nixpkgs' own `python3Packages.phonemizer` already patches
+  in this exact path as its own auto-detect default, for the same reason.
+
+`gpu = true` by default (`homelab.voiceTts.gpu`); the systemd unit grants `/dev/dri`
+access (`DeviceAllow = "char-drm rw"`, `SupplementaryGroups = [ "render" "video" ]`)
+and sets `VK_ICD_FILENAMES` from `config.hardware.graphics.package` (the Mesa ANV ICD
+for the A380) plus `LD_LIBRARY_PATH` for the Vulkan loader itself (unavoidable:
+`libvulkan.so.1` is `dlopen`'d by the WebGPU EP at runtime, not a declared `NEEDED`
+library, so it can't be `autoPatchelfHook`-fixed like the rest of the wheel's shared
+libraries). If WebGPU session init fails for any reason, `server.py` logs a WARNING
+and falls back to a CPU-only session rather than losing the voice entirely.
+`gpu = false` runs CPU-only with no GPU wiring requested at all — used for iris's own
+smoke test (iris has no GPU).
+
+The service is LAN-only (`homelab.voiceTts.address`/`.port`, no `homelab.routes`
+entry — iris reaches it directly, same `/24`, no router hop) and restricted to iris's
+source address only, via the same iptables pattern
+`modules/server/monitoring/agent.nix` uses to restrict exporter ports to the monitor
+VM (narrower than Jellyfin/Immich's whole-LAN-interface ports). The server has no
+authentication of its own, so that source-IP restriction is the only access control —
+noted here since there's no further hardening planned. The model (`kokoro-v1.0.onnx`)
+and voice pack (`voices-v1.0.bin`) are `fetchurl` pins (thewh1teagle/kokoro-onnx
+release `model-files-v1.1`), fixed-output derivations checked by `tests/agent.nix`.
+
+**Voice blends** (`voice`, Kokoro-FastAPI's own syntax, implemented in `server.py`'s
+`_resolve_voice_style`): `"name1(weight1)+name2(weight2)+..."`. Weights are optional
+per name — `"af_heart+af_nova"` is an equal split — and whatever is given is
+normalised to sum to 1 regardless (`"af_heart(2)+af_nova(1)"` is the same blend as
+`"af_heart(0.7)+af_nova(0.3)"` to one rounding digit). Implemented as a weighted sum
+of each named voice's full style vector (`Kokoro.get_voice_style(name)`), passed to
+`.create()` as an array instead of a name — a plain single name is just a one-term
+"blend" of weight 1, so it resolves to the exact same array `.create()` would have
+used directly; no behavior change for non-blended requests. Unknown names in a blend
+get HTTP 400 with the full voice list (`"valid_voices"`) in the body; malformed
+syntax or a non-positive weight sum are also 400. Parsed blends are cached by their
+exact spec string, so repeat requests for the same blend skip reparsing.
+
+Test it directly from iris once prod is deployed:
+```sh
+curl -s http://10.0.10.100:8880/v1/audio/voices   # lists all 54 af_*/bf_*/... voices
+curl -s http://10.0.10.100:8880/v1/audio/speech \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"kokoro","voice":"af_heart(0.7)+af_nova(0.3)","input":"Hello from Kokoro.","response_format":"wav"}' \
+  -o /tmp/test.wav
+```
+
+Dutch (Piper) is deferred — the owner speaks both languages, but Kokoro has no Dutch
+voice and this PR only replaces the English path. A future pass would need a small
+language-routing layer in front of both providers (English → Kokoro, Dutch → Piper);
+out of scope here. Kokoro's non-English voices (`ef_`/`ff_`/`hf_`/`if_`/`pf_`/`jf_`/
+`zf_`-prefixed, etc.) are all selectable through `/v1/audio/speech` too (the brief's
+"all voices selectable" requirement), each phonemized via the matching espeak-ng
+language code — except `jf_`/`jm_` (Japanese) and `zf_`/`zm_` (Chinese), which need a
+dedicated G2P (`misaki`, not bundled here) for good results; they're not rejected, but
+expect degraded quality, a known and documented limitation, not a half-finished
+feature.
 
 STT (transcribing voice messages) is the community `ajk0x00/hermes-gemini-stt` plugin
 (`settings.stt.provider = "gemini"`, model `gemini-3.8-flash`), installed declaratively
@@ -91,7 +189,62 @@ Send a voice message in Discord (DM or the home channel, since
 `DISCORD_REQUIRE_MENTION=false`) to talk to iris by voice from a phone — no separate
 app needed, Discord already has push notifications and voice messages. A live
 Discord voice-channel bot (`/voice join`) is a separate, heavier mode (needs
-`Connect`/`Speak` permissions and privileged intents) and is not set up here.
+`Connect`/`Speak` permissions and privileged intents); Thijs has used it, but see the
+known bug below — spoken replies currently never play back in the voice channel.
+
+### Fast voice model
+
+Any turn tagged `MessageType.VOICE` (a Discord voice-note reply or a live voice-channel
+turn) runs on `auxiliary.voice_chat` instead of the main Sonnet/Opus model — a
+livetalk-style voice session wants an instant small-talk reply, not full-model latency.
+Set in `hermes.nix`:
+```nix
+auxiliary.voice_chat = {
+  provider = "anthropic";
+  model = "claude-haiku-5-5";
+};
+```
+`claude-haiku-5-5` is the newest Haiku id this Hermes install's live model catalog
+knows for the `anthropic` provider (`~/.hermes/models_dev_cache.json`; the package's
+own bundled fallback catalog, `hermes_cli/models_catalog_static.py`, only has the
+older `claude-haiku-4-5-20251001` and is a disk-cache-unavailable fallback, not the
+account's real catalog). Hermes falls back to the main model by itself once a
+conversation's history no longer fits the cheaper model's context window
+(`agent/voice_turn_route.py`). `delegation.model`/`delegation.provider` are
+deliberately left unset: when the voice turn hands real work off with
+`delegate_task`, the delegated work keeps running on whichever model its own
+channel/session already uses, instead of being forced onto Haiku.
+
+### Bilingual STT
+
+Thijs speaks both Dutch and English, often in the same conversation. The gemini-stt
+plugin's `language_mode` setting (`plugins.entries.gemini-stt.settings.language_mode`,
+read via its own `ctx.get_config`, **not** `stt.gemini.*`, which is Hermes's own
+tree) defaults to `"hint"`: it forces every utterance to be transcribed as
+`stt.gemini.language` (`"en"`). Set to `"auto"` in `hermes.nix` so Gemini detects the
+spoken language per utterance instead — true per-utterance code-switching, one
+Gemini call, no second STT pass. `stt.gemini.language` stays set but is now inert
+(kept as the default if `language_mode` is ever switched back to `"hint"`).
+
+### Diagnostic logging (temporary)
+
+`sitecustomize.py` (same file as the opus/plugin-gate fixes above) also wraps 8
+functions in the voice-reply pipeline (`BasePlatformAdapter._wants_auto_tts`,
+`_synthesize_auto_tts`, `_play_tts_file`; the Discord adapter's `play_tts` and
+`play_in_voice_channel`; `GatewayVoiceMixin._should_send_voice_reply`,
+`_toggle_adapter_auto_tts_set`, `_sync_voice_mode_state_to_adapter`) to log one
+`logger.warning` line per call, prefix `voice-diag:` (visible in both `gateway.log`
+and `errors.log`, since `logger.warning` clears `errors.log`'s WARNING+ threshold),
+with the real inputs, adapter identity (`id(...)`), and the real decision — then
+return/raise exactly what the original did (proven behavior-preserving against the
+live pinned interpreter in `.../cache/scratch/voice-b1/harness.py`). It exists to
+pin down the open bug above: `/voice join` + `/voice on` leave the bot joined and
+listening, but no spoken reply is ever played back, and neither TTS gate logs so
+much as a warning on the failing path — something only a live trace of these 8
+calls' actual inputs (in particular `id(adapter)`, to catch an adapter replaced by
+a reconnect after `/voice on` populated a different instance's enabled-chats set)
+can pin down. **Remove this whole block once that live trace identifies the real
+cause and a real fix lands** — it is diagnostics only, not a fix.
 
 ## Claude coding workers (ACP, no tmux)
 

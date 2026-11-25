@@ -19,6 +19,12 @@ let
   mount = iris.fileSystems."/var/lib/hermes-backup";
   render = iris.homelab.agent.secretsEnvScript;
   fwRule = "iptables -w -A nixos-fw -p tcp -s 10.0.10.110 --dport 9119 -j nixos-fw-accept";
+  prod = nixosConfigurations.prod.config;
+  prodPkgs = nixosConfigurations.prod.pkgs;
+  voiceTts = prod.homelab.voiceTts;
+  voiceTtsService = prod.systemd.services.voice-tts.serviceConfig;
+  voiceTtsModels = prodPkgs.kokoro-tts-server.passthru.models;
+  voiceTtsFwRule = "iptables -w -A nixos-fw -p tcp -s ${voiceTts.allowFrom} --dport ${toString voiceTts.port} -j nixos-fw-accept";
 in
 assert iris.networking.hostName == "iris";
 assert iris.homelab.agent.enable;
@@ -38,17 +44,64 @@ assert h.settings.fallback_providers != [ ];
 assert lib.all (f: f.provider != h.settings.model.provider) h.settings.fallback_providers;
 assert lib.all (f: !(f ? api_key) && !(f ? key_env)) h.settings.fallback_providers;
 # voice replies in Discord (/voice on, /voice tts): STT is the community gemini-stt
-# plugin (Gemini Flash, pay-per-use — the one deliberate exception, see secrets.nix);
-# TTS stays free Edge TTS. The plugin is declared and enabled, and the key is never
-# a plaintext Nix value.
+# plugin (Gemini Flash, pay-per-use — the one deliberate exception, see secrets.nix).
+# The plugin is declared and enabled, and the key is never a plaintext Nix value.
 assert h.settings.stt.provider == "gemini";
-assert h.settings.tts.provider == "edge";
+# TTS: Kokoro on prod's GPU via Vulkan (onnxruntime WebGPU EP, a native systemd
+# service -- modules/server/services/voice-tts.nix), not Edge TTS, not a container,
+# anymore. Real invariants, not literal echoes: iris's base_url is built from prod's
+# own LAN address and the service's own port option (so they can't silently drift
+# apart), the service binds that same LAN address and port (not 0.0.0.0 / a
+# hand-copied literal), the model+voices files are fixed-output derivations (pinned by
+# hash, not "whatever's on disk"), GPU device access is actually granted when `gpu =
+# true` (the default), the firewall opens the port to iris's actual LAN address only
+# (not the whole LAN interface the way jellyfin.nix/immich.nix's ports are), and the
+# key is the server's documented placeholder, so a real key pasted in by mistake fails
+# here.
+assert h.settings.tts.provider != "edge";
+assert h.settings.tts.openai.api_key == "not-needed";
+assert prod.homelab.voiceTts.enable;
+assert voiceTts.allowFrom == iris.homelab.lan.address;
+assert
+  h.settings.tts.openai.base_url == "http://${prod.homelab.lan.address}:${toString voiceTts.port}/v1";
+assert
+  lib.elem "KOKORO_HOST=${prod.homelab.lan.address}" voiceTtsService.Environment
+  && lib.elem "KOKORO_PORT=${toString voiceTts.port}" voiceTtsService.Environment;
+assert voiceTtsModels.model ? outputHash && voiceTtsModels.voices ? outputHash;
+assert
+  !voiceTts.gpu
+  ||
+    voiceTtsService.DeviceAllow == [ "char-drm rw" ]
+    &&
+      voiceTtsService.SupplementaryGroups == [
+        "render"
+        "video"
+      ];
+assert
+  !(lib.elem voiceTts.port (
+    prod.networking.firewall.interfaces.${prod.homelab.lan.interface}.allowedTCPPorts or [ ]
+  ));
+assert !(lib.elem voiceTts.port prod.networking.firewall.allowedTCPPorts);
+assert lib.hasInfix voiceTtsFwRule prod.networking.firewall.extraCommands;
 assert
   h.settings.plugins.enabled != [ ]
   && lib.elem "gemini-stt" h.settings.plugins.enabled
   && lib.elem "local-stt-vocab" h.settings.plugins.enabled;
 assert h.extraPlugins != [ ] && lib.any (p: lib.hasInfix "gemini" (lib.getName p)) h.extraPlugins;
 assert !(h.settings.stt.gemini ? api_key) && !(h.settings.stt.gemini ? key_env);
+# Thijs speaks both Dutch and English in the same voice session: the plugin's own
+# config_schema only has two valid language_mode values ("hint"/"auto"; see its
+# plugin.yaml), and "hint" is the one that pins every utterance to stt.gemini.language
+# — so the real invariant is "not hint", not an echo of "auto" as a bare string.
+assert
+  let
+    languageMode = h.settings.plugins.entries.gemini-stt.settings.language_mode;
+  in
+  lib.elem languageMode [
+    "hint"
+    "auto"
+  ]
+  && languageMode != "hint";
 # No static settings.stt.prompt here: the vocabulary hint is dynamic now, supplied
 # per-request by local-stt-vocab's pre_transcription hook from a local file outside
 # the Nix store (so an agent can edit it without a PR/rebuild). What the Nix build
@@ -83,12 +136,54 @@ assert
   # mechanism); check it's actually there too, not just the opus half.
   && lib.hasInfix "running_hermes_version" sitecustomize
   && lib.hasInfix "plugins_manifest" sitecustomize;
+# Temporary voice-diag block (docs/agent.md Voice section: remove once the Discord
+# speak-back bug is fixed). A real structural check, not an echo of a literal: every
+# one of the 8 named functions it is supposed to wrap is actually passed to
+# _voice_diag_wrap (exactly 8 calls, one per name — catches a deleted/duplicated wrap),
+# and the wrapper's defining code both re-raises on exception and returns the original
+# result, instead of swallowing either.
+assert
+  let
+    pythonPath = iris.systemd.services.hermes-agent.environment.PYTHONPATH or "";
+    sitecustomize = if pythonPath == "" then "" else builtins.readFile "${pythonPath}/sitecustomize.py";
+    wrappedNames = [
+      "_wants_auto_tts"
+      "_synthesize_auto_tts"
+      "_play_tts_file"
+      "play_tts"
+      "play_in_voice_channel"
+      "_should_send_voice_reply"
+      "_toggle_adapter_auto_tts_set"
+      "_sync_voice_mode_state_to_adapter"
+    ];
+    # One occurrence of "_voice_diag_wrap(" is the helper's own `def`; every other
+    # occurrence is a call site, one per wrapped function.
+    occurrences = (lib.length (lib.splitString "_voice_diag_wrap(" sitecustomize)) - 1;
+    defCount = (lib.length (lib.splitString "def _voice_diag_wrap(" sitecustomize)) - 1;
+    callCount = occurrences - defCount;
+  in
+  lib.hasInfix "voice-diag:" sitecustomize
+  && lib.all (name: lib.hasInfix ''"${name}"'' sitecustomize) wrappedNames
+  && defCount == 1
+  && callCount == lib.length wrappedNames
+  && lib.hasInfix "raise" sitecustomize
+  && lib.hasInfix "return result" sitecustomize;
 assert
   !(h.environment ? ELEVENLABS_API_KEY)
   && !(h.environment ? GROQ_API_KEY)
   && !(h.environment ? VOICE_TOOLS_OPENAI_KEY)
   && !(h.environment ? GEMINI_API_KEY);
-assert !(h.settings ? auxiliary);
+# Voice-channel turns run on a cheap/fast model (auxiliary.voice_chat), never a plain
+# echo of the literal id: it must stay a *different*, Haiku-family model from the main
+# Sonnet/Opus one but the *same* provider (no separate OAuth/API-key setup), and must not
+# itself carry a plaintext key (OAuth plan only, like every other model slot here).
+# delegation.model/provider stay unset: handed-off work keeps whichever model the
+# delegating channel is already using, instead of being forced onto the voice model.
+assert h.settings.auxiliary.voice_chat.provider == h.settings.model.provider;
+assert h.settings.auxiliary.voice_chat.model != h.settings.model.default;
+assert lib.hasInfix "haiku" (lib.toLower h.settings.auxiliary.voice_chat.model);
+assert !(h.settings.auxiliary.voice_chat ? api_key) && !(h.settings.auxiliary.voice_chat ? key_env);
+assert !(h.settings ? delegation);
 assert !(secrets ? irisOpenrouter) && !(lib.hasInfix "OPENROUTER" render);
 # Discord: Thijs only, every message, cron output to the home channel
 assert h.environment.DISCORD_ALLOWED_USERS == "137629736993030144";
