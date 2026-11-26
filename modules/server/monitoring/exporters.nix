@@ -12,6 +12,9 @@
 #                front-door route (flake routes without router-test's, plus the router's
 #                `extraRoutes`), by name through the tailnet's split DNS. Redirects are
 #                followed and any 2xx counts as up, so a sign-in redirect is "up".
+#   public       the same exporter probing the public sites of `hosting.traefik.public`
+#                (hestia) by their public names (`tools.publicSitesFrom`); its
+#                `probe_ssl_earliest_cert_expiry` feeds the certificate alert.
 #   healthchecks Healthchecks.io's metrics endpoint, authorised with the read-only API
 #                key. The URL holds the project UUID, which is a secret in 1Password, so
 #                Prometheus gets it through a file_sd file that prometheus.service writes
@@ -43,6 +46,21 @@ let
       nixosConfigurations = lib.removeAttrs inputs.self.nixosConfigurations [ "router-test" ];
     }
     // inputs.self.nixosConfigurations.router.config.homelab.router.extraRoutes;
+
+  # Public sites outside the front door (hosting.traefik.public on hestia), probed by their
+  # public name and certificate: `https://<host><path>` for each of a site's `probePaths`.
+  publicTargets = lib.concatLists (
+    mapAttrsToList (
+      name: s:
+      map (path: {
+        targets = [ "https://${s.host}${path}" ];
+        labels = {
+          site = name;
+          host = s.declaredBy;
+        };
+      }) s.probePaths
+    ) (tools.publicSitesFrom { inherit lib; } { inherit (inputs.self) nixosConfigurations; })
+  );
 
   blackboxConfig = builtins.toFile "blackbox.yml" (
     builtins.toJSON {
@@ -145,7 +163,18 @@ lib.optionalAttrs hostPlatform.isLinux {
             }
             // viaExporter "127.0.0.1:9115"
           )
-        ];
+        ]
+        # Only when some host has public sites, so the monitor is unchanged without them.
+        ++ lib.optional (publicTargets != [ ]) (
+          {
+            job_name = "public";
+            metrics_path = "/probe";
+            params.module = [ "http_2xx" ];
+            scrape_interval = "1m";
+            static_configs = publicTargets;
+          }
+          // viaExporter "127.0.0.1:9115"
+        );
       }
 
       (lib.mkIf cfg.pve.enable {

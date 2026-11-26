@@ -31,6 +31,10 @@ What watches the homelab, where it runs, and how to change it. Design:
   - Uptime: blackbox_exporter probes `https://<host>/` of every route in the flake
     (`homelab.routes` and the router's `extraRoutes`), so a new route is probed
     without editing anything here. A redirect to the sign-in page counts as up.
+  - Public sites: the same exporter (job `public`) probes `https://<host><path>` for every
+    `probePaths` entry of every `hosting.traefik.public.sites` site in the flake
+    (`tools.publicSitesFrom`; hestia's orakel sites, `docs/orakel-hosting.md`) by its public
+    name, and records the certificate's expiry (`probe_ssl_earliest_cert_expiry`).
   - Healthchecks.io's own metrics (`hc_check_up`) for the existing checks.
 
 ## Grafana
@@ -63,13 +67,18 @@ little above the budget (up to 5 minutes at 1 MB/s before the next check).
 Grafana's alert rules (`modules/server/monitoring/alerts.nix`) each report to their
 own Healthchecks.io check, `homelab-<rule>`: `host-down`, `vm-down` (VMs with
 `onboot`), `disk-full` (> 85 %, also Proxmox storage), `failed-unit`, `route-down`,
-`truenas-pool`, `log-budget`, `memory` (< 10 % free). A firing notification marks the
+`truenas-pool`, `log-budget`, `memory` (< 10 % free), `public-site` (a public site down for
+5 minutes, or its certificate expiring within 14 days; `route-down` covers the front-door
+routes only). A firing notification marks the
 check down, a resolved one marks it up (keyword filters on the request body). The
 notification goes to the Discord integration **VWP BACKUP** only (`HC_CHANNELS` in
 `alerts.nix`; the sync replaces a check's integrations with it, never "all": the
 project also has the Raika Discord). Tested end to end on 2026-10-23: a failed unit
 took the check down after ~6.5 minutes and back up 2 minutes after it was cleared. `healthchecks-sync` creates the checks through the API on every switch
 (read-write key in 1Password `healthchecks-api-key`; the free plan allows 20 checks).
+`homelab-orakel-backup` has no rule: hestia's hourly `restic-orakel` pings it directly
+(`/start`, then its exit status; ping URL in 1Password `healthchecks-orakel-backup`), and it
+goes down when no successful run arrived for 1 h + 30 min (`docs/orakel-restore.md`).
 
 - **One check per rule, grouped per host:** if two machines trip the same rule, the
   check turns green when the first recovers although the second is still bad, until
@@ -97,7 +106,8 @@ took the check down after ~6.5 minutes and back up 2 minutes after it was cleare
 - **A new exporter on a server:** run it, open nothing yourself, and declare
   `homelab.monitoring.targets.<name> = { port = …; };` in its module; the firewall
   rule and the Prometheus job (named `<name>`) follow.
-- **A new route** is probed automatically.
+- **A new route** is probed automatically, and so is a new public site
+  (`hosting.traefik.public.sites.<name>.probePaths`).
 
 ## Secrets (1Password, vault Homelab)
 

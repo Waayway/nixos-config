@@ -68,9 +68,30 @@ let
     {
       hc = "route-down";
       name = "Route down";
-      expr = "probe_success == 0";
+      # The front-door routes only; public sites have `public-site`.
+      expr = ''probe_success{job="blackbox"} == 0'';
       for = "3m";
       summary = "A route does not answer the blackbox probe";
+    }
+    {
+      hc = "public-site";
+      name = "Public site down or certificate expiring";
+      # hosting.traefik.public sites (hestia), probed by their public names: down for 5
+      # minutes, or the served certificate expires within 14 days (Let's Encrypt renews at
+      # 30, so this means renewal has failed for two weeks).
+      expr = ''(probe_success{job="public"} == 0) or ((probe_ssl_earliest_cert_expiry{job="public"} - time()) < 14 * 86400)'';
+      for = "5m";
+      summary = "A public site does not answer, or its certificate expires within 14 days";
+    }
+    {
+      hc = "orakel-backup";
+      name = "Orakel backup (hestia)";
+      # No rule: restic-orakel.service pings this check itself (/start, then its exit
+      # status) through the ping URL in 1Password `healthchecks-orakel-backup`. Hourly, up
+      # to 10 minutes late, plus the run.
+      timeout = 3600;
+      grace = 1800;
+      keywords = null;
     }
     {
       hc = "truenas-pool";
